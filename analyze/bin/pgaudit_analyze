@@ -149,6 +149,9 @@ if (!defined($ARGV[0]))
     confess "file to parse must be passed";
 }
 
+# Read updating file
+# http://stackoverflow.com/questions/1425223/how-do-i-read-a-file-which-is-constantly-updating
+
 open($hFile, '<', $ARGV[0])
     or confess "unable to open $ARGV[0]";
 
