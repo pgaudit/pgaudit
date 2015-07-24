@@ -22,16 +22,119 @@ use PgAudit::CSV;
 ####################################################################################################################################
 $SIG{__DIE__} = sub { Carp::confess @_ };
 
-
 ####################################################################################################################################
 # Connect to Postgres
 ####################################################################################################################################
-my $hDb = DBI->connect('dbi:Pg:dbname=pgaudit;port=5432', 'postgres', undef, {AutoCommit => 0});
+my $hDb = DBI->connect('dbi:Pg:dbname=pgaudit;port=5432', 'vagrant', undef, {AutoCommit => 0, RaiseError => 1});
+
+my $hSqlSessionInsert = $hDb->prepare(
+    "insert into audit_log.session (user_name, process_id, session_key, session_start_time)\n" .
+    "                       values (?, ?, ?, ?)\n" .
+    "                    returning id");
+
+my $hSqlSessionSelect = $hDb->prepare(
+    "select id,\n" .
+    "       user_name\n" .
+    " from audit_log.session\n" .
+    " where process_id = ?::int\n" .
+    "   and session_key = ?\n" .
+    "   and session_start_time = ?::timestamp with time zone");
+
+my $hSqlSessionUpdate = $hDb->prepare(
+    "update audit_log.session\n" .
+    "   set user_name = ?\n" .
+    " where id = ?");
+
+####################################################################################################################################
+# Define column positions of log and audit data
+####################################################################################################################################
+use constant
+{
+    LOG_FIELD_LOG_TIME                  => 0,
+    LOG_FIELD_USER_NAME                 => 1,
+    LOG_FIELD_DATABASE_NAME             => 2,
+    LOG_FIELD_PROCESS_ID                => 3,
+    LOG_FIELD_CONNECTION_FROM           => 4,
+    LOG_FIELD_SESSION_ID                => 5,
+    LOG_FIELD_SESSION_LINE_NUM          => 6,
+    LOG_FIELD_COMMAND_TAG               => 7,
+    LOG_FIELD_SESSION_START_TIME        => 8,
+    LOG_FIELD_VIRTUAL_TRANSACTION_ID    => 9,
+    LOG_FIELD_TRANSACTION_ID            => 10,
+    LOG_FIELD_ERROR_SEVERITY            => 11,
+    LOG_FIELD_SQL_STATE_CODE            => 12,
+    LOG_FIELD_MESSAGE                   => 13,
+    LOG_FIELD_DETAIL                    => 14,
+    LOG_FIELD_HINT                      => 15,
+    LOG_FIELD_INTERNAL_QUERY            => 16,
+    LOG_FIELD_INTERNAL_QUERY_POS        => 17,
+    LOG_FIELD_CONTEXT                   => 18,
+    LOG_FIELD_QUERY                     => 19,
+    LOG_FIELD_QUERY_POS                 => 20,
+    LOG_FIELD_LOCATION                  => 21,
+    LOG_FIELD_APPLICATION_NAME          => 22
+};
 
 use constant
 {
-    FIELD_TIMESTAMP => 0
+    AUDIT_FIELD_AUDIT_TYPE => 0
 };
+
+####################################################################################################################################
+# Lookup Session ID.
+####################################################################################################################################
+my %oSessionHash;
+
+sub sessionGet
+{
+    my $strUserName = shift;
+    my $strProcessId = shift;
+    my $strSessionId = shift;
+    my $strSessionStartTime = shift;
+
+    # Build the session key used to cache sessions locally
+    if (!defined($strUserName))
+    {
+        $strUserName = '[postgres]';
+    }
+
+    my $strSessionKey = "${strUserName}:${strProcessId}:${strSessionId}:${strSessionStartTime}";
+
+    # Lookup session key in the hash
+    if (defined($oSessionHash{$strSessionKey}))
+    {
+        $oSessionHash{$strSessionKey}{last_log} = time();
+        return $oSessionHash{$strSessionKey}{id};
+    }
+
+    # Attempt to select from database
+    $hSqlSessionSelect->execute($strProcessId, $strSessionId, $strSessionStartTime);
+
+    my ($lSessionId, $strDbUserName) = $hSqlSessionSelect->fetchrow_array();
+
+    # If the user name has changed then update the session log
+    if (defined($lSessionId) && $strUserName ne $strDbUserName)
+    {
+        $hSqlSessionUpdate->execute($strUserName, $lSessionId);
+        $hDb->commit();
+        print "session update =  " . $strSessionKey . "\n";
+    }
+
+    # If session not found in the db then insert it
+    if (!defined($lSessionId))
+    {
+        $hSqlSessionInsert->execute($strUserName, $strProcessId, $strSessionId, $strSessionStartTime);
+        ($lSessionId) = $hSqlSessionInsert->fetchrow_array();
+        $hDb->commit();
+        print "session insert =  " . $strSessionKey . "\n";
+    }
+
+    # Add to the local cache
+    $oSessionHash{$strSessionKey}{id} = $lSessionId;
+    $oSessionHash{$strSessionKey}{last_log} = time();
+
+    return $lSessionId;
+}
 
 ####################################################################################################################################
 # Main loop
@@ -39,7 +142,7 @@ use constant
 # Open the ini file for reading
 my $hFile;
 
-print "opening $ARGV[0]";
+print "opening $ARGV[0]\n";
 
 if (!defined($ARGV[0]))
 {
@@ -50,11 +153,12 @@ open($hFile, '<', $ARGV[0])
     or confess "unable to open $ARGV[0]";
 
 # Read the log file
-my $oCSV = new PgAudit::CSV({binary => 1});
+my $oCSV = new PgAudit::CSV({binary => 1, empty_is_undef => 1});
 
 while (my $stryRow = $oCSV->getline($hFile))
 {
-   print "time " . $$stryRow[FIELD_TIMESTAMP] . "\n";
+    sessionGet($$stryRow[LOG_FIELD_USER_NAME], $$stryRow[LOG_FIELD_PROCESS_ID], $$stryRow[LOG_FIELD_SESSION_ID],
+               $$stryRow[LOG_FIELD_SESSION_START_TIME]);
 }
 
 if ($!)

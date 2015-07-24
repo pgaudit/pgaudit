@@ -15,15 +15,19 @@ set session authorization audit_log_owner;
 
 create schema audit_log;
 
+create sequence audit_log.object_id_seq start with 1;
+
 create table audit_log.session
 (
-    id bigint not null,
-    timestamp timestamp(3) with time zone not null,
-    logon text not null,
+    id bigint not null default nextval('audit_log.object_id_seq'),
+    user_name text not null,
     process_id int not null,
     session_key text not null,
+    session_start_time timestamp with time zone not null,
 
-    constraint session_pk primary key (id)
+    constraint session_pk primary key (id),
+    constraint session_processid_sessionkey_sessionstarttime_unq
+        unique (process_id, session_key, session_start_time)
 );
 
 -- create table audit_log.logon
@@ -35,17 +39,19 @@ create table audit_log.session
 
 create table audit_log.event
 (
-    session_id bigint not null,
+    session_id bigint not null
+        constraint even_sessionid_fk
+            references audit_log.session (id),
     timestamp timestamp(3) with time zone not null,
     audit_type text not null
         constraint event_audittype_ck
-        check (audit_type in ('s', 'o')),
+            check (audit_type in ('s', 'o')),
     statement_id bigint not null
         constraint event_statementid_ck
-        check (statement_id >= 1),
+            check (statement_id >= 1),
     substatement_id bigint not null
         constraint event_substatementid_ck
-        check (substatement_id >= 1),
+            check (substatement_id >= 1),
     class text not null,
     command text not null,
     object_type text,
