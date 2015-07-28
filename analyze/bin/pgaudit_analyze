@@ -52,13 +52,30 @@ my $hSqlSessionUpdate = $hDb->prepare(
     "       state = ?\n" .
     " where id = ?");
 
+my $hSqlLogInsert = $hDb->prepare(
+    "insert into audit_log.log_event (session_id, log_time, session_line_num, command, message, query)\n" .
+    "                         values (?, ?, ?, ?, ?, ?)");
+
+my $hSqlLogUpdate = $hDb->prepare(
+    "update audit_log.log_event\n" .
+    "   set user_name = ?,\n" .
+    "       database_name = ?,\n" .
+    "       connection_from = ?,\n" .
+    "       state = ?\n" .
+    " where id = ?");
+
+
+my $hSqlAuditInsert = $hDb->prepare(
+    "insert into audit_log.audit_event (session_id, session_line_num, audit_type, statement_id, substatement_id,\n" .
+    "                                   class, command, object_type, object_name, statement)\n" .
+    "                           values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
 ####################################################################################################################################
 # Define column positions of log and audit data
 ####################################################################################################################################
 use constant
 {
     # Session unique fields
-    LOG_FIELD_LOG_TIME                  => 0,
     LOG_FIELD_USER_NAME                 => 1,
     LOG_FIELD_DATABASE_NAME             => 2,
     LOG_FIELD_PROCESS_ID                => 3,
@@ -66,7 +83,8 @@ use constant
     LOG_FIELD_SESSION_ID                => 5,
     LOG_FIELD_SESSION_START_TIME        => 8,
 
-    # Session unique fields
+    # Log fields
+    LOG_FIELD_LOG_TIME                  => 0,
     LOG_FIELD_SESSION_LINE_NUM          => 6,
     LOG_FIELD_COMMAND_TAG               => 7,
     LOG_FIELD_VIRTUAL_TRANSACTION_ID    => 9,
@@ -87,7 +105,23 @@ use constant
 
 use constant
 {
-    AUDIT_FIELD_AUDIT_TYPE => 0
+    AUDIT_FIELD_AUDIT_TYPE          => 0,
+    AUDIT_FIELD_STATEMENT_ID        => 1,
+    AUDIT_FIELD_SUBSTATEMENT_ID     => 2,
+    AUDIT_FIELD_CLASS               => 3,
+    AUDIT_FIELD_COMMAND             => 4,
+    AUDIT_FIELD_OBJECT_TYPE         => 5,
+    AUDIT_FIELD_OBJECT_NAME         => 6,
+    AUDIT_FIELD_STATEMENT           => 7
+};
+
+use constant
+{
+    AUDIT_TYPE_SESSION              => 'session',
+    AUDIT_TYPE_ABBR_SESSION         => 's',
+
+    AUDIT_TYPE_OBJECT               => 'object',
+    AUDIT_TYPE_ABBR_OBJECT          => 'o'
 };
 
 use constant
@@ -97,13 +131,19 @@ use constant
 
 use constant
 {
-    ERROR_SEVERITY_FATAL  => 'FATAL'
+    ERROR_SEVERITY_FATAL  => 'fatal'
 };
 
 use constant
 {
     STATE_OK    => 'ok',
     STATE_ERROR => 'error'
+};
+
+use constant
+{
+    true    => 1,
+    false   => 0
 };
 
 ####################################################################################################################################
@@ -143,8 +183,8 @@ sub sessionGet
     # Set state to a default if not defined yet
     my $strState;
 
-    if (defined($strCommandTag) && $strCommandTag eq COMMAND_TAG_AUTHENTICATION &&
-        defined($strErrorSeverity) && $strErrorSeverity eq ERROR_SEVERITY_FATAL)
+    if (defined($strCommandTag) && lc($strCommandTag) eq COMMAND_TAG_AUTHENTICATION &&
+        defined($strErrorSeverity) && lc($strErrorSeverity) eq ERROR_SEVERITY_FATAL)
     {
         $strState = STATE_ERROR;
     }
@@ -159,7 +199,7 @@ sub sessionGet
     if (defined($oSessionHash{$strSessionKey}))
     {
         $oSessionHash{$strSessionKey}{last_log} = time();
-        return $oSessionHash{$strSessionKey}{id};
+        return $strSessionKey;
     }
 
     # Attempt to select from database
@@ -192,13 +232,66 @@ sub sessionGet
     $oSessionHash{$strSessionKey}{id} = $lSessionId;
     $oSessionHash{$strSessionKey}{last_log} = time();
 
-    return $lSessionId;
+    return $strSessionKey;
 }
 
 ####################################################################################################################################
 # logWrite
 ####################################################################################################################################
+sub logWrite
+{
+    my $strSessionKey = shift;
+    my $strLogTime = shift;
+    my $lSessionLineNum = shift;
+    my $strCommandTag = shift;
+    my $strErrorSeverity = shift;
+    my $strMessage = shift;
+    my $strQuery = shift;
 
+    if (!defined($oSessionHash{$strSessionKey}{line_num}) ||
+        $oSessionHash{$strSessionKey}{line_num} < $lSessionLineNum)
+    {
+        # print "write session $oSessionHash{$strSessionKey}{id}, line num $lSessionLineNum, message $strMessage\n";
+
+        $hSqlLogInsert->execute($oSessionHash{$strSessionKey}{id}, $strLogTime, $lSessionLineNum, lc($strCommandTag),
+                                $strMessage, $strQuery);
+        $oSessionHash{$strSessionKey}{line_num} = $lSessionLineNum;
+    }
+
+    return auditWrite($strSessionKey, $lSessionLineNum, $strMessage);
+}
+
+####################################################################################################################################
+# auditWrite
+####################################################################################################################################
+my $oAuditCSV = new PgAudit::CSV({binary => 1, empty_is_undef => 1});
+
+sub auditWrite
+{
+    my $strSessionKey = shift;
+    my $lSessionLineNum = shift;
+    my $strMessage = shift;
+
+    if ($strMessage =~ /^AUDIT\:\ /)
+    {
+        $oAuditCSV->parse(substr($strMessage, 6));
+        my @stryRow = $oAuditCSV->fields();
+
+        # print "audit: " . $stryRow[AUDIT_FIELD_AUDIT_TYPE] . "\n";
+
+        $hSqlAuditInsert->execute($oSessionHash{$strSessionKey}{id}, $lSessionLineNum,
+                                  lc($stryRow[AUDIT_FIELD_AUDIT_TYPE]) eq AUDIT_TYPE_SESSION ?
+                                  AUDIT_TYPE_ABBR_SESSION : AUDIT_TYPE_ABBR_OBJECT,
+                                  $stryRow[AUDIT_FIELD_STATEMENT_ID], $stryRow[AUDIT_FIELD_SUBSTATEMENT_ID],
+                                  lc($stryRow[AUDIT_FIELD_CLASS]), lc($stryRow[AUDIT_FIELD_COMMAND]),
+                                  lc($stryRow[AUDIT_FIELD_OBJECT_TYPE]), lc($stryRow[AUDIT_FIELD_OBJECT_NAME]),
+                                  $stryRow[AUDIT_FIELD_STATEMENT]);
+
+        return true;
+    }
+
+    return false;
+}
 
 ####################################################################################################################################
 # Main loop
@@ -220,14 +313,18 @@ open($hFile, '<', $ARGV[0])
     or confess "unable to open $ARGV[0]";
 
 # Read the log file
-my $oCSV = new PgAudit::CSV({binary => 1, empty_is_undef => 1});
+my $oLogCSV = new PgAudit::CSV({binary => 1, empty_is_undef => 1});
 
-while (my $stryRow = $oCSV->getline($hFile))
+while (my $stryRow = $oLogCSV->getline($hFile))
 {
-    my $lSessionId = sessionGet($$stryRow[LOG_FIELD_USER_NAME], $$stryRow[LOG_FIELD_PROCESS_ID],
-                                $$stryRow[LOG_FIELD_SESSION_ID], $$stryRow[LOG_FIELD_SESSION_START_TIME],
-                                $$stryRow[LOG_FIELD_DATABASE_NAME], $$stryRow[LOG_FIELD_CONNECTION_FROM],
-                                $$stryRow[LOG_FIELD_COMMAND_TAG], $$stryRow[LOG_FIELD_ERROR_SEVERITY]);
+    my $strSessionKey = sessionGet($$stryRow[LOG_FIELD_USER_NAME], $$stryRow[LOG_FIELD_PROCESS_ID],
+                                   $$stryRow[LOG_FIELD_SESSION_ID], $$stryRow[LOG_FIELD_SESSION_START_TIME],
+                                   $$stryRow[LOG_FIELD_DATABASE_NAME], $$stryRow[LOG_FIELD_CONNECTION_FROM],
+                                   $$stryRow[LOG_FIELD_COMMAND_TAG], $$stryRow[LOG_FIELD_ERROR_SEVERITY]);
+
+    logWrite($strSessionKey, $$stryRow[LOG_FIELD_LOG_TIME], $$stryRow[LOG_FIELD_SESSION_LINE_NUM],
+             $$stryRow[LOG_FIELD_COMMAND_TAG], $$stryRow[LOG_FIELD_ERROR_SEVERITY],
+             $$stryRow[LOG_FIELD_MESSAGE], $$stryRow[LOG_FIELD_QUERY]);
 }
 
 if ($!)
