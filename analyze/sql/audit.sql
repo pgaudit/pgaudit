@@ -24,6 +24,10 @@ create table audit_log.session
     process_id int not null,
     session_key text not null,
     session_start_time timestamp with time zone not null,
+    database_name text,
+    connection_from text,
+    state text not null
+        constraint session_state_ck check (state in ('ok', 'error')),
 
     constraint session_pk primary key (id),
     constraint session_processid_sessionkey_sessionstarttime_unq

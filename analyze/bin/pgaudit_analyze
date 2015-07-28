@@ -28,13 +28,17 @@ $SIG{__DIE__} = sub { Carp::confess @_ };
 my $hDb = DBI->connect('dbi:Pg:dbname=pgaudit;port=5432', 'vagrant', undef, {AutoCommit => 0, RaiseError => 1});
 
 my $hSqlSessionInsert = $hDb->prepare(
-    "insert into audit_log.session (user_name, process_id, session_key, session_start_time)\n" .
-    "                       values (?, ?, ?, ?)\n" .
+    "insert into audit_log.session (user_name, process_id, session_key, session_start_time, database_name,\n" .
+    "                               connection_from, state)\n" .
+    "                       values (?, ?, ?, ?, ?, ?, ?)\n" .
     "                    returning id");
 
 my $hSqlSessionSelect = $hDb->prepare(
     "select id,\n" .
-    "       user_name\n" .
+    "       user_name,\n" .
+    "       database_name,\n" .
+    "       connection_from,\n" .
+    "       state\n" .
     " from audit_log.session\n" .
     " where process_id = ?::int\n" .
     "   and session_key = ?\n" .
@@ -42,7 +46,10 @@ my $hSqlSessionSelect = $hDb->prepare(
 
 my $hSqlSessionUpdate = $hDb->prepare(
     "update audit_log.session\n" .
-    "   set user_name = ?\n" .
+    "   set user_name = ?,\n" .
+    "       database_name = ?,\n" .
+    "       connection_from = ?,\n" .
+    "       state = ?\n" .
     " where id = ?");
 
 ####################################################################################################################################
@@ -50,15 +57,18 @@ my $hSqlSessionUpdate = $hDb->prepare(
 ####################################################################################################################################
 use constant
 {
+    # Session unique fields
     LOG_FIELD_LOG_TIME                  => 0,
     LOG_FIELD_USER_NAME                 => 1,
     LOG_FIELD_DATABASE_NAME             => 2,
     LOG_FIELD_PROCESS_ID                => 3,
     LOG_FIELD_CONNECTION_FROM           => 4,
     LOG_FIELD_SESSION_ID                => 5,
+    LOG_FIELD_SESSION_START_TIME        => 8,
+
+    # Session unique fields
     LOG_FIELD_SESSION_LINE_NUM          => 6,
     LOG_FIELD_COMMAND_TAG               => 7,
-    LOG_FIELD_SESSION_START_TIME        => 8,
     LOG_FIELD_VIRTUAL_TRANSACTION_ID    => 9,
     LOG_FIELD_TRANSACTION_ID            => 10,
     LOG_FIELD_ERROR_SEVERITY            => 11,
@@ -80,8 +90,24 @@ use constant
     AUDIT_FIELD_AUDIT_TYPE => 0
 };
 
+use constant
+{
+    COMMAND_TAG_AUTHENTICATION  => 'authentication'
+};
+
+use constant
+{
+    ERROR_SEVERITY_FATAL  => 'FATAL'
+};
+
+use constant
+{
+    STATE_OK    => 'ok',
+    STATE_ERROR => 'error'
+};
+
 ####################################################################################################################################
-# Lookup Session ID.
+# sessionGet
 ####################################################################################################################################
 my %oSessionHash;
 
@@ -91,11 +117,40 @@ sub sessionGet
     my $strProcessId = shift;
     my $strSessionId = shift;
     my $strSessionStartTime = shift;
+    my $strDatabaseName = shift;
+    my $strConnectionFrom = shift;
+    my $strCommandTag = shift;
+    my $strErrorSeverity = shift;
 
-    # Build the session key used to cache sessions locally
+    # Set user name to a default if not defined yet
     if (!defined($strUserName))
     {
         $strUserName = '[postgres]';
+    }
+
+    # Set database name to a default if not defined yet
+    if (!defined($strDatabaseName))
+    {
+        $strDatabaseName = '[none]';
+    }
+
+    # Set connection from to a default if not defined yet
+    if (!defined($strConnectionFrom))
+    {
+        $strConnectionFrom = '[unknown]';
+    }
+
+    # Set state to a default if not defined yet
+    my $strState;
+
+    if (defined($strCommandTag) && $strCommandTag eq COMMAND_TAG_AUTHENTICATION &&
+        defined($strErrorSeverity) && $strErrorSeverity eq ERROR_SEVERITY_FATAL)
+    {
+        $strState = STATE_ERROR;
+    }
+    else
+    {
+        $strState = STATE_OK;
     }
 
     my $strSessionKey = "${strUserName}:${strProcessId}:${strSessionId}:${strSessionStartTime}";
@@ -110,12 +165,14 @@ sub sessionGet
     # Attempt to select from database
     $hSqlSessionSelect->execute($strProcessId, $strSessionId, $strSessionStartTime);
 
-    my ($lSessionId, $strDbUserName) = $hSqlSessionSelect->fetchrow_array();
+    my ($lSessionId, $strDbUserName, $strDbDatabaseName, $strDbConnectionFrom, $strDbState) = $hSqlSessionSelect->fetchrow_array();
 
     # If the user name has changed then update the session log
-    if (defined($lSessionId) && $strUserName ne $strDbUserName)
+    if (defined($lSessionId) &&
+        ($strUserName ne $strDbUserName || $strDatabaseName ne $strDbDatabaseName || $strConnectionFrom ne $strDbConnectionFrom ||
+         $strState ne $strDbState))
     {
-        $hSqlSessionUpdate->execute($strUserName, $lSessionId);
+        $hSqlSessionUpdate->execute($strUserName, $strDatabaseName, $strConnectionFrom, $strState, $lSessionId);
         $hDb->commit();
         print "session update =  " . $strSessionKey . "\n";
     }
@@ -123,7 +180,9 @@ sub sessionGet
     # If session not found in the db then insert it
     if (!defined($lSessionId))
     {
-        $hSqlSessionInsert->execute($strUserName, $strProcessId, $strSessionId, $strSessionStartTime);
+        $hSqlSessionInsert->execute($strUserName, $strProcessId, $strSessionId, $strSessionStartTime, $strDatabaseName,
+                                    $strConnectionFrom, $strState);
+
         ($lSessionId) = $hSqlSessionInsert->fetchrow_array();
         $hDb->commit();
         print "session insert =  " . $strSessionKey . "\n";
@@ -135,6 +194,11 @@ sub sessionGet
 
     return $lSessionId;
 }
+
+####################################################################################################################################
+# logWrite
+####################################################################################################################################
+
 
 ####################################################################################################################################
 # Main loop
@@ -160,8 +224,10 @@ my $oCSV = new PgAudit::CSV({binary => 1, empty_is_undef => 1});
 
 while (my $stryRow = $oCSV->getline($hFile))
 {
-    sessionGet($$stryRow[LOG_FIELD_USER_NAME], $$stryRow[LOG_FIELD_PROCESS_ID], $$stryRow[LOG_FIELD_SESSION_ID],
-               $$stryRow[LOG_FIELD_SESSION_START_TIME]);
+    my $lSessionId = sessionGet($$stryRow[LOG_FIELD_USER_NAME], $$stryRow[LOG_FIELD_PROCESS_ID],
+                                $$stryRow[LOG_FIELD_SESSION_ID], $$stryRow[LOG_FIELD_SESSION_START_TIME],
+                                $$stryRow[LOG_FIELD_DATABASE_NAME], $$stryRow[LOG_FIELD_CONNECTION_FROM],
+                                $$stryRow[LOG_FIELD_COMMAND_TAG], $$stryRow[LOG_FIELD_ERROR_SEVERITY]);
 }
 
 if ($!)
