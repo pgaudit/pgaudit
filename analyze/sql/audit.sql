@@ -59,6 +59,37 @@ create table audit_log.log_event
     --     unique (session_id, session_line_num)
 );
 
+create table audit_log.audit_statement
+(
+    session_id bigint not null,
+    statement_id bigint not null,
+    virtual_transaction_id text not null,
+    state text not null
+        constraint auditstatement_state_ck check (state in ('ok', 'error')),
+    error_session_line_num bigint,
+);
+
+create table audit_log.audit_substatement
+(
+    session_id bigint not null,
+    statement_id bigint not null,
+    substatement_id bigint not null,
+    statement text,
+    parameter text[],
+);
+
+create table audit_log.audit_substatement_detail
+(
+    session_id bigint not null,
+    statement_id bigint not null,
+    substatement_id bigint not null,
+    session_line_num bigint not null,
+    class text not null,
+    command text not null,
+    object_type text,
+    object_name text
+);
+
 create table audit_log.audit_event
 (
     session_id bigint not null,
