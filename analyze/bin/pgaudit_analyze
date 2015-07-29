@@ -53,8 +53,10 @@ my $hSqlSessionUpdate = $hDb->prepare(
     " where id = ?");
 
 my $hSqlLogInsert = $hDb->prepare(
-    "insert into audit_log.log_event (session_id, log_time, session_line_num, command, virtual_transaction_id, message, query)\n" .
-    "                         values (?, ?, ?, ?, ?, ?, ?)");
+    "insert into audit_log.log_event (session_id, log_time, session_line_num, command, error_severity, sql_state_code,\n" .
+    "                                 virtual_transaction_id, transaction_id, message, detail, hint, query, query_pos,\n" .
+    "                                 internal_query, internal_query_pos, context, location)\n" .
+    "                         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
 my $hSqlLogUpdate = $hDb->prepare(
     "update audit_log.log_event\n" .
@@ -63,11 +65,6 @@ my $hSqlLogUpdate = $hDb->prepare(
     "       connection_from = ?,\n" .
     "       state = ?\n" .
     " where id = ?");
-
-# my $hSqlAuditInsert = $hDb->prepare(
-#     "insert into audit_log.audit_event (session_id, session_line_num, audit_type, statement_id, substatement_id,\n" .
-#     "                                   class, command, object_type, object_name, statement)\n" .
-#     "                           values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
 my $hSqlAuditStmtInsert = $hDb->prepare(
     "insert into audit_log.audit_statement (session_id, statement_id)\n" .
@@ -277,10 +274,19 @@ sub logWrite
     my $strLogTime = shift;
     my $lSessionLineNum = shift;
     my $strCommandTag = shift;
-    my $strVirtualTransationId = shift;
     my $strErrorSeverity = shift;
+    my $strSqlStateCode = shift;
+    my $strVirtualTransationId = shift;
+    my $lTransactionId = shift;
     my $strMessage = shift;
+    my $strDetail = shift;
+    my $strHint = shift;
     my $strQuery = shift;
+    my $iQueryPos = shift;
+    my $strInternalQuery = shift;
+    my $iInternalQueryPos = shift;
+    my $strContext = shift;
+    my $strLocation = shift;
 
     if (auditWrite($strSessionKey, $lSessionLineNum, $strMessage))
     {
@@ -291,7 +297,9 @@ sub logWrite
         $oSessionHash{$strSessionKey}{line_num} < $lSessionLineNum)
     {
         $hSqlLogInsert->execute($oSessionHash{$strSessionKey}{id}, $strLogTime, $lSessionLineNum, $strCommandTag,
-                                $strVirtualTransationId, $strMessage, $strQuery);
+                                $strErrorSeverity, $strSqlStateCode, $strVirtualTransationId, $lTransactionId, $strMessage,
+                                $strDetail, $strHint, $strQuery, $iQueryPos, $strInternalQuery, $iInternalQueryPos, $strContext,
+                                $strLocation);
         $oSessionHash{$strSessionKey}{line_num} = $lSessionLineNum;
 
         if (defined($strErrorSeverity) && ($strErrorSeverity eq ERROR_SEVERITY_ERROR ||
@@ -377,9 +385,15 @@ while (my $stryRow = $oLogCSV->getline($hFile))
                                    $$stryRow[LOG_FIELD_COMMAND_TAG], $$stryRow[LOG_FIELD_ERROR_SEVERITY]);
 
     logWrite($strSessionKey, $$stryRow[LOG_FIELD_LOG_TIME], $$stryRow[LOG_FIELD_SESSION_LINE_NUM],
-             lc($$stryRow[LOG_FIELD_COMMAND_TAG]), $$stryRow[LOG_FIELD_VIRTUAL_TRANSACTION_ID],
-             lc($$stryRow[LOG_FIELD_ERROR_SEVERITY]), $$stryRow[LOG_FIELD_MESSAGE], $$stryRow[LOG_FIELD_QUERY]);
+             lc($$stryRow[LOG_FIELD_COMMAND_TAG]), lc($$stryRow[LOG_FIELD_ERROR_SEVERITY]),
+             lc($$stryRow[LOG_FIELD_SQL_STATE_CODE]), $$stryRow[LOG_FIELD_VIRTUAL_TRANSACTION_ID],
+             $$stryRow[LOG_FIELD_TRANSACTION_ID], $$stryRow[LOG_FIELD_MESSAGE], $$stryRow[LOG_FIELD_DETAIL],
+             $$stryRow[LOG_FIELD_HINT], $$stryRow[LOG_FIELD_QUERY], $$stryRow[LOG_FIELD_QUERY_POS],
+             $$stryRow[LOG_FIELD_INTERNAL_QUERY], $$stryRow[LOG_FIELD_INTERNAL_QUERY_POS], $$stryRow[LOG_FIELD_CONTEXT],
+             $$stryRow[LOG_FIELD_LOCATION]);
 }
+
+$hDb->commit();
 
 if ($!)
 {

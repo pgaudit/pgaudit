@@ -26,6 +26,7 @@ create table audit_log.session
     session_start_time timestamp with time zone not null,
     database_name text,
     connection_from text,
+    application_name text,
     state text not null
         constraint session_state_ck check (state in ('ok', 'error')),
 
@@ -50,9 +51,19 @@ create table audit_log.log_event
     session_line_num numeric not null,
     log_time timestamp(3) with time zone not null,
     command text,
+    error_severity text,
+    sql_state_code text,
     virtual_transaction_id text,
+    transaction_id int,
     message text,
+    detail text,
+    hint text,
     query text,
+    query_pos integer,
+    internal_query text,
+    internal_query_pos integer,
+    context text,
+    location text,
 
     constraint logevent_pk
         primary key (session_id, session_line_num)
