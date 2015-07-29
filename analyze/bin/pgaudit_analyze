@@ -64,7 +64,6 @@ my $hSqlLogUpdate = $hDb->prepare(
     "       state = ?\n" .
     " where id = ?");
 
-
 # my $hSqlAuditInsert = $hDb->prepare(
 #     "insert into audit_log.audit_event (session_id, session_line_num, audit_type, statement_id, substatement_id,\n" .
 #     "                                   class, command, object_type, object_name, statement)\n" .
@@ -74,16 +73,24 @@ my $hSqlAuditStmtInsert = $hDb->prepare(
     "insert into audit_log.audit_statement (session_id, statement_id)\n" .
     "                               values (?, ?)");
 
-# my $hSqlAuditStmtErrorUpdate = $hDb->prepare(
-#     "update audit_log.audit_statement\n" .
-#     "   set state = 'error',\n" .
-#     "       error_session_line_num = ?" .
-#     " where exists\n" .
-#     "(\n" .
-#     "    select 1\n" .
-#     "      from audit_log.log_event\n" .
-#     "     where log_event.session_id = ?\n" .
-#     "       and log_event.virtual_transaction_id = ?");"
+my $hSqlAuditStmtErrorUpdate = $hDb->prepare(
+    "update audit_log.audit_statement as audit_statement_update\n" .
+    "   set state = 'error',\n" .
+    "       error_session_line_num = ?" .
+    " where exists\n" .
+    "(\n" .
+    "    select true\n" .
+    "      from audit_log.log_event\n" .
+    "           inner join audit_log.audit_substatement_detail\n" .
+    "                on audit_substatement_detail.session_id = log_event.session_id\n" .
+    "               and audit_substatement_detail.session_line_num = log_event.session_line_num\n" .
+    "               and audit_substatement_detail.statement_id = audit_statement_update.statement_id\n" .
+    "           inner join audit_log.audit_statement\n" .
+    "                on audit_statement.session_id = audit_substatement_detail.session_id\n" .
+    "               and audit_statement.statement_id = audit_substatement_detail.statement_id\n" .
+    "     where log_event.session_id = ?\n" .
+    "       and log_event.virtual_transaction_id = ?\n" .
+    ")");
 
 my $hSqlAuditSubStmtInsert = $hDb->prepare(
     "insert into audit_log.audit_substatement (session_id, statement_id, substatement_id, statement)\n" .
@@ -290,6 +297,7 @@ sub logWrite
         if (defined($strErrorSeverity) && ($strErrorSeverity eq ERROR_SEVERITY_ERROR ||
             $strErrorSeverity eq ERROR_SEVERITY_FATAL || $strErrorSeverity eq ERROR_SEVERITY_PANIC))
         {
+            $hSqlAuditStmtErrorUpdate->execute($lSessionLineNum, $oSessionHash{$strSessionKey}{id}, $strVirtualTransationId);
         }
     }
 }
