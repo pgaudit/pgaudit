@@ -53,8 +53,8 @@ my $hSqlSessionUpdate = $hDb->prepare(
     " where id = ?");
 
 my $hSqlLogInsert = $hDb->prepare(
-    "insert into audit_log.log_event (session_id, log_time, session_line_num, command, message, query)\n" .
-    "                         values (?, ?, ?, ?, ?, ?)");
+    "insert into audit_log.log_event (session_id, log_time, session_line_num, command, virtual_transaction_id, message, query)\n" .
+    "                         values (?, ?, ?, ?, ?, ?, ?)");
 
 my $hSqlLogUpdate = $hDb->prepare(
     "update audit_log.log_event\n" .
@@ -65,10 +65,34 @@ my $hSqlLogUpdate = $hDb->prepare(
     " where id = ?");
 
 
-my $hSqlAuditInsert = $hDb->prepare(
-    "insert into audit_log.audit_event (session_id, session_line_num, audit_type, statement_id, substatement_id,\n" .
-    "                                   class, command, object_type, object_name, statement)\n" .
-    "                           values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+# my $hSqlAuditInsert = $hDb->prepare(
+#     "insert into audit_log.audit_event (session_id, session_line_num, audit_type, statement_id, substatement_id,\n" .
+#     "                                   class, command, object_type, object_name, statement)\n" .
+#     "                           values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+my $hSqlAuditStmtInsert = $hDb->prepare(
+    "insert into audit_log.audit_statement (session_id, statement_id)\n" .
+    "                               values (?, ?)");
+
+# my $hSqlAuditStmtErrorUpdate = $hDb->prepare(
+#     "update audit_log.audit_statement\n" .
+#     "   set state = 'error',\n" .
+#     "       error_session_line_num = ?" .
+#     " where exists\n" .
+#     "(\n" .
+#     "    select 1\n" .
+#     "      from audit_log.log_event\n" .
+#     "     where log_event.session_id = ?\n" .
+#     "       and log_event.virtual_transaction_id = ?");"
+
+my $hSqlAuditSubStmtInsert = $hDb->prepare(
+    "insert into audit_log.audit_substatement (session_id, statement_id, substatement_id, statement)\n" .
+    "                                  values (?, ?, ?, ?)");
+
+my $hSqlAuditSubStmtDetailInsert = $hDb->prepare(
+    "insert into audit_log.audit_substatement_detail (session_id, statement_id, substatement_id, session_line_num,\n" .
+    "                                                 audit_type, class, command, object_type, object_name)\n" .
+    "                                         values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
 ####################################################################################################################################
 # Define column positions of log and audit data
@@ -115,14 +139,14 @@ use constant
     AUDIT_FIELD_STATEMENT           => 7
 };
 
-use constant
-{
-    AUDIT_TYPE_SESSION              => 'session',
-    AUDIT_TYPE_ABBR_SESSION         => 's',
-
-    AUDIT_TYPE_OBJECT               => 'object',
-    AUDIT_TYPE_ABBR_OBJECT          => 'o'
-};
+# use constant
+# {
+#     AUDIT_TYPE_SESSION              => 'session',
+#     AUDIT_TYPE_ABBR_SESSION         => 's',
+#
+#     AUDIT_TYPE_OBJECT               => 'object',
+#     AUDIT_TYPE_ABBR_OBJECT          => 'o'
+# };
 
 use constant
 {
@@ -131,7 +155,9 @@ use constant
 
 use constant
 {
-    ERROR_SEVERITY_FATAL  => 'fatal'
+    ERROR_SEVERITY_ERROR  => 'error',
+    ERROR_SEVERITY_FATAL  => 'fatal',
+    ERROR_SEVERITY_PANIC  => 'panic'
 };
 
 use constant
@@ -244,21 +270,28 @@ sub logWrite
     my $strLogTime = shift;
     my $lSessionLineNum = shift;
     my $strCommandTag = shift;
+    my $strVirtualTransationId = shift;
     my $strErrorSeverity = shift;
     my $strMessage = shift;
     my $strQuery = shift;
 
+    if (auditWrite($strSessionKey, $lSessionLineNum, $strMessage))
+    {
+        undef($strMessage);
+    }
+
     if (!defined($oSessionHash{$strSessionKey}{line_num}) ||
         $oSessionHash{$strSessionKey}{line_num} < $lSessionLineNum)
     {
-        # print "write session $oSessionHash{$strSessionKey}{id}, line num $lSessionLineNum, message $strMessage\n";
-
-        $hSqlLogInsert->execute($oSessionHash{$strSessionKey}{id}, $strLogTime, $lSessionLineNum, lc($strCommandTag),
-                                $strMessage, $strQuery);
+        $hSqlLogInsert->execute($oSessionHash{$strSessionKey}{id}, $strLogTime, $lSessionLineNum, $strCommandTag,
+                                $strVirtualTransationId, $strMessage, $strQuery);
         $oSessionHash{$strSessionKey}{line_num} = $lSessionLineNum;
-    }
 
-    return auditWrite($strSessionKey, $lSessionLineNum, $strMessage);
+        if (defined($strErrorSeverity) && ($strErrorSeverity eq ERROR_SEVERITY_ERROR ||
+            $strErrorSeverity eq ERROR_SEVERITY_FATAL || $strErrorSeverity eq ERROR_SEVERITY_PANIC))
+        {
+        }
+    }
 }
 
 ####################################################################################################################################
@@ -274,18 +307,31 @@ sub auditWrite
 
     if ($strMessage =~ /^AUDIT\:\ /)
     {
-        $oAuditCSV->parse(substr($strMessage, 6));
+        $oAuditCSV->parse(substr($strMessage, 7));
         my @stryRow = $oAuditCSV->fields();
+        my $lStatementId = $stryRow[AUDIT_FIELD_STATEMENT_ID];
+        my $lSubStatementId = $stryRow[AUDIT_FIELD_SUBSTATEMENT_ID];
 
-        # print "audit: " . $stryRow[AUDIT_FIELD_AUDIT_TYPE] . "\n";
+        if (!defined($oSessionHash{$strSessionKey}{statement_id}) ||
+            $oSessionHash{$strSessionKey}{statement_id} < $lStatementId)
+        {
+            $hSqlAuditStmtInsert->execute($oSessionHash{$strSessionKey}{id}, $lStatementId);
+            $oSessionHash{$strSessionKey}{statement_id} = $lStatementId;
+            delete($oSessionHash{$strSessionKey}{substatement_id});
+        }
 
-        $hSqlAuditInsert->execute($oSessionHash{$strSessionKey}{id}, $lSessionLineNum,
-                                  lc($stryRow[AUDIT_FIELD_AUDIT_TYPE]) eq AUDIT_TYPE_SESSION ?
-                                  AUDIT_TYPE_ABBR_SESSION : AUDIT_TYPE_ABBR_OBJECT,
-                                  $stryRow[AUDIT_FIELD_STATEMENT_ID], $stryRow[AUDIT_FIELD_SUBSTATEMENT_ID],
-                                  lc($stryRow[AUDIT_FIELD_CLASS]), lc($stryRow[AUDIT_FIELD_COMMAND]),
-                                  lc($stryRow[AUDIT_FIELD_OBJECT_TYPE]), lc($stryRow[AUDIT_FIELD_OBJECT_NAME]),
-                                  $stryRow[AUDIT_FIELD_STATEMENT]);
+        if (!defined($oSessionHash{$strSessionKey}{substatement_id}) ||
+            $oSessionHash{$strSessionKey}{substatement_id} < $lSubStatementId)
+        {
+            $hSqlAuditSubStmtInsert->execute($oSessionHash{$strSessionKey}{id}, $lStatementId, $lSubStatementId,
+                                             $stryRow[AUDIT_FIELD_STATEMENT]);
+            $oSessionHash{$strSessionKey}{substatement_id} = $lSubStatementId;
+        }
+
+        $hSqlAuditSubStmtDetailInsert->execute($oSessionHash{$strSessionKey}{id}, $lStatementId, $lSubStatementId,
+                                               $lSessionLineNum, lc($stryRow[AUDIT_FIELD_AUDIT_TYPE]),
+                                               lc($stryRow[AUDIT_FIELD_CLASS]), lc($stryRow[AUDIT_FIELD_COMMAND]),
+                                               lc($stryRow[AUDIT_FIELD_OBJECT_TYPE]), lc($stryRow[AUDIT_FIELD_OBJECT_NAME]));
 
         return true;
     }
@@ -323,8 +369,8 @@ while (my $stryRow = $oLogCSV->getline($hFile))
                                    $$stryRow[LOG_FIELD_COMMAND_TAG], $$stryRow[LOG_FIELD_ERROR_SEVERITY]);
 
     logWrite($strSessionKey, $$stryRow[LOG_FIELD_LOG_TIME], $$stryRow[LOG_FIELD_SESSION_LINE_NUM],
-             $$stryRow[LOG_FIELD_COMMAND_TAG], $$stryRow[LOG_FIELD_ERROR_SEVERITY],
-             $$stryRow[LOG_FIELD_MESSAGE], $$stryRow[LOG_FIELD_QUERY]);
+             lc($$stryRow[LOG_FIELD_COMMAND_TAG]), $$stryRow[LOG_FIELD_VIRTUAL_TRANSACTION_ID],
+             lc($$stryRow[LOG_FIELD_ERROR_SEVERITY]), $$stryRow[LOG_FIELD_MESSAGE], $$stryRow[LOG_FIELD_QUERY]);
 }
 
 if ($!)

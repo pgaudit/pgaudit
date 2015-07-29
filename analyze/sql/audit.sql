@@ -47,9 +47,10 @@ create table audit_log.log_event
     session_id bigint not null
         constraint even_sessionid_fk
             references audit_log.session (id),
-    session_line_num bigint not null,
+    session_line_num numeric not null,
     log_time timestamp(3) with time zone not null,
     command text,
+    virtual_transaction_id text,
     message text,
     query text,
 
@@ -62,57 +63,50 @@ create table audit_log.log_event
 create table audit_log.audit_statement
 (
     session_id bigint not null,
-    statement_id bigint not null,
-    virtual_transaction_id text not null,
-    state text not null
+    statement_id numeric not null,
+    state text not null default 'ok'
         constraint auditstatement_state_ck check (state in ('ok', 'error')),
     error_session_line_num bigint,
+
+    constraint auditstatement_pk
+        primary key (session_id, statement_id)
 );
 
 create table audit_log.audit_substatement
 (
     session_id bigint not null,
-    statement_id bigint not null,
-    substatement_id bigint not null,
+    statement_id numeric not null,
+    substatement_id numeric not null,
     statement text,
     parameter text[],
+
+    constraint auditsubstatement_pk
+        primary key (session_id, statement_id, substatement_id),
+    constraint auditsubstatement_sessionid_statementid_fk
+        foreign key (session_id, statement_id)
+        references audit_log.audit_statement (session_id, statement_id)
 );
 
 create table audit_log.audit_substatement_detail
 (
     session_id bigint not null,
-    statement_id bigint not null,
-    substatement_id bigint not null,
-    session_line_num bigint not null,
-    class text not null,
-    command text not null,
-    object_type text,
-    object_name text
-);
-
-create table audit_log.audit_event
-(
-    session_id bigint not null,
-    session_line_num bigint not null,
+    statement_id numeric not null,
+    substatement_id numeric not null,
+    session_line_num numeric not null,
     audit_type text not null
-        constraint event_audittype_ck
-            check (audit_type in ('s', 'o')),
-    statement_id bigint not null
-        constraint event_statementid_ck
-            check (statement_id >= 1),
-    substatement_id bigint not null
-        constraint event_substatementid_ck
-            check (substatement_id >= 1),
+        constraint auditsubstatementdetail_audittype_ck
+            check (audit_type in ('session', 'object')),
     class text not null,
     command text not null,
     object_type text,
     object_name text,
-    statement text,
-    parameter text[],
 
-    constraint auditevent_pk
-        primary key (session_id, session_line_num),
-    constraint auditevent_sessionid_sessionlinenum_fk
-        foreign key (session_id, session_line_num)
-        references audit_log.log_event (session_id, session_line_num)
+    constraint auditsubstatementdetail_pk
+        primary key (session_id, statement_id, substatement_id, session_line_num),
+    constraint auditsubstatementdetail_sessionid_sessionlinenum_unq
+        unique (session_id, session_line_num),
+    constraint auditsubstatementdetail_sessionid_statementid_substatementid_fk
+        foreign key (session_id, statement_id, substatement_id)
+        references audit_log.audit_substatement (session_id, statement_id, substatement_id)
+        deferrable initially deferred
 );
