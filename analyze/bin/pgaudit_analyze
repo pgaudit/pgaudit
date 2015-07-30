@@ -20,7 +20,7 @@ use PgAudit::CSV;
 ####################################################################################################################################
 # Handle die as a confess instead to get more detailed error information
 ####################################################################################################################################
-$SIG{__DIE__} = sub { Carp::confess @_ };
+$SIG{__DIE__} = sub {Carp::confess @_};
 
 ####################################################################################################################################
 # Connect to Postgres
@@ -28,29 +28,51 @@ $SIG{__DIE__} = sub { Carp::confess @_ };
 my $hDb = DBI->connect('dbi:Pg:dbname=pgaudit;port=5432', 'vagrant', undef, {AutoCommit => 0, RaiseError => 1});
 
 my $hSqlSessionInsert = $hDb->prepare(
-    "insert into audit_log.session (user_name, process_id, session_key, session_start_time, database_name,\n" .
+    "insert into audit_log.session (session_id, process_id, session_start_time, user_name, database_name, application_name,\n" .
     "                               connection_from, state)\n" .
-    "                       values (?, ?, ?, ?, ?, ?, ?)\n" .
-    "                    returning id");
+    "                       values (?, ?, ?, ?, ?, ?, ?, ?)");
 
 my $hSqlSessionSelect = $hDb->prepare(
-    "select id,\n" .
-    "       user_name,\n" .
-    "       database_name,\n" .
-    "       connection_from,\n" .
-    "       state\n" .
+    "with session_line_num as\n" .
+    "(\n" .
+    "    select session_id,\n" .
+    "           max(session_line_num) as session_line_num_max\n" .
+    "      from audit_log.log_event\n" .
+    "     where session_id = ?\n" .
+    "     group by session_id\n" .
+    "),\n" .
+    "audit as\n" .
+    "(\n" .
+    "    select session_id,\n" .
+    "           max(statement_id) as statement_id_max,\n" .
+    "           max(substatement_id) as substatement_id_max\n" .
+    "      from audit_log.audit_substatement\n" .
+    "     where session_id = ?\n" .
+    "     group by session_id\n" .
+    ")\n" .
+    "select session.user_name,\n" .
+    "       session.database_name,\n" .
+    "       session.application_name,\n" .
+    "       session.connection_from,\n" .
+    "       session.state,\n" .
+    "       coalesce(session_line_num.session_line_num_max, 0) as session_line_num_max,\n" .
+    "       coalesce(audit.statement_id_max, 0) as statement_id_max,\n" .
+    "       coalesce(audit.substatement_id_max, 0) as substatement_id_max\n" .
     " from audit_log.session\n" .
-    " where process_id = ?::int\n" .
-    "   and session_key = ?\n" .
-    "   and session_start_time = ?::timestamp with time zone");
+    "      left outer join session_line_num\n" .
+    "           on session_line_num.session_id = session.session_id\n" .
+    "      left outer join audit\n" .
+    "           on audit.session_id = session.session_id\n" .
+    " where session.session_id = ?");
 
 my $hSqlSessionUpdate = $hDb->prepare(
     "update audit_log.session\n" .
     "   set user_name = ?,\n" .
     "       database_name = ?,\n" .
+    "       application_name = ?,\n" .
     "       connection_from = ?,\n" .
     "       state = ?\n" .
-    " where id = ?");
+    " where session_id = ?");
 
 my $hSqlLogInsert = $hDb->prepare(
     "insert into audit_log.log_event (session_id, log_time, session_line_num, command, error_severity, sql_state_code,\n" .
@@ -143,15 +165,6 @@ use constant
     AUDIT_FIELD_STATEMENT           => 7
 };
 
-# use constant
-# {
-#     AUDIT_TYPE_SESSION              => 'session',
-#     AUDIT_TYPE_ABBR_SESSION         => 's',
-#
-#     AUDIT_TYPE_OBJECT               => 'object',
-#     AUDIT_TYPE_ABBR_OBJECT          => 'o'
-# };
-
 use constant
 {
     COMMAND_TAG_AUTHENTICATION  => 'authentication'
@@ -183,11 +196,12 @@ my %oSessionHash;
 
 sub sessionGet
 {
-    my $strUserName = shift;
-    my $strProcessId = shift;
     my $strSessionId = shift;
+    my $strProcessId = shift;
     my $strSessionStartTime = shift;
+    my $strUserName = shift;
     my $strDatabaseName = shift;
+    my $strApplicationName = shift;
     my $strConnectionFrom = shift;
     my $strCommandTag = shift;
     my $strErrorSeverity = shift;
@@ -205,64 +219,88 @@ sub sessionGet
     }
 
     # Set connection from to a default if not defined yet
+    if (!defined($strApplicationName))
+    {
+        $strApplicationName = '[unknown]';
+    }
+
+    # Set connection from to a default if not defined yet
     if (!defined($strConnectionFrom))
     {
         $strConnectionFrom = '[unknown]';
     }
 
-    # Set state to a default if not defined yet
-    my $strState;
+    # Set state to OK
+    my $strState = STATE_OK;
 
+    # Set state to ERROR on authentication failure
     if (defined($strCommandTag) && lc($strCommandTag) eq COMMAND_TAG_AUTHENTICATION &&
         defined($strErrorSeverity) && lc($strErrorSeverity) eq ERROR_SEVERITY_FATAL)
     {
         $strState = STATE_ERROR;
     }
-    else
+
+    # If session id does not exist in the cache
+    if (!defined($oSessionHash{$strSessionId}))
     {
-        $strState = STATE_OK;
+        # Attempt to select from database
+        $hSqlSessionSelect->execute($strSessionId, $strSessionId, $strSessionId);
+
+        ($oSessionHash{$strSessionId}{user_name}, $oSessionHash{$strSessionId}{database_name},
+         $oSessionHash{$strSessionId}{application_name}, $oSessionHash{$strSessionId}{connection_from},
+         $oSessionHash{$strSessionId}{state}, $oSessionHash{$strSessionId}{session_line_num},
+         $oSessionHash{$strSessionId}{statement_id},
+         $oSessionHash{$strSessionId}{substatement_id}) = $hSqlSessionSelect->fetchrow_array();
+
+        # If state is defined then the select was successful
+        if (defined($oSessionHash{$strSessionId}{state}))
+        {
+            print "session select $strSessionId: session_line_num $oSessionHash{$strSessionId}{session_line_num}" .
+                  ", statement_id $oSessionHash{$strSessionId}{statement_id}" .
+                  ", substatement_id $oSessionHash{$strSessionId}{substatement_id}\n";
+        }
+        # Else the session does not exist and must be inserted
+        else
+        {
+            $hSqlSessionInsert->execute($strSessionId, $strProcessId, $strSessionStartTime, $strUserName, $strDatabaseName,
+                                        $strApplicationName, $strConnectionFrom, $strState);
+            $hDb->commit();
+
+            $oSessionHash{$strSessionId}{user_name} = $strUserName;
+            $oSessionHash{$strSessionId}{database_name} = $strDatabaseName;
+            $oSessionHash{$strSessionId}{application_name} = $strApplicationName;
+            $oSessionHash{$strSessionId}{connection_from} = $strConnectionFrom;
+            $oSessionHash{$strSessionId}{state} = $strState;
+            $oSessionHash{$strSessionId}{session_line_num} = 0;
+            $oSessionHash{$strSessionId}{statement_id} = 0;
+            $oSessionHash{$strSessionId}{substatement_id} = 0;
+
+            print "session insert =  " . $strSessionId . "\n";
+        }
     }
-
-    my $strSessionKey = "${strUserName}:${strProcessId}:${strSessionId}:${strSessionStartTime}";
-
-    # Lookup session key in the hash
-    if (defined($oSessionHash{$strSessionKey}))
-    {
-        $oSessionHash{$strSessionKey}{last_log} = time();
-        return $strSessionKey;
-    }
-
-    # Attempt to select from database
-    $hSqlSessionSelect->execute($strProcessId, $strSessionId, $strSessionStartTime);
-
-    my ($lSessionId, $strDbUserName, $strDbDatabaseName, $strDbConnectionFrom, $strDbState) = $hSqlSessionSelect->fetchrow_array();
 
     # If the user name has changed then update the session log
-    if (defined($lSessionId) &&
-        ($strUserName ne $strDbUserName || $strDatabaseName ne $strDbDatabaseName || $strConnectionFrom ne $strDbConnectionFrom ||
-         $strState ne $strDbState))
+    if ($strUserName ne $oSessionHash{$strSessionId}{user_name} ||
+        $strDatabaseName ne $oSessionHash{$strSessionId}{database_name} ||
+        $strApplicationName ne $oSessionHash{$strSessionId}{application_name} ||
+        $strConnectionFrom ne $oSessionHash{$strSessionId}{connection_from} ||
+        $strState ne $oSessionHash{$strSessionId}{state})
     {
-        $hSqlSessionUpdate->execute($strUserName, $strDatabaseName, $strConnectionFrom, $strState, $lSessionId);
+        $hSqlSessionUpdate->execute($strUserName, $strDatabaseName, $strApplicationName, $strConnectionFrom,
+                                    $strState, $strSessionId);
         $hDb->commit();
-        print "session update =  " . $strSessionKey . "\n";
-    }
 
-    # If session not found in the db then insert it
-    if (!defined($lSessionId))
-    {
-        $hSqlSessionInsert->execute($strUserName, $strProcessId, $strSessionId, $strSessionStartTime, $strDatabaseName,
-                                    $strConnectionFrom, $strState);
+        $oSessionHash{$strSessionId}{user_name} = $strUserName;
+        $oSessionHash{$strSessionId}{database_name} = $strDatabaseName;
+        $oSessionHash{$strSessionId}{application_name} = $strApplicationName;
+        $oSessionHash{$strSessionId}{connection_from} = $strConnectionFrom;
+        $oSessionHash{$strSessionId}{state} = $strState;
 
-        ($lSessionId) = $hSqlSessionInsert->fetchrow_array();
-        $hDb->commit();
-        print "session insert =  " . $strSessionKey . "\n";
+        print "session update =  " . $strSessionId . "\n";
     }
 
     # Add to the local cache
-    $oSessionHash{$strSessionKey}{id} = $lSessionId;
-    $oSessionHash{$strSessionKey}{last_log} = time();
-
-    return $strSessionKey;
+    $oSessionHash{$strSessionId}{last_log} = time();
 }
 
 ####################################################################################################################################
@@ -270,7 +308,7 @@ sub sessionGet
 ####################################################################################################################################
 sub logWrite
 {
-    my $strSessionKey = shift;
+    my $strSessionId = shift;
     my $strLogTime = shift;
     my $lSessionLineNum = shift;
     my $strCommandTag = shift;
@@ -288,24 +326,23 @@ sub logWrite
     my $strContext = shift;
     my $strLocation = shift;
 
-    if (auditWrite($strSessionKey, $lSessionLineNum, $strMessage))
+    if (auditWrite($strSessionId, $lSessionLineNum, $strMessage))
     {
         undef($strMessage);
     }
 
-    if (!defined($oSessionHash{$strSessionKey}{line_num}) ||
-        $oSessionHash{$strSessionKey}{line_num} < $lSessionLineNum)
+    if ($lSessionLineNum > $oSessionHash{$strSessionId}{session_line_num})
     {
-        $hSqlLogInsert->execute($oSessionHash{$strSessionKey}{id}, $strLogTime, $lSessionLineNum, $strCommandTag,
+        $hSqlLogInsert->execute($strSessionId, $strLogTime, $lSessionLineNum, $strCommandTag,
                                 $strErrorSeverity, $strSqlStateCode, $strVirtualTransationId, $lTransactionId, $strMessage,
                                 $strDetail, $strHint, $strQuery, $iQueryPos, $strInternalQuery, $iInternalQueryPos, $strContext,
                                 $strLocation);
-        $oSessionHash{$strSessionKey}{line_num} = $lSessionLineNum;
+        $oSessionHash{$strSessionId}{session_line_num} = $lSessionLineNum;
 
         if (defined($strErrorSeverity) && ($strErrorSeverity eq ERROR_SEVERITY_ERROR ||
             $strErrorSeverity eq ERROR_SEVERITY_FATAL || $strErrorSeverity eq ERROR_SEVERITY_PANIC))
         {
-            $hSqlAuditStmtErrorUpdate->execute($lSessionLineNum, $oSessionHash{$strSessionKey}{id}, $strVirtualTransationId);
+            $hSqlAuditStmtErrorUpdate->execute($lSessionLineNum, $strSessionId, $strVirtualTransationId);
         }
     }
 }
@@ -317,7 +354,7 @@ my $oAuditCSV = new PgAudit::CSV({binary => 1, empty_is_undef => 1});
 
 sub auditWrite
 {
-    my $strSessionKey = shift;
+    my $strSessionId = shift;
     my $lSessionLineNum = shift;
     my $strMessage = shift;
 
@@ -328,26 +365,28 @@ sub auditWrite
         my $lStatementId = $stryRow[AUDIT_FIELD_STATEMENT_ID];
         my $lSubStatementId = $stryRow[AUDIT_FIELD_SUBSTATEMENT_ID];
 
-        if (!defined($oSessionHash{$strSessionKey}{statement_id}) ||
-            $oSessionHash{$strSessionKey}{statement_id} < $lStatementId)
+        if ($lStatementId > $oSessionHash{$strSessionId}{statement_id})
         {
-            $hSqlAuditStmtInsert->execute($oSessionHash{$strSessionKey}{id}, $lStatementId);
-            $oSessionHash{$strSessionKey}{statement_id} = $lStatementId;
-            delete($oSessionHash{$strSessionKey}{substatement_id});
+            $hSqlAuditStmtInsert->execute($strSessionId, $lStatementId);
+            $oSessionHash{$strSessionId}{statement_id} = $lStatementId;
+            $oSessionHash{$strSessionId}{substatement_id} = 0;
         }
 
-        if (!defined($oSessionHash{$strSessionKey}{substatement_id}) ||
-            $oSessionHash{$strSessionKey}{substatement_id} < $lSubStatementId)
+        if ($lStatementId == $oSessionHash{$strSessionId}{statement_id} &&
+            $lSubStatementId > $oSessionHash{$strSessionId}{substatement_id})
         {
-            $hSqlAuditSubStmtInsert->execute($oSessionHash{$strSessionKey}{id}, $lStatementId, $lSubStatementId,
+            $hSqlAuditSubStmtInsert->execute($strSessionId, $lStatementId, $lSubStatementId,
                                              $stryRow[AUDIT_FIELD_STATEMENT]);
-            $oSessionHash{$strSessionKey}{substatement_id} = $lSubStatementId;
+            $oSessionHash{$strSessionId}{substatement_id} = $lSubStatementId;
         }
 
-        $hSqlAuditSubStmtDetailInsert->execute($oSessionHash{$strSessionKey}{id}, $lStatementId, $lSubStatementId,
-                                               $lSessionLineNum, lc($stryRow[AUDIT_FIELD_AUDIT_TYPE]),
-                                               lc($stryRow[AUDIT_FIELD_CLASS]), lc($stryRow[AUDIT_FIELD_COMMAND]),
-                                               lc($stryRow[AUDIT_FIELD_OBJECT_TYPE]), lc($stryRow[AUDIT_FIELD_OBJECT_NAME]));
+        if ($lSessionLineNum > $oSessionHash{$strSessionId}{session_line_num})
+        {
+            $hSqlAuditSubStmtDetailInsert->execute($strSessionId, $lStatementId, $lSubStatementId,
+                                                   $lSessionLineNum, lc($stryRow[AUDIT_FIELD_AUDIT_TYPE]),
+                                                   lc($stryRow[AUDIT_FIELD_CLASS]), lc($stryRow[AUDIT_FIELD_COMMAND]),
+                                                   lc($stryRow[AUDIT_FIELD_OBJECT_TYPE]), lc($stryRow[AUDIT_FIELD_OBJECT_NAME]));
+        }
 
         return true;
     }
@@ -379,12 +418,13 @@ my $oLogCSV = new PgAudit::CSV({binary => 1, empty_is_undef => 1});
 
 while (my $stryRow = $oLogCSV->getline($hFile))
 {
-    my $strSessionKey = sessionGet($$stryRow[LOG_FIELD_USER_NAME], $$stryRow[LOG_FIELD_PROCESS_ID],
-                                   $$stryRow[LOG_FIELD_SESSION_ID], $$stryRow[LOG_FIELD_SESSION_START_TIME],
-                                   $$stryRow[LOG_FIELD_DATABASE_NAME], $$stryRow[LOG_FIELD_CONNECTION_FROM],
-                                   $$stryRow[LOG_FIELD_COMMAND_TAG], $$stryRow[LOG_FIELD_ERROR_SEVERITY]);
+    my $strSessionId = $$stryRow[LOG_FIELD_SESSION_ID];
 
-    logWrite($strSessionKey, $$stryRow[LOG_FIELD_LOG_TIME], $$stryRow[LOG_FIELD_SESSION_LINE_NUM],
+    sessionGet($strSessionId, $$stryRow[LOG_FIELD_PROCESS_ID], $$stryRow[LOG_FIELD_SESSION_START_TIME],
+               $$stryRow[LOG_FIELD_USER_NAME], $$stryRow[LOG_FIELD_DATABASE_NAME], $$stryRow[LOG_FIELD_APPLICATION_NAME],
+               $$stryRow[LOG_FIELD_CONNECTION_FROM], $$stryRow[LOG_FIELD_COMMAND_TAG], $$stryRow[LOG_FIELD_ERROR_SEVERITY]);
+
+    logWrite($strSessionId, $$stryRow[LOG_FIELD_LOG_TIME], $$stryRow[LOG_FIELD_SESSION_LINE_NUM],
              lc($$stryRow[LOG_FIELD_COMMAND_TAG]), lc($$stryRow[LOG_FIELD_ERROR_SEVERITY]),
              lc($$stryRow[LOG_FIELD_SQL_STATE_CODE]), $$stryRow[LOG_FIELD_VIRTUAL_TRANSACTION_ID],
              $$stryRow[LOG_FIELD_TRANSACTION_ID], $$stryRow[LOG_FIELD_MESSAGE], $$stryRow[LOG_FIELD_DETAIL],

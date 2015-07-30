@@ -15,25 +15,20 @@ set session authorization audit_log_owner;
 
 create schema audit_log;
 
-create sequence audit_log.object_id_seq start with 1;
-
 create table audit_log.session
 (
-    id bigint not null default nextval('audit_log.object_id_seq'),
-    user_name text not null,
+    session_id text not null,
     process_id int not null,
-    session_key text not null,
     session_start_time timestamp with time zone not null,
+    user_name text not null,
     database_name text,
-    connection_from text,
     application_name text,
+    connection_from text,
     state text not null
         constraint session_state_ck check (state in ('ok', 'error')),
 
     constraint session_pk
-        primary key (id),
-    constraint session_processid_sessionkey_sessionstarttime_unq
-        unique (process_id, session_key, session_start_time)
+        primary key (session_id)
 );
 
 -- create table audit_log.logon
@@ -45,9 +40,9 @@ create table audit_log.session
 
 create table audit_log.log_event
 (
-    session_id bigint not null
-        constraint even_sessionid_fk
-            references audit_log.session (id),
+    session_id text not null
+        constraint logevent_sessionid_fk
+            references audit_log.session (session_id),
     session_line_num numeric not null,
     log_time timestamp(3) with time zone not null,
     command text,
@@ -73,7 +68,9 @@ create table audit_log.log_event
 
 create table audit_log.audit_statement
 (
-    session_id bigint not null,
+    session_id text not null
+        constraint auditstatement_sessionid_fk
+            references audit_log.session (session_id),
     statement_id numeric not null,
     state text not null default 'ok'
         constraint auditstatement_state_ck check (state in ('ok', 'error')),
@@ -85,7 +82,7 @@ create table audit_log.audit_statement
 
 create table audit_log.audit_substatement
 (
-    session_id bigint not null,
+    session_id text not null,
     statement_id numeric not null,
     substatement_id numeric not null,
     statement text,
@@ -100,7 +97,7 @@ create table audit_log.audit_substatement
 
 create table audit_log.audit_substatement_detail
 (
-    session_id bigint not null,
+    session_id text not null,
     statement_id numeric not null,
     substatement_id numeric not null,
     session_line_num numeric not null,
@@ -118,6 +115,9 @@ create table audit_log.audit_substatement_detail
         unique (session_id, session_line_num),
     constraint auditsubstatementdetail_sessionid_statementid_substatementid_fk
         foreign key (session_id, statement_id, substatement_id)
-        references audit_log.audit_substatement (session_id, statement_id, substatement_id)
+        references audit_log.audit_substatement (session_id, statement_id, substatement_id),
+    constraint auditsubstatementdetail_sessionid_sessionlinenum_fk
+        foreign key (session_id, session_line_num)
+        references audit_log.log_event (session_id, session_line_num)
         deferrable initially deferred
 );
