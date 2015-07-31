@@ -4,7 +4,7 @@
 -- Make sure that errors are detected and not automatically rolled back
 \set ON_ERROR_ROLLBACK off
 
-drop database if exists pgaudit;
+drop database if exists audit_test;
 drop role if exists pgaudit_owner;
 drop role if exists pgaudit_etl;
 drop user if exists pgaudit;
@@ -14,18 +14,19 @@ create role pgaudit_etl;
 create user pgaudit;
 grant pgaudit_etl to pgaudit;
 
-create database pgaudit with owner pgaudit_owner;
+create database audit_test;
 
-\c pgaudit
+\c audit_test
+
+create schema pgaudit authorization pgaudit_owner;
+
+grant usage
+   on schema pgaudit
+   to pgaudit_etl;
 
 set session authorization pgaudit_owner;
 
-create schema audit_log;
-grant usage
-   on schema audit_log
-   to pgaudit_etl;
-
-create table audit_log.session
+create table pgaudit.session
 (
     session_id text not null,
     process_id int not null,
@@ -43,21 +44,21 @@ create table audit_log.session
 grant select,
       insert,
       update
-   on audit_log.session
+   on pgaudit.session
    to pgaudit_etl;
 
--- create table audit_log.logon
+-- create table pgaudit.logon
 -- (
 --     id bigint not null,
 --     session_id bigint not null,
 --     constraint logon_pk primary key (id)
 -- )
 
-create table audit_log.log_event
+create table pgaudit.log_event
 (
     session_id text not null
         constraint logevent_sessionid_fk
-            references audit_log.session (session_id),
+            references pgaudit.session (session_id),
     session_line_num numeric not null,
     log_time timestamp(3) with time zone not null,
     command text,
@@ -83,14 +84,14 @@ create table audit_log.log_event
 
 grant select,
       insert
-   on audit_log.log_event
+   on pgaudit.log_event
    to pgaudit_etl;
 
-create table audit_log.audit_statement
+create table pgaudit.audit_statement
 (
     session_id text not null
         constraint auditstatement_sessionid_fk
-            references audit_log.session (session_id),
+            references pgaudit.session (session_id),
     statement_id numeric not null,
     state text not null default 'ok'
         constraint auditstatement_state_ck check (state in ('ok', 'error')),
@@ -103,10 +104,10 @@ create table audit_log.audit_statement
 grant select,
       update (state, error_session_line_num),
       insert
-   on audit_log.audit_statement
+   on pgaudit.audit_statement
    to pgaudit_etl;
 
-create table audit_log.audit_substatement
+create table pgaudit.audit_substatement
 (
     session_id text not null,
     statement_id numeric not null,
@@ -118,15 +119,15 @@ create table audit_log.audit_substatement
         primary key (session_id, statement_id, substatement_id),
     constraint auditsubstatement_sessionid_statementid_fk
         foreign key (session_id, statement_id)
-        references audit_log.audit_statement (session_id, statement_id)
+        references pgaudit.audit_statement (session_id, statement_id)
 );
 
 grant select,
       insert
-   on audit_log.audit_substatement
+   on pgaudit.audit_substatement
    to pgaudit_etl;
 
-create table audit_log.audit_substatement_detail
+create table pgaudit.audit_substatement_detail
 (
     session_id text not null,
     statement_id numeric not null,
@@ -146,14 +147,14 @@ create table audit_log.audit_substatement_detail
         unique (session_id, session_line_num),
     constraint auditsubstatementdetail_sessionid_statementid_substatementid_fk
         foreign key (session_id, statement_id, substatement_id)
-        references audit_log.audit_substatement (session_id, statement_id, substatement_id),
+        references pgaudit.audit_substatement (session_id, statement_id, substatement_id),
     constraint auditsubstatementdetail_sessionid_sessionlinenum_fk
         foreign key (session_id, session_line_num)
-        references audit_log.log_event (session_id, session_line_num)
+        references pgaudit.log_event (session_id, session_line_num)
         deferrable initially deferred
 );
 
 grant select,
       insert
-   on audit_log.audit_substatement_detail
+   on pgaudit.audit_substatement_detail
    to pgaudit_etl;

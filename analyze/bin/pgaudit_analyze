@@ -94,34 +94,59 @@ use constant
 ####################################################################################################################################
 # Connect to Postgres
 ####################################################################################################################################
-my $hDb;
 my %oDbHash;
 my $strAuditUserName = 'pgaudit';
+my $strAuditSchemaName = 'pgaudit';
 
 sub databaseGet
 {
     my $strDatabaseName = shift;
 
-    return false
-        if ($strDatabaseName ne 'pgaudit');
+    # Check if the database session already exists
+    if (defined($oDbHash{$strDatabaseName}))
+    {
+        # Return false if this database was found not to have an audit schema
+        return false
+            if (!$oDbHash{$strDatabaseName}{log});
 
-    return true
-        if (defined($oDbHash{$strDatabaseName}));
+        # Else return true to allow audit logging
+        return true;
+    }
 
-    $hDb = DBI->connect("dbi:Pg:dbname=${strDatabaseName};port=5432", $strAuditUserName, undef,
-                           {AutoCommit => 0, RaiseError => 1});
+    # Connect to the database
+    $oDbHash{$strDatabaseName}{hDb} = DBI->connect("dbi:Pg:dbname=${strDatabaseName};port=5432", $strAuditUserName, undef,
+                                                   {AutoCommit => 0, RaiseError => 1});
 
-    $oDbHash{$strDatabaseName}{hSqlSessionInsert} = $hDb->prepare(
-        "insert into audit_log.session (session_id, process_id, session_start_time, user_name, application_name,\n" .
-        "                               connection_from, state)\n" .
-        "                       values (?, ?, ?, ?, ?, ?, ?)");
+    # Check for the audit schema to determine whether or not to log this database
+    my $hSqlSchemaSelect = $oDbHash{$strDatabaseName}{hDb}->prepare(
+        "select count(*) = 1\n" .
+        "  from pg_namespace\n" .
+        " where nspname = ?");
 
-    $oDbHash{$strDatabaseName}{hSqlSessionSelect} = $hDb->prepare(
+    $hSqlSchemaSelect->execute($strAuditSchemaName);
+
+    $oDbHash{$strDatabaseName}{log} = ($hSqlSchemaSelect->fetchrow_array())[0] ? true : false;
+    undef($hSqlSchemaSelect);
+
+    # Disconnect from database and return false if there is no audit schema
+    if (!$oDbHash{$strDatabaseName}{log})
+    {
+        $oDbHash{$strDatabaseName}{hDb}->disconnect();
+        undef($oDbHash{$strDatabaseName}{hDb});
+        return false;
+    }
+
+    $oDbHash{$strDatabaseName}{hSqlSessionInsert} = $oDbHash{$strDatabaseName}{hDb}->prepare(
+        "insert into pgaudit.session (session_id, process_id, session_start_time, user_name, application_name,\n" .
+        "                             connection_from, state)\n" .
+        "                     values (?, ?, ?, ?, ?, ?, ?)");
+
+    $oDbHash{$strDatabaseName}{hSqlSessionSelect} = $oDbHash{$strDatabaseName}{hDb}->prepare(
         "with session_line_num as\n" .
         "(\n" .
         "    select session_id,\n" .
         "           max(session_line_num) as session_line_num_max\n" .
-        "      from audit_log.log_event\n" .
+        "      from pgaudit.log_event\n" .
         "     where session_id = ?\n" .
         "     group by session_id\n" .
         "),\n" .
@@ -130,7 +155,7 @@ sub databaseGet
         "    select session_id,\n" .
         "           max(statement_id) as statement_id_max,\n" .
         "           max(substatement_id) as substatement_id_max\n" .
-        "      from audit_log.audit_substatement\n" .
+        "      from pgaudit.audit_substatement\n" .
         "     where session_id = ?\n" .
         "     group by session_id\n" .
         ")\n" .
@@ -140,65 +165,65 @@ sub databaseGet
         "       coalesce(session_line_num.session_line_num_max, 0) as session_line_num_max,\n" .
         "       coalesce(audit.statement_id_max, 0) as statement_id_max,\n" .
         "       coalesce(audit.substatement_id_max, 0) as substatement_id_max\n" .
-        " from audit_log.session\n" .
+        " from pgaudit.session\n" .
         "      left outer join session_line_num\n" .
         "           on session_line_num.session_id = session.session_id\n" .
         "      left outer join audit\n" .
         "           on audit.session_id = session.session_id\n" .
         " where session.session_id = ?");
 
-    $oDbHash{$strDatabaseName}{hSqlSessionUpdate} = $hDb->prepare(
-        "update audit_log.session\n" .
+    $oDbHash{$strDatabaseName}{hSqlSessionUpdate} = $oDbHash{$strDatabaseName}{hDb}->prepare(
+        "update pgaudit.session\n" .
         "   set application_name = ?,\n" .
         "       connection_from = ?,\n" .
         "       state = ?\n" .
         " where session_id = ?");
 
-    $oDbHash{$strDatabaseName}{hSqlLogInsert} = $hDb->prepare(
-        "insert into audit_log.log_event (session_id, log_time, session_line_num, command, error_severity, sql_state_code,\n" .
-        "                                 virtual_transaction_id, transaction_id, message, detail, hint, query, query_pos,\n" .
-        "                                 internal_query, internal_query_pos, context, location)\n" .
-        "                         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $oDbHash{$strDatabaseName}{hSqlLogInsert} = $oDbHash{$strDatabaseName}{hDb}->prepare(
+        "insert into pgaudit.log_event (session_id, log_time, session_line_num, command, error_severity, sql_state_code,\n" .
+        "                               virtual_transaction_id, transaction_id, message, detail, hint, query, query_pos,\n" .
+        "                               internal_query, internal_query_pos, context, location)\n" .
+        "                       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    $oDbHash{$strDatabaseName}{hSqlLogUpdate} = $hDb->prepare(
-        "update audit_log.log_event\n" .
+    $oDbHash{$strDatabaseName}{hSqlLogUpdate} = $oDbHash{$strDatabaseName}{hDb}->prepare(
+        "update pgaudit.log_event\n" .
         "   set user_name = ?,\n" .
         "       database_name = ?,\n" .
         "       connection_from = ?,\n" .
         "       state = ?\n" .
         " where id = ?");
 
-    $oDbHash{$strDatabaseName}{hSqlAuditStmtInsert} = $hDb->prepare(
-        "insert into audit_log.audit_statement (session_id, statement_id)\n" .
-        "                               values (?, ?)");
+    $oDbHash{$strDatabaseName}{hSqlAuditStmtInsert} = $oDbHash{$strDatabaseName}{hDb}->prepare(
+        "insert into pgaudit.audit_statement (session_id, statement_id)\n" .
+        "                             values (?, ?)");
 
-    $oDbHash{$strDatabaseName}{hSqlAuditStmtErrorUpdate} = $hDb->prepare(
-        "update audit_log.audit_statement as audit_statement_update\n" .
+    $oDbHash{$strDatabaseName}{hSqlAuditStmtErrorUpdate} = $oDbHash{$strDatabaseName}{hDb}->prepare(
+        "update pgaudit.audit_statement as audit_statement_update\n" .
         "   set state = 'error',\n" .
         "       error_session_line_num = ?" .
         " where exists\n" .
         "(\n" .
         "    select true\n" .
-        "      from audit_log.log_event\n" .
-        "           inner join audit_log.audit_substatement_detail\n" .
+        "      from pgaudit.log_event\n" .
+        "           inner join pgaudit.audit_substatement_detail\n" .
         "                on audit_substatement_detail.session_id = log_event.session_id\n" .
         "               and audit_substatement_detail.session_line_num = log_event.session_line_num\n" .
         "               and audit_substatement_detail.statement_id = audit_statement_update.statement_id\n" .
-        "           inner join audit_log.audit_statement\n" .
+        "           inner join pgaudit.audit_statement\n" .
         "                on audit_statement.session_id = audit_substatement_detail.session_id\n" .
         "               and audit_statement.statement_id = audit_substatement_detail.statement_id\n" .
         "     where log_event.session_id = ?\n" .
         "       and log_event.virtual_transaction_id = ?\n" .
         ")");
 
-    $oDbHash{$strDatabaseName}{hSqlAuditSubStmtInsert} = $hDb->prepare(
-        "insert into audit_log.audit_substatement (session_id, statement_id, substatement_id, statement)\n" .
-        "                                  values (?, ?, ?, ?)");
+    $oDbHash{$strDatabaseName}{hSqlAuditSubStmtInsert} = $oDbHash{$strDatabaseName}{hDb}->prepare(
+        "insert into pgaudit.audit_substatement (session_id, statement_id, substatement_id, statement)\n" .
+        "                                values (?, ?, ?, ?)");
 
-    $oDbHash{$strDatabaseName}{hSqlAuditSubStmtDetailInsert} = $hDb->prepare(
-        "insert into audit_log.audit_substatement_detail (session_id, statement_id, substatement_id, session_line_num,\n" .
-        "                                                 audit_type, class, command, object_type, object_name)\n" .
-        "                                         values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $oDbHash{$strDatabaseName}{hSqlAuditSubStmtDetailInsert} = $oDbHash{$strDatabaseName}{hDb}->prepare(
+        "insert into pgaudit.audit_substatement_detail (session_id, statement_id, substatement_id, session_line_num,\n" .
+        "                                               audit_type, class, command, object_type, object_name)\n" .
+        "                                       values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     return true;
 }
@@ -266,7 +291,7 @@ sub sessionGet
             $oDbHash{$strDatabaseName}{hSqlSessionInsert}->execute(
                 $strSessionId, $strProcessId, $strSessionStartTime, $strUserName, $strApplicationName,
                 $strConnectionFrom, $strState);
-            $hDb->commit();
+            $oDbHash{$strDatabaseName}{hDb}->commit();
 
             $oSessionHash{$strSessionId}{application_name} = $strApplicationName;
             $oSessionHash{$strSessionId}{connection_from} = $strConnectionFrom;
@@ -285,7 +310,7 @@ sub sessionGet
         $strState ne $oSessionHash{$strSessionId}{state})
     {
         $oDbHash{$strDatabaseName}{hSqlSessionUpdate}->execute($strApplicationName, $strConnectionFrom, $strState, $strSessionId);
-        $hDb->commit();
+        $oDbHash{$strDatabaseName}{hDb}->commit();
 
         $oSessionHash{$strSessionId}{application_name} = $strApplicationName;
         $oSessionHash{$strSessionId}{connection_from} = $strConnectionFrom;
@@ -433,10 +458,10 @@ while (my $stryRow = $oLogCSV->getline($hFile))
                  $$stryRow[LOG_FIELD_HINT], $$stryRow[LOG_FIELD_QUERY], $$stryRow[LOG_FIELD_QUERY_POS],
                  $$stryRow[LOG_FIELD_INTERNAL_QUERY], $$stryRow[LOG_FIELD_INTERNAL_QUERY_POS], $$stryRow[LOG_FIELD_CONTEXT],
                  $$stryRow[LOG_FIELD_LOCATION]);
+
+        $oDbHash{$strDatabaseName}{hDb}->commit();
     }
 }
-
-$hDb->commit();
 
 if ($!)
 {
