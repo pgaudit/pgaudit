@@ -28,7 +28,7 @@ psql -U postgres -f sql/audit.sql <db>
 
 ## Caveats
 
-* The pgaudit.
+* The pgaudit.logon table contains the logon information for users of the database.  If a user is renamed they must also be renamed in this table or the logon history will be lost.
 
 ## Authors
 
