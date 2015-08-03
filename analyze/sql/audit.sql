@@ -41,18 +41,44 @@ create table pgaudit.session
         primary key (session_id)
 );
 
+create or replace function pgaudit.session_insert()
+    returns trigger as $$
+begin
+    update pgaudit.logon
+       set last_logon_time = case when new.state = 'ok' then new.session_start_time else last_logon_time end,
+           logon_failure_total = case when new.state = 'ok' then 0 else logon_failure_total + 1 end
+     where user_name = new.user_name;
+
+    if not found then
+        insert into pgaudit.logon (user_name, last_logon_time, logon_failure_total)
+                           values (new.user_name,
+                                   case when new.state = 'ok' then new.session_start_time else null end,
+                                   case when new.state = 'ok' then 0 else 1 end);
+    end if;
+
+    return new;
+end
+$$ language plpgsql security definer;
+
+create trigger session_trigger_insert
+    after insert on pgaudit.session
+    for each row execute procedure pgaudit.session_insert();
+
 grant select,
       insert,
-      update
+      update (application_name)
    on pgaudit.session
    to pgaudit_etl;
 
--- create table pgaudit.logon
--- (
---     id bigint not null,
---     session_id bigint not null,
---     constraint logon_pk primary key (id)
--- )
+create table pgaudit.logon
+(
+     user_name text not null,
+     last_logon_time timestamp with time zone,
+     logon_failure_total int not null,
+
+     constraint logon_pk
+        primary key (user_name)
+);
 
 create table pgaudit.log_event
 (
