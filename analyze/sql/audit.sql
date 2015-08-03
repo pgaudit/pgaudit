@@ -43,7 +43,20 @@ create table pgaudit.session
 
 create or replace function pgaudit.session_insert()
     returns trigger as $$
+-- declare
+--     tsLastLogonTime timestamp with time zone;
+--     tsCurrentLogonTime timestamp with time zone;
+--     iLogonFailureTotal int;
 begin
+    -- select last_logon_time,
+    --        current_logon_time,
+    --        logon_failure_total
+    --   into tsLastLogonTime,
+    --        tsCurrentLogonTime,
+    --        iLogonFailureTotal
+    --   from pgaudit.logon
+    --  where user_name = new.user_name;
+
     update pgaudit.logon
        set last_logon_time = case when new.state = 'ok' then new.session_start_time else last_logon_time end,
            logon_failure_total = case when new.state = 'ok' then 0 else logon_failure_total + 1 end
@@ -79,6 +92,26 @@ create table pgaudit.logon
      constraint logon_pk
         primary key (user_name)
 );
+
+create or replace function pgaudit.logon_info()
+    returns table
+(
+    last_logon_time timestamp with time zone,
+    logon_failures_since_last_logon int
+)
+    as $$
+begin
+    return query
+    (
+        select last_logon_time,
+               logon_failure_total
+          from logon
+         where user_name = session_user
+    );
+end
+$$ language plpgsql security definer;
+
+grant execute on function pgaudit.logon_info() to public;
 
 create table pgaudit.log_event
 (
