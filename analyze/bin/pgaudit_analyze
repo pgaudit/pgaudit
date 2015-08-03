@@ -160,7 +160,6 @@ sub databaseGet
         "     group by session_id\n" .
         ")\n" .
         "select session.application_name,\n" .
-        "       session.connection_from,\n" .
         "       session.state,\n" .
         "       coalesce(session_line_num.session_line_num_max, 0) as session_line_num_max,\n" .
         "       coalesce(audit.statement_id_max, 0) as statement_id_max,\n" .
@@ -174,9 +173,7 @@ sub databaseGet
 
     $oDbHash{$strDatabaseName}{hSqlSessionUpdate} = $oDbHash{$strDatabaseName}{hDb}->prepare(
         "update pgaudit.session\n" .
-        "   set application_name = ?,\n" .
-        "       connection_from = ?,\n" .
-        "       state = ?\n" .
+        "   set application_name = ?\n" .
         " where session_id = ?");
 
     $oDbHash{$strDatabaseName}{hSqlLogInsert} = $oDbHash{$strDatabaseName}{hDb}->prepare(
@@ -236,6 +233,7 @@ my %oSessionHash;
 sub sessionGet
 {
     my $strSessionId = shift;
+    my $lSessionLineNum = shift;
     my $strProcessId = shift;
     my $strSessionStartTime = shift;
     my $strUserName = shift;
@@ -273,9 +271,8 @@ sub sessionGet
         # Attempt to select from database
         $oDbHash{$strDatabaseName}{hSqlSessionSelect}->execute($strSessionId, $strSessionId, $strSessionId);
 
-        ($oSessionHash{$strSessionId}{application_name}, $oSessionHash{$strSessionId}{connection_from},
-         $oSessionHash{$strSessionId}{state}, $oSessionHash{$strSessionId}{session_line_num},
-         $oSessionHash{$strSessionId}{statement_id},
+        ($oSessionHash{$strSessionId}{application_name}, $oSessionHash{$strSessionId}{state},
+         $oSessionHash{$strSessionId}{session_line_num}, $oSessionHash{$strSessionId}{statement_id},
          $oSessionHash{$strSessionId}{substatement_id}) = $oDbHash{$strDatabaseName}{hSqlSessionSelect}->fetchrow_array();
 
         # If state is defined then the select was successful
@@ -294,7 +291,6 @@ sub sessionGet
             $oDbHash{$strDatabaseName}{hDb}->commit();
 
             $oSessionHash{$strSessionId}{application_name} = $strApplicationName;
-            $oSessionHash{$strSessionId}{connection_from} = $strConnectionFrom;
             $oSessionHash{$strSessionId}{state} = $strState;
             $oSessionHash{$strSessionId}{session_line_num} = 0;
             $oSessionHash{$strSessionId}{statement_id} = 0;
@@ -305,18 +301,13 @@ sub sessionGet
     }
 
     # If the user name has changed then update the session log
-    if ($strApplicationName ne $oSessionHash{$strSessionId}{application_name} ||
-        $strConnectionFrom ne $oSessionHash{$strSessionId}{connection_from} ||
-        $strState ne $oSessionHash{$strSessionId}{state})
+    if ($lSessionLineNum > $oSessionHash{$strSessionId}{session_line_num} &&
+        $strApplicationName ne $oSessionHash{$strSessionId}{application_name})
     {
-        $oDbHash{$strDatabaseName}{hSqlSessionUpdate}->execute($strApplicationName, $strConnectionFrom, $strState, $strSessionId);
-        $oDbHash{$strDatabaseName}{hDb}->commit();
-
+        $oDbHash{$strDatabaseName}{hSqlSessionUpdate}->execute($strApplicationName, $strSessionId);
         $oSessionHash{$strSessionId}{application_name} = $strApplicationName;
-        $oSessionHash{$strSessionId}{connection_from} = $strConnectionFrom;
-        $oSessionHash{$strSessionId}{state} = $strState;
 
-        print "session update =  " . $strSessionId . "\n";
+        print "session update =  " . $strSessionId . ", application = ${strApplicationName}\n";
     }
 
     # Add to the local cache
@@ -417,55 +408,116 @@ sub auditWrite
 }
 
 ####################################################################################################################################
+# nextLogFile
+#
+# Find next log file to be analyzed.
+####################################################################################################################################
+sub nextLogFile
+{
+    my $strPath = shift;
+    my $strLastLogFile = shift;
+
+    # Open the log file path
+    my $hPath;
+
+    if (!opendir($hPath, $strPath))
+    {
+        confess "unable to open database log directory";
+    }
+
+    # Get the list of log files and make sure there are some
+    my @stryFileList = sort(grep(/.*\.csv$/i, readdir($hPath)));
+
+    if (@stryFileList == 0)
+    {
+        confess "no csv log files found";
+    }
+
+    # If there is no last log file return the first log in the list
+    if (!defined($strLastLogFile))
+    {
+        return $stryFileList[0];
+    }
+
+    # Else return the first log file alphabetically greater than the last log
+    for (my $iIndex = 0; $iIndex < @stryFileList; $iIndex++)
+    {
+        return $stryFileList[$iIndex]
+            if ($stryFileList[$iIndex] gt $strLastLogFile);
+    }
+
+    # Else there is no next file
+    return undef;
+}
+
+####################################################################################################################################
 # Main loop
 ####################################################################################################################################
-# Open the ini file for reading
+my $strLogPath = $ARGV[0];
+
+if (!defined($strLogPath))
+{
+    confess "log file path must be passed";
+}
+
 my $hFile;
+my $strNextLogFile = nextLogFile($strLogPath);
+my $strLogFile;
+my $oLogCSV;
 
-print "opening $ARGV[0]\n";
-
-if (!defined($ARGV[0]))
+while(1)
 {
-    confess "file to parse must be passed";
-}
-
-# Read updating file
-# http://stackoverflow.com/questions/1425223/how-do-i-read-a-file-which-is-constantly-updating
-
-open($hFile, '<', $ARGV[0])
-    or confess "unable to open $ARGV[0]";
-
-# Read the log file
-my $oLogCSV = new PgAudit::CSV({binary => 1, empty_is_undef => 1});
-
-while (my $stryRow = $oLogCSV->getline($hFile))
-{
-    my $strSessionId = $$stryRow[LOG_FIELD_SESSION_ID];
-    my $strUserName = $$stryRow[LOG_FIELD_USER_NAME];
-    my $strDatabaseName = $$stryRow[LOG_FIELD_DATABASE_NAME];
-
-    if (defined($strUserName) && $strAuditUserName ne $strUserName &&
-        defined($strDatabaseName) && databaseGet($strDatabaseName))
+    if (!defined($strNextLogFile))
     {
-        sessionGet($strSessionId, $$stryRow[LOG_FIELD_PROCESS_ID], $$stryRow[LOG_FIELD_SESSION_START_TIME], $strUserName,
-                   $strDatabaseName, $$stryRow[LOG_FIELD_APPLICATION_NAME], $$stryRow[LOG_FIELD_CONNECTION_FROM],
-                   $$stryRow[LOG_FIELD_COMMAND_TAG], $$stryRow[LOG_FIELD_ERROR_SEVERITY]);
+        $strNextLogFile = nextLogFile($strLogPath, $strLogFile);
 
-        logWrite($strSessionId, $strDatabaseName, $$stryRow[LOG_FIELD_LOG_TIME], $$stryRow[LOG_FIELD_SESSION_LINE_NUM],
-                 lc($$stryRow[LOG_FIELD_COMMAND_TAG]), lc($$stryRow[LOG_FIELD_ERROR_SEVERITY]),
-                 lc($$stryRow[LOG_FIELD_SQL_STATE_CODE]), $$stryRow[LOG_FIELD_VIRTUAL_TRANSACTION_ID],
-                 $$stryRow[LOG_FIELD_TRANSACTION_ID], $$stryRow[LOG_FIELD_MESSAGE], $$stryRow[LOG_FIELD_DETAIL],
-                 $$stryRow[LOG_FIELD_HINT], $$stryRow[LOG_FIELD_QUERY], $$stryRow[LOG_FIELD_QUERY_POS],
-                 $$stryRow[LOG_FIELD_INTERNAL_QUERY], $$stryRow[LOG_FIELD_INTERNAL_QUERY_POS], $$stryRow[LOG_FIELD_CONTEXT],
-                 $$stryRow[LOG_FIELD_LOCATION]);
-
-        $oDbHash{$strDatabaseName}{hDb}->commit();
+        sleep(1);
     }
-}
+    else
+    {
+        $strLogFile = $strNextLogFile;
+        undef($strNextLogFile);
 
-if ($!)
-{
-    confess $!;
+        print "opening ${strLogFile}\n";
+
+        # Read updating file
+        # http://stackoverflow.com/questions/1425223/how-do-i-read-a-file-which-is-constantly-updating
+
+        open($hFile, '<', "${strLogPath}/${strLogFile}")
+            or confess "unable to open ${strLogPath}/${strLogFile}";
+
+        # Read the log file
+        $oLogCSV = new PgAudit::CSV({binary => 1, empty_is_undef => 1});
+    }
+
+    # Parse all rows in the file into CSV
+    while (my $stryRow = $oLogCSV->getline($hFile))
+    {
+        my $strSessionId = $$stryRow[LOG_FIELD_SESSION_ID];
+        my $lSessionLineNum = $$stryRow[LOG_FIELD_SESSION_LINE_NUM];
+        my $strUserName = $$stryRow[LOG_FIELD_USER_NAME];
+        my $strDatabaseName = $$stryRow[LOG_FIELD_DATABASE_NAME];
+
+        if (defined($strUserName) && $strAuditUserName ne $strUserName &&
+            defined($strDatabaseName) && databaseGet($strDatabaseName) &&
+            (!defined($oSessionHash{$strSessionId}) || !defined($oSessionHash{$strSessionId}{session_line_num}) ||
+             $lSessionLineNum > $oSessionHash{$strSessionId}{session_line_num}))
+        {
+            sessionGet($strSessionId, $lSessionLineNum, $$stryRow[LOG_FIELD_PROCESS_ID], $$stryRow[LOG_FIELD_SESSION_START_TIME],
+                       $strUserName, $strDatabaseName, $$stryRow[LOG_FIELD_APPLICATION_NAME], $$stryRow[LOG_FIELD_CONNECTION_FROM],
+                       $$stryRow[LOG_FIELD_COMMAND_TAG], $$stryRow[LOG_FIELD_ERROR_SEVERITY]);
+
+            logWrite($strSessionId, $strDatabaseName, $$stryRow[LOG_FIELD_LOG_TIME], $lSessionLineNum,
+                     lc($$stryRow[LOG_FIELD_COMMAND_TAG]), lc($$stryRow[LOG_FIELD_ERROR_SEVERITY]),
+                     lc($$stryRow[LOG_FIELD_SQL_STATE_CODE]), $$stryRow[LOG_FIELD_VIRTUAL_TRANSACTION_ID],
+                     $$stryRow[LOG_FIELD_TRANSACTION_ID], $$stryRow[LOG_FIELD_MESSAGE], $$stryRow[LOG_FIELD_DETAIL],
+                     $$stryRow[LOG_FIELD_HINT], $$stryRow[LOG_FIELD_QUERY], $$stryRow[LOG_FIELD_QUERY_POS],
+                     $$stryRow[LOG_FIELD_INTERNAL_QUERY], $$stryRow[LOG_FIELD_INTERNAL_QUERY_POS], $$stryRow[LOG_FIELD_CONTEXT],
+                     $$stryRow[LOG_FIELD_LOCATION]);
+
+            $oDbHash{$strDatabaseName}{hDb}->commit();
+        }
+    }
 }
 
 close($hFile);
