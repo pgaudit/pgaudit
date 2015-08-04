@@ -176,6 +176,26 @@ sub databaseGet
         "   set application_name = ?\n" .
         " where session_id = ?");
 
+    $oDbHash{$strDatabaseName}{hSqlLogonSelect} = $oDbHash{$strDatabaseName}{hDb}->prepare(
+        "select last_success,\n" .
+        "       current_success,\n" .
+        "       last_failure,\n" .
+        "       failures_since_last_success\n".
+        "  from pgaudit.logon\n" .
+        " where user_name = ?");
+
+    $oDbHash{$strDatabaseName}{hSqlLogonInsert} = $oDbHash{$strDatabaseName}{hDb}->prepare(
+        "insert into pgaudit.logon (user_name, current_success, last_failure, failures_since_last_success)\n" .
+        "                   values (?, ?, ?, ?)");
+
+    $oDbHash{$strDatabaseName}{hSqlLogonUpdate} = $oDbHash{$strDatabaseName}{hDb}->prepare(
+        "update pgaudit.logon\n" .
+        "   set last_success = ?,\n" .
+        "       current_success = ?,\n" .
+        "       last_failure = ?,\n" .
+        "       failures_since_last_success = ?\n".
+        " where user_name = ?");
+
     $oDbHash{$strDatabaseName}{hSqlLogInsert} = $oDbHash{$strDatabaseName}{hDb}->prepare(
         "insert into pgaudit.log_event (session_id, log_time, session_line_num, command, error_severity, sql_state_code,\n" .
         "                               virtual_transaction_id, transaction_id, message, detail, hint, query, query_pos,\n" .
@@ -229,6 +249,7 @@ sub databaseGet
 # sessionGet
 ####################################################################################################################################
 my %oSessionHash;
+my %oLogonHash;
 
 sub sessionGet
 {
@@ -285,22 +306,80 @@ sub sessionGet
         # Else the session does not exist and must be inserted
         else
         {
+            # Insert session row
             $oDbHash{$strDatabaseName}{hSqlSessionInsert}->execute(
                 $strSessionId, $strProcessId, $strSessionStartTime, $strUserName, $strApplicationName,
                 $strConnectionFrom, $strState);
-            $oDbHash{$strDatabaseName}{hDb}->commit();
 
+            # Set session cache so the session does not have to be queried every time
             $oSessionHash{$strSessionId}{application_name} = $strApplicationName;
             $oSessionHash{$strSessionId}{state} = $strState;
             $oSessionHash{$strSessionId}{session_line_num} = 0;
             $oSessionHash{$strSessionId}{statement_id} = 0;
             $oSessionHash{$strSessionId}{substatement_id} = 0;
 
+            # Get logon Info
+            $oDbHash{$strDatabaseName}{hSqlLogonSelect}->execute($strUserName);
+            my ($strLastSuccess, $strCurrentSuccess, $strLastFailure,
+                $iFailuresSinceLastSuccess) = $oDbHash{$strDatabaseName}{hSqlLogonSelect}->fetchrow_array();
+
+            # If the user has logged on before
+            if (defined($iFailuresSinceLastSuccess))
+            {
+                # If this logon was successful
+                if ($strState eq STATE_OK)
+                {
+                    # If the last logon was successful
+                    if (defined($strCurrentSuccess))
+                    {
+                        $strLastSuccess = $strCurrentSuccess;
+                        undef($strLastFailure);
+                        $iFailuresSinceLastSuccess = 0;
+                    }
+
+                    $strCurrentSuccess = $strSessionStartTime;
+                }
+                # Else this logon was not successful
+                else
+                {
+                    undef($strCurrentSuccess);
+                    $strLastFailure = $strSessionStartTime;
+                    $iFailuresSinceLastSuccess += 1;
+                }
+
+                # Update the logon row
+                $oDbHash{$strDatabaseName}{hSqlLogonUpdate}->execute(
+                    $strLastSuccess, $strCurrentSuccess, $strLastFailure, $iFailuresSinceLastSuccess, $strUserName);
+            }
+            # Else the user has never logged on
+            else
+            {
+                # If this logon was successful
+                if ($strState eq STATE_OK)
+                {
+                    $strCurrentSuccess = $strSessionStartTime;
+                    $iFailuresSinceLastSuccess = 0;
+                }
+                # Else this logon was not successful
+                else
+                {
+                    $strLastFailure = $strSessionStartTime;
+                    $iFailuresSinceLastSuccess = 0;
+                }
+
+                # Insert the logon row
+                $oDbHash{$strDatabaseName}{hSqlLogonInsert}->execute(
+                    $strUserName, $strCurrentSuccess, $strLastFailure, $iFailuresSinceLastSuccess);
+            }
+
+            $oDbHash{$strDatabaseName}{hDb}->commit();
+
             print "session insert =  " . $strSessionId . "\n";
         }
     }
 
-    # If the user name has changed then update the session log
+
+    # If the application name has changed update it (only the last application name is preserved)
     if ($lSessionLineNum > $oSessionHash{$strSessionId}{session_line_num} &&
         $strApplicationName ne $oSessionHash{$strSessionId}{application_name})
     {

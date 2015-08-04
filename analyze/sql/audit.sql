@@ -41,42 +41,6 @@ create table pgaudit.session
         primary key (session_id)
 );
 
-create or replace function pgaudit.session_insert()
-    returns trigger as $$
--- declare
---     tsLastLogonTime timestamp with time zone;
---     tsCurrentLogonTime timestamp with time zone;
---     iLogonFailureTotal int;
-begin
-    -- select last_logon_time,
-    --        current_logon_time,
-    --        logon_failure_total
-    --   into tsLastLogonTime,
-    --        tsCurrentLogonTime,
-    --        iLogonFailureTotal
-    --   from pgaudit.logon
-    --  where user_name = new.user_name;
-
-    update pgaudit.logon
-       set last_logon_time = case when new.state = 'ok' then new.session_start_time else last_logon_time end,
-           logon_failure_total = case when new.state = 'ok' then 0 else logon_failure_total + 1 end
-     where user_name = new.user_name;
-
-    if not found then
-        insert into pgaudit.logon (user_name, last_logon_time, logon_failure_total)
-                           values (new.user_name,
-                                   case when new.state = 'ok' then new.session_start_time else null end,
-                                   case when new.state = 'ok' then 0 else 1 end);
-    end if;
-
-    return new;
-end
-$$ language plpgsql security definer;
-
-create trigger session_trigger_insert
-    after insert on pgaudit.session
-    for each row execute procedure pgaudit.session_insert();
-
 grant select,
       insert,
       update (application_name)
@@ -86,27 +50,37 @@ grant select,
 create table pgaudit.logon
 (
      user_name text not null,
-     last_logon_time timestamp with time zone,
-     logon_failure_total int not null,
+     last_success timestamp with time zone,
+     current_success timestamp with time zone,
+     last_failure timestamp with time zone,
+     failures_since_last_success int not null,
 
      constraint logon_pk
         primary key (user_name)
 );
 
+grant select,
+      insert (user_name, current_success, last_failure, failures_since_last_success),
+      update (last_success, current_success, last_failure, failures_since_last_success)
+   on pgaudit.logon
+   to pgaudit_etl;
+
 create or replace function pgaudit.logon_info()
     returns table
 (
-    last_logon_time timestamp with time zone,
-    logon_failures_since_last_logon int
+    last_success timestamp with time zone,
+    last_failure timestamp with time zone,
+    failures_since_last_success int
 )
     as $$
 begin
     return query
     (
-        select last_logon_time,
-               logon_failure_total
-          from logon
-         where user_name = session_user
+        select logon.last_success,
+               logon.last_failure,
+               logon.failures_since_last_success
+          from pgaudit.logon
+         where logon.user_name = session_user
     );
 end
 $$ language plpgsql security definer;
