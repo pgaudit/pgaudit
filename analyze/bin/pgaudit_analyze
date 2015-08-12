@@ -114,7 +114,7 @@ sub databaseGet
     }
 
     # Connect to the database
-    $oDbHash{$strDatabaseName}{hDb} = DBI->connect("dbi:Pg:dbname=${strDatabaseName};port=5432", $strAuditUserName, undef,
+    $oDbHash{$strDatabaseName}{hDb} = DBI->connect("dbi:Pg:dbname=${strDatabaseName};port=5432;host=/tmp", $strAuditUserName, undef,
                                                    {AutoCommit => 0, RaiseError => 1});
 
     # Check for the audit schema to determine whether or not to log this database
@@ -476,8 +476,9 @@ sub auditWrite
         {
             $oDbHash{$strDatabaseName}{hSqlAuditSubStmtDetailInsert}->execute(
                 $strSessionId, $lStatementId, $lSubStatementId, $lSessionLineNum, lc($stryRow[AUDIT_FIELD_AUDIT_TYPE]),
-                lc($stryRow[AUDIT_FIELD_CLASS]), lc($stryRow[AUDIT_FIELD_COMMAND]), lc($stryRow[AUDIT_FIELD_OBJECT_TYPE]),
-                lc($stryRow[AUDIT_FIELD_OBJECT_NAME]));
+                lc($stryRow[AUDIT_FIELD_CLASS]), lc($stryRow[AUDIT_FIELD_COMMAND]),
+                defined($stryRow[AUDIT_FIELD_OBJECT_TYPE]) ? lc($stryRow[AUDIT_FIELD_OBJECT_TYPE]) : undef,
+                defined($stryRow[AUDIT_FIELD_OBJECT_NAME]) ? lc($stryRow[AUDIT_FIELD_OBJECT_NAME]) : undef);
         }
 
         return true;

@@ -13,6 +13,7 @@ use Carp;
 use Getopt::Long;
 use Pod::Usage;
 use DBI;
+use File::Basename qw(dirname);
 use Cwd qw(abs_path);
 use IPC::System::Simple qw(capture system);
 
@@ -33,7 +34,7 @@ my $strPgSqlBin = '/usr/local/pgsql/bin';   # Path of PG binaries to use for
 my $strTestPath = 'test';                   # Path where testing will occur
 my $strUser = getpwuid($>);                 # PG user name
 my $strDatabase = 'postgres';               # PG database
-my $iPort = 6000;                           # Port to run Postgres on
+my $iPort = 5432;                           # Port to run Postgres on
 my $bHelp = false;                          # Display help
 my $bQuiet = false;                         # Supress output except for errors
 my $bNoCleanup = false;                     # Cleanup database on exit
@@ -255,12 +256,28 @@ sub pgStart
 }
 
 ################################################################################
+# pgPsql
+################################################################################
+sub pgPsql
+{
+    my $strOption = shift;
+
+    commandExecute("${strPgSqlBin}/psql -p ${iPort} " .
+                   "${strOption} ${strDatabase}");
+}
+
+################################################################################
 # Main
 ################################################################################
+my $strBasePath = dirname(dirname(abs_path($0)));
+
 # Drop the old cluster, build the code, and create a new cluster
 pgDrop();
 pgCreate();
 pgStart();
+
+# Load the audit schema
+pgPsql("-f ${strBasePath}/sql/audit.sql");
 
 # Stop the database
 if (!$bNoCleanup)

@@ -4,27 +4,17 @@
 -- Make sure that errors are detected and not automatically rolled back
 \set ON_ERROR_ROLLBACK off
 
-drop database if exists audit_test;
-drop role if exists pgaudit_owner;
-drop role if exists pgaudit_etl;
-drop user if exists pgaudit;
-
 create role pgaudit_owner;
 create role pgaudit_etl;
-create user pgaudit;
-grant pgaudit_etl to pgaudit;
-
-create database audit_test;
-
-\c audit_test
+create user pgaudit in role pgaudit_etl;
 
 create schema pgaudit authorization pgaudit_owner;
+
+set session authorization pgaudit_owner;
 
 grant usage
    on schema pgaudit
    to pgaudit_etl;
-
-set session authorization pgaudit_owner;
 
 create table pgaudit.session
 (
