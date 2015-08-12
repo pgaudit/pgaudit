@@ -120,7 +120,7 @@ sub pgConnect
     pgDisconnect();
 
     # Connect to the db
-    $hDb = DBI->connect('dbi:Pg:dbname=' .
+    return DBI->connect('dbi:Pg:dbname=' .
                         (defined($strDatabaseParam) ? $strDatabaseParam : $strDatabase) .
                         ";port=${iPort};host=" .
                         (defined($strHostParam) ? $strHostParam : '/tmp'),
@@ -144,38 +144,35 @@ sub pgDisconnect
 }
 
 ################################################################################
+# pgQuery
+################################################################################
+# sub pgQuery
+# {
+#     my $strSql = shift;
+#
+#     # Log the statement
+#     &log("  SQL: ${strSql}");
+#
+#     # Execute the statement
+#     my $hStatement = $hDb->prepare($strSql);
+#
+#     $hStatement->execute();
+#     $hStatement->finish();
+# }
+
+################################################################################
 # pgExecute
 ################################################################################
 sub pgExecute
 {
     my $strSql = shift;
+    my $hDbParam = shift;
 
     # Log the statement
     &log("  SQL: ${strSql}");
 
     # Execute the statement
-    my $hStatement = $hDb->prepare($strSql);
-
-    print "${strSql};\n";
-
-    $hStatement->execute();
-    $hStatement->finish();
-}
-
-################################################################################
-# pgExecuteOnly
-################################################################################
-sub pgExecuteOnly
-{
-    my $strSql = shift;
-
-    # Log the statement
-    &log("  SQL: ${strSql}");
-
-    print "${strSql};\n";
-
-    # Execute the statement
-    $hDb->do($strSql);
+    ($hDbParam ? $hDbParam : $hDb)->do($strSql);
 }
 
 ################################################################################
@@ -267,7 +264,7 @@ sub pgStart
                    "\" -D ${strPath} -l ${strPath}/postgresql.log -w -s");
 
     # Connect user session
-    pgConnect();
+    $hDb = pgConnect();
 }
 
 ################################################################################
