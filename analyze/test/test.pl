@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 ################################################################################
-# test.pl - pg_audit Unit Tests
+# test.pl - pgaudit log analyze regression tests
 ################################################################################
 
 ################################################################################
@@ -352,7 +352,7 @@ sub PgConnect
 
 	# Disconnect user session
 	PgDisconnect();
-	
+
 	print "\\connect ${strDatabase} ${strUser}\n\n";
 
 	# Connect to the db
@@ -577,7 +577,7 @@ sub PgLogExpect
 
 	# Log based on session
 	my $bSessionRelation = false;
-	
+
 	if (PgShouldLog($strCommand))
 	{
 		# Make sure class is defined
@@ -1405,7 +1405,7 @@ PgLogExecute(COMMAND_SELECT, $strSql, undef, false, true);
 # Now try some DDL in a do block
 $strSql = 'do $$ ' .
 		  'declare ' .
-		  "    table_name text = 'do_table'; " . 
+		  "    table_name text = 'do_table'; " .
 		  'begin ' .
 		  "    execute 'create table ' || table_name || ' (\"weird name\" int)'; " .
 		  "    execute 'drop table ' || table_name; " .
