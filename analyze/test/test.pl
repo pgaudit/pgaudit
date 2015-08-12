@@ -15,7 +15,7 @@ use Pod::Usage;
 use DBI;
 use File::Basename qw(dirname);
 use Cwd qw(abs_path);
-use IPC::System::Simple qw(capture system);
+use IPC::System::Simple qw(capture);
 
 ################################################################################
 # Constants
@@ -107,6 +107,12 @@ sub log
 ################################################################################
 sub pgConnect
 {
+    my $strUserParam = shift;
+    my $strPasswordParam = shift;
+    my $strHostParam = shift;
+    my $strDatabaseParam = shift;
+    my $bRaiseError = shift;
+
     # Log Connection
     &log("   DB: connect user ${strUser}, database ${strDatabase}");
 
@@ -114,9 +120,14 @@ sub pgConnect
     pgDisconnect();
 
     # Connect to the db
-    $hDb = DBI->connect("dbi:Pg:dbname=${strDatabase};port=${iPort};host=/tmp",
-                        $strUser, undef,
-                        {AutoCommit => 1, RaiseError => 1});
+    $hDb = DBI->connect('dbi:Pg:dbname=' .
+                        (defined($strDatabaseParam) ? $strDatabaseParam : $strDatabase) .
+                        ";port=${iPort};host=" .
+                        (defined($strHostParam) ? $strHostParam : '/tmp'),
+                        defined($strUserParam) ? $strUserParam : $strUser,
+                        defined($strPasswordParam) ? $strPasswordParam : undef,
+                        {AutoCommit => true,
+                         RaiseError => defined($bRaiseError) ? $bRaiseError : true});
 }
 
 ################################################################################
@@ -196,6 +207,9 @@ sub pgCreate
 
     commandExecute("${strPgSqlBin}/initdb -D ${strPath} -U ${strUser}" .
                    ' -A trust > /dev/null');
+
+    commandExecute("echo 'local all all trust' > ${strPath}/pg_hba.conf");
+    commandExecute("echo 'host all all 127.0.0.1/32 md5' >> ${strPath}/pg_hba.conf");
 }
 
 ################################################################################
@@ -249,6 +263,7 @@ sub pgStart
                    " -c logging_collector=on" .
                    " -c log_rotation_age=1" .
                    " -c log_connections=on" .
+                   " -c unix_socket_directories='/tmp'" .
                    "\" -D ${strPath} -l ${strPath}/postgresql.log -w -s");
 
     # Connect user session
@@ -261,15 +276,17 @@ sub pgStart
 sub pgPsql
 {
     my $strOption = shift;
+    my $bSuppressError = shift;
 
     commandExecute("${strPgSqlBin}/psql -p ${iPort} " .
-                   "${strOption} ${strDatabase}");
+                   "${strOption} ${strDatabase}", $bSuppressError);
 }
 
 ################################################################################
 # Main
 ################################################################################
 my $strBasePath = dirname(dirname(abs_path($0)));
+my $strAnalyzeExe = "${strBasePath}/bin/pgaudit_analyze";
 
 # Drop the old cluster, build the code, and create a new cluster
 pgDrop();
@@ -278,6 +295,16 @@ pgStart();
 
 # Load the audit schema
 pgPsql("-f ${strBasePath}/sql/audit.sql");
+
+# Verify that successful logons are logged
+#-------------------------------------------------------------------------------
+my $strUser1 = 'test1';
+pgExecute("create user ${strUser1} with password '${strUser1}'");
+
+pgConnect($strUser1, 'bogus', '127.0.0.1', undef, false);
+pgConnect($strUser1, 'still-bogus', '127.0.0.1', undef, false);
+
+commandExecute("${strAnalyzeExe} $strTestPath/pg_log");
 
 # Stop the database
 if (!$bNoCleanup)

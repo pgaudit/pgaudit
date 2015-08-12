@@ -364,7 +364,7 @@ sub sessionGet
                 else
                 {
                     $strLastFailure = $strSessionStartTime;
-                    $iFailuresSinceLastSuccess = 0;
+                    $iFailuresSinceLastSuccess = 1;
                 }
 
                 # Insert the logon row
@@ -537,21 +537,33 @@ my $strLogPath = $ARGV[0];
 
 if (!defined($strLogPath))
 {
-    confess "log file path must be passed";
+    confess "log file/path must be passed";
 }
 
 my $hFile;
-my $strNextLogFile = nextLogFile($strLogPath);
+my $strNextLogFile;
 my $strLogFile;
 my $oLogCSV;
+my $bDone = false;
 
-while(1)
+$strNextLogFile = -d $strLogPath ? nextLogFile($strLogPath) : $strLogPath;
+
+while(!$bDone)
 {
     if (!defined($strNextLogFile))
     {
-        $strNextLogFile = nextLogFile($strLogPath, $strLogFile);
+        if (-d $strLogPath)
+        {
+            $strNextLogFile = nextLogFile($strLogPath, $strLogFile);
 
-        sleep(1);
+            $bDone = true;
+
+#            sleep(1);
+        }
+        else
+        {
+            $bDone = true;
+        }
     }
     else
     {

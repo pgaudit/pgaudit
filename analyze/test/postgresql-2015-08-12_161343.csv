@@ -1,0 +1,658 @@
+2015-08-12 16:13:43.810 UTC,,,22602,,55cb70b7.584a,1,,2015-08-12 16:13:43 UTC,,0,LOG,00000,"ending log output to stderr",,"Future log output will go to log destination ""csvlog"".",,,,,,"PostmasterMain, postmaster.c:1201",""
+2015-08-12 16:13:43.811 UTC,,,22604,,55cb70b7.584c,1,,2015-08-12 16:13:43 UTC,,0,LOG,00000,"database system was shut down at 2015-08-12 16:13:43 UTC",,,,,,,,"StartupXLOG, xlog.c:5936",""
+2015-08-12 16:13:43.812 UTC,,,22604,,55cb70b7.584c,2,,2015-08-12 16:13:43 UTC,,0,LOG,00000,"MultiXact member wraparound protections are now enabled",,,,,,,,"DetermineSafeOldestOffset, multixact.c:2601",""
+2015-08-12 16:13:43.812 UTC,,,22602,,55cb70b7.584a,2,,2015-08-12 16:13:43 UTC,,0,LOG,00000,"database system is ready to accept connections",,,,,,,,"reaper, postmaster.c:2739",""
+2015-08-12 16:13:43.813 UTC,,,22608,,55cb70b7.5850,1,,2015-08-12 16:13:43 UTC,,0,LOG,00000,"autovacuum launcher started",,,,,,,,"AutoVacLauncherMain, autovacuum.c:413",""
+2015-08-12 16:13:44.803 UTC,,,22610,"",55cb70b8.5852,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.803 UTC,"vagrant","postgres",22610,"[local]",55cb70b8.5852,2,"authentication",2015-08-12 16:13:44 UTC,2/1,0,LOG,00000,"connection authorized: user=vagrant database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.806 UTC,,,22612,"",55cb70b8.5854,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.807 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,2,"authentication",2015-08-12 16:13:44 UTC,2/2,0,LOG,00000,"connection authorized: user=vagrant database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.809 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,3,"CREATE ROLE",2015-08-12 16:13:44 UTC,2/3,1830,LOG,00000,"AUDIT: SESSION,1,1,ROLE,CREATE ROLE,,,create role pgaudit_owner;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.810 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,4,"CREATE ROLE",2015-08-12 16:13:44 UTC,2/4,1831,LOG,00000,"AUDIT: SESSION,2,1,ROLE,CREATE ROLE,,,create role pgaudit_etl;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.811 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,5,"CREATE ROLE",2015-08-12 16:13:44 UTC,2/5,1832,LOG,00000,"AUDIT: SESSION,3,1,ROLE,CREATE ROLE,,,create user pgaudit in role pgaudit_etl;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.812 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,6,"CREATE SCHEMA",2015-08-12 16:13:44 UTC,2/6,1833,LOG,00000,"AUDIT: SESSION,4,1,DDL,CREATE SCHEMA,,,create schema pgaudit authorization pgaudit_owner;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.813 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,7,"SET",2015-08-12 16:13:44 UTC,2/7,0,LOG,00000,"AUDIT: SESSION,5,1,MISC,SET,,,set session authorization pgaudit_owner;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.813 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,8,"GRANT",2015-08-12 16:13:44 UTC,2/8,1834,LOG,00000,"AUDIT: SESSION,6,1,ROLE,GRANT,,,""grant usage
+   on schema pgaudit
+   to pgaudit_etl;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.816 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,9,"CREATE TABLE",2015-08-12 16:13:44 UTC,2/9,1835,LOG,00000,"AUDIT: SESSION,7,1,DDL,CREATE TABLE,,,""create table pgaudit.session
+(
+    session_id text not null,
+    process_id int not null,
+    session_start_time timestamp with time zone not null,
+    user_name text not null,
+    application_name text,
+    connection_from text,
+    state text not null
+        constraint session_state_ck check (state in ('ok', 'error')),
+    constraint session_pk
+        primary key (session_id)
+);"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.818 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,10,"GRANT",2015-08-12 16:13:44 UTC,2/10,1836,LOG,00000,"AUDIT: SESSION,8,1,ROLE,GRANT,,,""grant select,
+      insert,
+      update (application_name)
+   on pgaudit.session
+   to pgaudit_etl;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.822 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,11,"CREATE TABLE",2015-08-12 16:13:44 UTC,2/11,1837,LOG,00000,"AUDIT: SESSION,9,1,DDL,CREATE TABLE,,,""create table pgaudit.logon
+(
+     user_name text not null,
+     last_success timestamp with time zone,
+     current_success timestamp with time zone,
+     last_failure timestamp with time zone,
+     failures_since_last_success int not null,
+     constraint logon_pk
+        primary key (user_name)
+);"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.824 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,12,"GRANT",2015-08-12 16:13:44 UTC,2/12,1838,LOG,00000,"AUDIT: SESSION,10,1,ROLE,GRANT,,,""grant select,
+      insert (user_name, current_success, last_failure, failures_since_last_success),
+      update (last_success, current_success, last_failure, failures_since_last_success)
+   on pgaudit.logon
+   to pgaudit_etl;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.826 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,13,"CREATE FUNCTION",2015-08-12 16:13:44 UTC,2/13,1839,LOG,00000,"AUDIT: SESSION,11,1,DDL,CREATE FUNCTION,,,""create or replace function pgaudit.logon_info()
+    returns table
+(
+    last_success timestamp with time zone,
+    last_failure timestamp with time zone,
+    failures_since_last_success int
+)
+    as $$
+begin
+    return query
+    (
+        select logon.last_success,
+               logon.last_failure,
+               logon.failures_since_last_success
+          from pgaudit.logon
+         where logon.user_name = session_user
+    );
+end
+$$ language plpgsql security definer;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.827 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,14,"GRANT",2015-08-12 16:13:44 UTC,2/14,1840,LOG,00000,"AUDIT: SESSION,12,1,ROLE,GRANT,,,grant execute on function pgaudit.logon_info() to public;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.830 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,15,"CREATE TABLE",2015-08-12 16:13:44 UTC,2/15,1841,LOG,00000,"AUDIT: SESSION,13,1,DDL,CREATE TABLE,,,""create table pgaudit.log_event
+(
+    session_id text not null
+        constraint logevent_sessionid_fk
+            references pgaudit.session (session_id),
+    session_line_num numeric not null,
+    log_time timestamp(3) with time zone not null,
+    command text,
+    error_severity text,
+    sql_state_code text,
+    virtual_transaction_id text,
+    transaction_id int,
+    message text,
+    detail text,
+    hint text,
+    query text,
+    query_pos integer,
+    internal_query text,
+    internal_query_pos integer,
+    context text,
+    location text,
+    constraint logevent_pk
+        primary key (session_id, session_line_num)
+
+
+);"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.831 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,16,"GRANT",2015-08-12 16:13:44 UTC,2/16,1842,LOG,00000,"AUDIT: SESSION,14,1,ROLE,GRANT,,,""grant select,
+      insert
+   on pgaudit.log_event
+   to pgaudit_etl;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.835 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,17,"CREATE TABLE",2015-08-12 16:13:44 UTC,2/17,1843,LOG,00000,"AUDIT: SESSION,15,1,DDL,CREATE TABLE,,,""create table pgaudit.audit_statement
+(
+    session_id text not null
+        constraint auditstatement_sessionid_fk
+            references pgaudit.session (session_id),
+    statement_id numeric not null,
+    state text not null default 'ok'
+        constraint auditstatement_state_ck check (state in ('ok', 'error')),
+    error_session_line_num bigint,
+    constraint auditstatement_pk
+        primary key (session_id, statement_id)
+);"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.836 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,18,"GRANT",2015-08-12 16:13:44 UTC,2/18,1844,LOG,00000,"AUDIT: SESSION,16,1,ROLE,GRANT,,,""grant select,
+      update (state, error_session_line_num),
+      insert
+   on pgaudit.audit_statement
+   to pgaudit_etl;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.839 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,19,"CREATE TABLE",2015-08-12 16:13:44 UTC,2/19,1845,LOG,00000,"AUDIT: SESSION,17,1,DDL,CREATE TABLE,,,""create table pgaudit.audit_substatement
+(
+    session_id text not null,
+    statement_id numeric not null,
+    substatement_id numeric not null,
+    statement text,
+    parameter text[],
+    constraint auditsubstatement_pk
+        primary key (session_id, statement_id, substatement_id),
+    constraint auditsubstatement_sessionid_statementid_fk
+        foreign key (session_id, statement_id)
+        references pgaudit.audit_statement (session_id, statement_id)
+);"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.841 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,20,"GRANT",2015-08-12 16:13:44 UTC,2/20,1846,LOG,00000,"AUDIT: SESSION,18,1,ROLE,GRANT,,,""grant select,
+      insert
+   on pgaudit.audit_substatement
+   to pgaudit_etl;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.846 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,21,"CREATE TABLE",2015-08-12 16:13:44 UTC,2/21,1847,LOG,00000,"AUDIT: SESSION,19,1,DDL,CREATE TABLE,,,""create table pgaudit.audit_substatement_detail
+(
+    session_id text not null,
+    statement_id numeric not null,
+    substatement_id numeric not null,
+    session_line_num numeric not null,
+    audit_type text not null
+        constraint auditsubstatementdetail_audittype_ck
+            check (audit_type in ('session', 'object')),
+    class text not null,
+    command text not null,
+    object_type text,
+    object_name text,
+    constraint auditsubstatementdetail_pk
+        primary key (session_id, statement_id, substatement_id, session_line_num),
+    constraint auditsubstatementdetail_sessionid_sessionlinenum_unq
+        unique (session_id, session_line_num),
+    constraint auditsubstatementdetail_sessionid_statementid_substatementid_fk
+        foreign key (session_id, statement_id, substatement_id)
+        references pgaudit.audit_substatement (session_id, statement_id, substatement_id),
+    constraint auditsubstatementdetail_sessionid_sessionlinenum_fk
+        foreign key (session_id, session_line_num)
+        references pgaudit.log_event (session_id, session_line_num)
+        deferrable initially deferred
+);"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.847 UTC,"vagrant","postgres",22612,"[local]",55cb70b8.5854,22,"GRANT",2015-08-12 16:13:44 UTC,2/22,1848,LOG,00000,"AUDIT: SESSION,20,1,ROLE,GRANT,,,""grant select,
+      insert
+   on pgaudit.audit_substatement_detail
+   to pgaudit_etl;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.850 UTC,,,22614,"",55cb70b8.5856,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.850 UTC,"vagrant","postgres",22614,"[local]",55cb70b8.5856,2,"authentication",2015-08-12 16:13:44 UTC,2/23,0,LOG,00000,"connection authorized: user=vagrant database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.852 UTC,"vagrant","postgres",22614,"[local]",55cb70b8.5856,3,"CREATE EXTENSION",2015-08-12 16:13:44 UTC,2/24,1849,LOG,00000,"AUDIT: SESSION,1,1,DDL,CREATE FUNCTION,,,""/* pgaudit/pgaudit--1.0.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE FUNCTION pgaudit_ddl_command_end()
+	RETURNS event_trigger
+	LANGUAGE C
+	AS '$libdir/pgaudit', 'pgaudit_ddl_command_end';
+
+CREATE EVENT TRIGGER pgaudit_ddl_command_end
+	ON ddl_command_end
+	EXECUTE PROCEDURE pgaudit_ddl_command_end();
+
+CREATE FUNCTION pgaudit_sql_drop()
+	RETURNS event_trigger
+	LANGUAGE C
+	AS '$libdir/pgaudit', 'pgaudit_sql_drop';
+
+CREATE EVENT TRIGGER pgaudit_sql_drop
+	ON sql_drop
+	EXECUTE PROCEDURE pgaudit_sql_drop();
+"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.853 UTC,"vagrant","postgres",22614,"[local]",55cb70b8.5856,4,"CREATE EXTENSION",2015-08-12 16:13:44 UTC,2/24,1849,LOG,00000,"AUDIT: SESSION,1,2,DDL,CREATE EVENT TRIGGER,,,""/* pgaudit/pgaudit--1.0.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE FUNCTION pgaudit_ddl_command_end()
+	RETURNS event_trigger
+	LANGUAGE C
+	AS '$libdir/pgaudit', 'pgaudit_ddl_command_end';
+
+CREATE EVENT TRIGGER pgaudit_ddl_command_end
+	ON ddl_command_end
+	EXECUTE PROCEDURE pgaudit_ddl_command_end();
+
+CREATE FUNCTION pgaudit_sql_drop()
+	RETURNS event_trigger
+	LANGUAGE C
+	AS '$libdir/pgaudit', 'pgaudit_sql_drop';
+
+CREATE EVENT TRIGGER pgaudit_sql_drop
+	ON sql_drop
+	EXECUTE PROCEDURE pgaudit_sql_drop();
+"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.853 UTC,"vagrant","postgres",22614,"[local]",55cb70b8.5856,5,"CREATE EXTENSION",2015-08-12 16:13:44 UTC,2/24,1849,LOG,00000,"AUDIT: SESSION,1,3,DDL,CREATE FUNCTION,FUNCTION,public.pgaudit_sql_drop(),""/* pgaudit/pgaudit--1.0.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE FUNCTION pgaudit_ddl_command_end()
+	RETURNS event_trigger
+	LANGUAGE C
+	AS '$libdir/pgaudit', 'pgaudit_ddl_command_end';
+
+CREATE EVENT TRIGGER pgaudit_ddl_command_end
+	ON ddl_command_end
+	EXECUTE PROCEDURE pgaudit_ddl_command_end();
+
+CREATE FUNCTION pgaudit_sql_drop()
+	RETURNS event_trigger
+	LANGUAGE C
+	AS '$libdir/pgaudit', 'pgaudit_sql_drop';
+
+CREATE EVENT TRIGGER pgaudit_sql_drop
+	ON sql_drop
+	EXECUTE PROCEDURE pgaudit_sql_drop();
+"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.853 UTC,"vagrant","postgres",22614,"[local]",55cb70b8.5856,6,"CREATE EXTENSION",2015-08-12 16:13:44 UTC,2/24,1849,LOG,00000,"AUDIT: SESSION,1,4,DDL,CREATE EVENT TRIGGER,,,""/* pgaudit/pgaudit--1.0.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE FUNCTION pgaudit_ddl_command_end()
+	RETURNS event_trigger
+	LANGUAGE C
+	AS '$libdir/pgaudit', 'pgaudit_ddl_command_end';
+
+CREATE EVENT TRIGGER pgaudit_ddl_command_end
+	ON ddl_command_end
+	EXECUTE PROCEDURE pgaudit_ddl_command_end();
+
+CREATE FUNCTION pgaudit_sql_drop()
+	RETURNS event_trigger
+	LANGUAGE C
+	AS '$libdir/pgaudit', 'pgaudit_sql_drop';
+
+CREATE EVENT TRIGGER pgaudit_sql_drop
+	ON sql_drop
+	EXECUTE PROCEDURE pgaudit_sql_drop();
+"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.853 UTC,"vagrant","postgres",22614,"[local]",55cb70b8.5856,7,"CREATE EXTENSION",2015-08-12 16:13:44 UTC,2/24,1849,ERROR,39P03,"pg_event_trigger_ddl_commands() can only be called in an event trigger function",,,,,"SQL statement ""SELECT UPPER(object_type), object_identity, UPPER(command_tag)
+  FROM pg_catalog.pg_event_trigger_ddl_commands()""","CREATE EXTENSION pgaudit;",,"pg_event_trigger_ddl_commands, event_trigger.c:1991","psql"
+2015-08-12 16:13:44.854 UTC,"vagrant","postgres",22614,"[local]",55cb70b8.5856,8,"SELECT",2015-08-12 16:13:44 UTC,2/25,0,LOG,00000,"AUDIT: SESSION,2,1,READ,SELECT,,,SELECT current_user ,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.854 UTC,"vagrant","postgres",22614,"[local]",55cb70b8.5856,9,"ALTER ROLE",2015-08-12 16:13:44 UTC,2/26,1850,LOG,00000,"AUDIT: SESSION,3,1,ROLE,ALTER ROLE,,,ALTER ROLE vagrant SET pgaudit.log = 'Role';,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.857 UTC,"vagrant","postgres",22614,"[local]",55cb70b8.5856,10,"ALTER ROLE",2015-08-12 16:13:44 UTC,2/27,1851,LOG,00000,"AUDIT: SESSION,4,1,ROLE,ALTER ROLE,,,ALTER ROLE vagrant SET pgaudit.log_level = 'notice';,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.859 UTC,,,22615,"",55cb70b8.5857,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.859 UTC,"vagrant","postgres",22615,"[local]",55cb70b8.5857,2,"authentication",2015-08-12 16:13:44 UTC,3/1,0,LOG,00000,"connection authorized: user=vagrant database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.860 UTC,"vagrant","postgres",22615,"[local]",55cb70b8.5857,3,"CREATE ROLE",2015-08-12 16:13:44 UTC,3/2,1852,NOTICE,00000,"AUDIT: SESSION,1,1,ROLE,CREATE ROLE,,,CREATE ROLE auditor;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.861 UTC,"vagrant","postgres",22615,"[local]",55cb70b8.5857,4,"CREATE ROLE",2015-08-12 16:13:44 UTC,3/3,1853,NOTICE,00000,"AUDIT: SESSION,2,1,ROLE,CREATE ROLE,,,CREATE USER user1;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.863 UTC,"vagrant","postgres",22615,"[local]",55cb70b8.5857,5,"ALTER ROLE",2015-08-12 16:13:44 UTC,3/4,1854,NOTICE,00000,"AUDIT: SESSION,3,1,ROLE,ALTER ROLE,,,""ALTER ROLE user1 SET pgaudit.log = 'ddl, ROLE';"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.864 UTC,"vagrant","postgres",22615,"[local]",55cb70b8.5857,6,"ALTER ROLE",2015-08-12 16:13:44 UTC,3/5,1855,NOTICE,00000,"AUDIT: SESSION,4,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_level = 'notice';,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.865 UTC,,,22616,"",55cb70b8.5858,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.865 UTC,"user1","postgres",22616,"[local]",55cb70b8.5858,2,"authentication",2015-08-12 16:13:44 UTC,2/28,0,LOG,00000,"connection authorized: user=user1 database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.867 UTC,"user1","postgres",22616,"[local]",55cb70b8.5858,3,"CREATE TABLE",2015-08-12 16:13:44 UTC,2/29,1856,NOTICE,00000,"AUDIT: SESSION,1,1,DDL,CREATE TABLE,,,""CREATE TABLE public.test
+(
+	id INT
+);"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.869 UTC,"user1","postgres",22616,"[local]",55cb70b8.5858,4,"DROP TABLE",2015-08-12 16:13:44 UTC,2/31,1857,NOTICE,00000,"AUDIT: SESSION,2,1,DDL,DROP TABLE,,,DROP TABLE test;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.870 UTC,,,22617,"",55cb70b8.5859,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.870 UTC,"vagrant","postgres",22617,"[local]",55cb70b8.5859,2,"authentication",2015-08-12 16:13:44 UTC,3/6,0,LOG,00000,"connection authorized: user=vagrant database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.872 UTC,"vagrant","postgres",22617,"[local]",55cb70b8.5859,3,"CREATE ROLE",2015-08-12 16:13:44 UTC,3/7,1858,NOTICE,00000,"AUDIT: SESSION,1,1,ROLE,CREATE ROLE,,,CREATE USER user2;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.872 UTC,"vagrant","postgres",22617,"[local]",55cb70b8.5859,4,"ALTER ROLE",2015-08-12 16:13:44 UTC,3/8,1859,NOTICE,00000,"AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,""ALTER ROLE user2 SET pgaudit.log = 'Read, writE';"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.873 UTC,"vagrant","postgres",22617,"[local]",55cb70b8.5859,5,"ALTER ROLE",2015-08-12 16:13:44 UTC,3/9,1860,NOTICE,00000,"AUDIT: SESSION,3,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.log_catalog = OFF;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.873 UTC,"vagrant","postgres",22617,"[local]",55cb70b8.5859,6,"ALTER ROLE",2015-08-12 16:13:44 UTC,3/10,1861,NOTICE,00000,"AUDIT: SESSION,4,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.log_level = 'warning';,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.873 UTC,"vagrant","postgres",22617,"[local]",55cb70b8.5859,7,"ALTER ROLE",2015-08-12 16:13:44 UTC,3/11,1862,NOTICE,00000,"AUDIT: SESSION,5,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.role = auditor;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.874 UTC,"vagrant","postgres",22617,"[local]",55cb70b8.5859,8,"ALTER ROLE",2015-08-12 16:13:44 UTC,3/12,1863,NOTICE,00000,"AUDIT: SESSION,6,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.log_statement_once = ON;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.876 UTC,"vagrant","postgres",22617,"[local]",55cb70b8.5859,9,"GRANT",2015-08-12 16:13:44 UTC,3/14,1865,NOTICE,00000,"AUDIT: SESSION,7,1,ROLE,GRANT,,,""GRANT SELECT, INSERT, UPDATE, DELETE
+   ON test2
+   TO user2, user1;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.876 UTC,"vagrant","postgres",22617,"[local]",55cb70b8.5859,10,"GRANT",2015-08-12 16:13:44 UTC,3/15,1866,NOTICE,00000,"AUDIT: SESSION,8,1,ROLE,GRANT,,,""GRANT SELECT, UPDATE
+   ON TABLE public.test2
+   TO auditor;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.878 UTC,"vagrant","postgres",22617,"[local]",55cb70b8.5859,11,"GRANT",2015-08-12 16:13:44 UTC,3/17,1868,NOTICE,00000,"AUDIT: SESSION,9,1,ROLE,GRANT,,,""GRANT SELECT, INSERT, UPDATE, DELETE
+   ON test3
+   TO user2;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.879 UTC,"vagrant","postgres",22617,"[local]",55cb70b8.5859,12,"GRANT",2015-08-12 16:13:44 UTC,3/18,1869,NOTICE,00000,"AUDIT: SESSION,10,1,ROLE,GRANT,,,""GRANT INSERT
+   ON TABLE public.test3
+   TO auditor;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.885 UTC,"vagrant","postgres",22617,"[local]",55cb70b8.5859,13,"GRANT",2015-08-12 16:13:44 UTC,3/25,1876,NOTICE,00000,"AUDIT: SESSION,11,1,ROLE,GRANT,,,""GRANT SELECT
+   ON vw_test3
+   TO user2;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.885 UTC,"vagrant","postgres",22617,"[local]",55cb70b8.5859,14,"GRANT",2015-08-12 16:13:44 UTC,3/26,1877,NOTICE,00000,"AUDIT: SESSION,12,1,ROLE,GRANT,,,""GRANT SELECT
+   ON vw_test3
+   TO auditor;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.887 UTC,,,22618,"",55cb70b8.585a,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.887 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,2,"authentication",2015-08-12 16:13:44 UTC,2/32,0,LOG,00000,"connection authorized: user=user2 database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.889 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,3,"SELECT",2015-08-12 16:13:44 UTC,2/34,0,WARNING,01000,"AUDIT: SESSION,1,1,READ,SELECT,,,""SELECT *
+  FROM test3, test2;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.889 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,4,"SELECT",2015-08-12 16:13:44 UTC,2/34,0,WARNING,01000,"AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.test2,<previously logged>,<previously logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.889 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,5,"SELECT",2015-08-12 16:13:44 UTC,2/35,0,WARNING,01000,"AUDIT: SESSION,2,1,READ,SELECT,,,""SELECT *
+  FROM vw_test3, test2;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.889 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,6,"SELECT",2015-08-12 16:13:44 UTC,2/35,0,WARNING,01000,"AUDIT: OBJECT,2,1,READ,SELECT,TABLE,public.test2,<previously logged>,<previously logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.889 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,7,"SELECT",2015-08-12 16:13:44 UTC,2/35,0,WARNING,01000,"AUDIT: OBJECT,2,1,READ,SELECT,VIEW,public.vw_test3,<previously logged>,<previously logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.889 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,8,"INSERT",2015-08-12 16:13:44 UTC,2/36,0,WARNING,01000,"AUDIT: SESSION,3,1,WRITE,INSERT,,,""WITH CTE AS
+(
+	SELECT id
+	  FROM test2
+)
+INSERT INTO test3
+SELECT id
+  FROM cte;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.889 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,9,"INSERT",2015-08-12 16:13:44 UTC,2/36,0,WARNING,01000,"AUDIT: OBJECT,3,1,WRITE,INSERT,TABLE,public.test3,<previously logged>,<previously logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.889 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,10,"INSERT",2015-08-12 16:13:44 UTC,2/36,0,WARNING,01000,"AUDIT: OBJECT,3,1,READ,SELECT,TABLE,public.test2,<previously logged>,<previously logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.889 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,11,"INSERT",2015-08-12 16:13:44 UTC,2/37,0,WARNING,01000,"AUDIT: SESSION,4,1,WRITE,INSERT,,,""WITH CTE AS
+(
+	INSERT INTO test3 VALUES (1)
+				   RETURNING id
+)
+INSERT INTO test2
+SELECT id
+  FROM cte;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.889 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,12,"INSERT",2015-08-12 16:13:44 UTC,2/37,0,WARNING,01000,"AUDIT: OBJECT,4,1,WRITE,INSERT,TABLE,public.test3,<previously logged>,<previously logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.891 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,13,"DO",2015-08-12 16:13:44 UTC,2/38,0,WARNING,01000,"AUDIT: SESSION,5,1,READ,SELECT,,,SELECT test2_change(91),<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.891 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,14,"DO",2015-08-12 16:13:44 UTC,2/38,0,WARNING,01000,"AUDIT: SESSION,5,2,WRITE,UPDATE,,,""UPDATE test2
+	   SET id = id + 1
+	 WHERE id = change_id"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.891 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,15,"DO",2015-08-12 16:13:44 UTC,2/38,0,WARNING,01000,"AUDIT: OBJECT,5,2,WRITE,UPDATE,TABLE,public.test2,<previously logged>,<previously logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.892 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,16,"INSERT",2015-08-12 16:13:44 UTC,2/39,0,WARNING,01000,"AUDIT: SESSION,6,1,WRITE,INSERT,,,""WITH CTE AS
+(
+	UPDATE test2
+	   SET id = 45
+	 WHERE id = 92
+	RETURNING id
+)
+INSERT INTO test3
+SELECT id
+  FROM cte;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.892 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,17,"INSERT",2015-08-12 16:13:44 UTC,2/39,0,WARNING,01000,"AUDIT: OBJECT,6,1,WRITE,INSERT,TABLE,public.test3,<previously logged>,<previously logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.892 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,18,"INSERT",2015-08-12 16:13:44 UTC,2/39,0,WARNING,01000,"AUDIT: OBJECT,6,1,WRITE,UPDATE,TABLE,public.test2,<previously logged>,<previously logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.893 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,19,"UPDATE",2015-08-12 16:13:44 UTC,2/40,0,WARNING,01000,"AUDIT: SESSION,7,1,WRITE,UPDATE,,,""WITH CTE AS
+(
+	INSERT INTO test2 VALUES (37)
+				   RETURNING id
+)
+UPDATE test3
+   SET id = cte.id
+  FROM cte
+ WHERE test3.id <> cte.id;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.893 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,20,"UPDATE",2015-08-12 16:13:44 UTC,2/40,0,WARNING,01000,"AUDIT: OBJECT,7,1,WRITE,INSERT,TABLE,public.test2,<previously logged>,<previously logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.894 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,21,"SELECT",2015-08-12 16:13:44 UTC,2/41,0,WARNING,01000,"AUDIT: SESSION,8,1,READ,SELECT,,,""SELECT *
+  FROM test2
+ ORDER BY ID;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.894 UTC,"user2","postgres",22618,"[local]",55cb70b8.585a,22,"SELECT",2015-08-12 16:13:44 UTC,2/41,0,WARNING,01000,"AUDIT: OBJECT,8,1,READ,SELECT,TABLE,public.test2,<previously logged>,<previously logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.895 UTC,,,22619,"",55cb70b8.585b,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.895 UTC,"vagrant","postgres",22619,"[local]",55cb70b8.585b,2,"authentication",2015-08-12 16:13:44 UTC,3/27,0,LOG,00000,"connection authorized: user=vagrant database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.897 UTC,"vagrant","postgres",22619,"[local]",55cb70b8.585b,3,"ALTER ROLE",2015-08-12 16:13:44 UTC,3/28,1882,NOTICE,00000,"AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.log = 'NONE';,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.898 UTC,,,22620,"",55cb70b8.585c,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.898 UTC,"user2","postgres",22620,"[local]",55cb70b8.585c,2,"authentication",2015-08-12 16:13:44 UTC,2/42,0,LOG,00000,"connection authorized: user=user2 database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.904 UTC,"user2","postgres",22620,"[local]",55cb70b8.585c,3,"SELECT",2015-08-12 16:13:44 UTC,2/48,0,WARNING,01000,"AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.test4,""SELECT name
+  FROM public.test4;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.905 UTC,"user2","postgres",22620,"[local]",55cb70b8.585c,4,"INSERT",2015-08-12 16:13:44 UTC,2/50,0,WARNING,01000,"AUDIT: OBJECT,2,1,WRITE,INSERT,TABLE,public.test4,""INSERT INTO public.test4 (name)
+				  VALUES ('test');"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.906 UTC,"user2","postgres",22620,"[local]",55cb70b8.585c,5,"UPDATE",2015-08-12 16:13:44 UTC,2/52,0,WARNING,01000,"AUDIT: OBJECT,3,1,WRITE,UPDATE,TABLE,public.test4,""UPDATE public.test4
+   SET id = 1;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.907 UTC,"user2","postgres",22620,"[local]",55cb70b8.585c,6,"UPDATE",2015-08-12 16:13:44 UTC,2/53,0,WARNING,01000,"AUDIT: OBJECT,4,1,WRITE,UPDATE,TABLE,public.test4,update public.test4 set name = 'foo' where name = 'bar';,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.908 UTC,,,22621,"",55cb70b8.585d,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.908 UTC,"vagrant","postgres",22621,"[local]",55cb70b8.585d,2,"authentication",2015-08-12 16:13:44 UTC,3/29,0,LOG,00000,"connection authorized: user=vagrant database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.915 UTC,"vagrant","postgres",22621,"[local]",55cb70b8.585d,3,"ALTER ROLE",2015-08-12 16:13:44 UTC,3/36,1897,NOTICE,00000,"AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,""ALTER ROLE user1 SET pgaudit.log = 'DDL, READ';"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.916 UTC,,,22622,"",55cb70b8.585e,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.916 UTC,"user1","postgres",22622,"[local]",55cb70b8.585e,2,"authentication",2015-08-12 16:13:44 UTC,2/54,0,LOG,00000,"connection authorized: user=user1 database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.920 UTC,"user1","postgres",22622,"[local]",55cb70b8.585e,3,"CREATE TABLE",2015-08-12 16:13:44 UTC,2/55,1898,NOTICE,00000,"AUDIT: SESSION,1,1,DDL,CREATE TABLE,,,""CREATE TABLE public.account
+(
+	id INT,
+	name TEXT,
+	password TEXT,
+	description TEXT
+);"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.921 UTC,"user1","postgres",22622,"[local]",55cb70b8.585e,4,"SELECT",2015-08-12 16:13:44 UTC,2/56,0,NOTICE,00000,"AUDIT: SESSION,2,1,READ,SELECT,,,""SELECT *
+  FROM account;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.922 UTC,,,22623,"",55cb70b8.585f,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.923 UTC,"vagrant","postgres",22623,"[local]",55cb70b8.585f,2,"authentication",2015-08-12 16:13:44 UTC,3/37,0,LOG,00000,"connection authorized: user=vagrant database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.924 UTC,"vagrant","postgres",22623,"[local]",55cb70b8.585f,3,"ALTER ROLE",2015-08-12 16:13:44 UTC,3/38,1900,NOTICE,00000,"AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log = 'none';,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.925 UTC,"vagrant","postgres",22623,"[local]",55cb70b8.585f,4,"ALTER ROLE",2015-08-12 16:13:44 UTC,3/39,1901,NOTICE,00000,"AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.role = 'auditor';,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.926 UTC,,,22624,"",55cb70b8.5860,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.926 UTC,"user1","postgres",22624,"[local]",55cb70b8.5860,2,"authentication",2015-08-12 16:13:44 UTC,2/58,0,LOG,00000,"connection authorized: user=user1 database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.928 UTC,"user1","postgres",22624,"[local]",55cb70b8.5860,3,"SELECT",2015-08-12 16:13:44 UTC,2/61,0,NOTICE,00000,"AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,""SELECT password
+  FROM account;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.929 UTC,"user1","postgres",22624,"[local]",55cb70b8.5860,4,"UPDATE",2015-08-12 16:13:44 UTC,2/63,0,NOTICE,00000,"AUDIT: OBJECT,2,1,WRITE,UPDATE,TABLE,public.account,""UPDATE account
+   SET password = 'HASH2';"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.931 UTC,,,22625,"",55cb70b8.5861,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.931 UTC,"vagrant","postgres",22625,"[local]",55cb70b8.5861,2,"authentication",2015-08-12 16:13:44 UTC,3/40,0,LOG,00000,"connection authorized: user=vagrant database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.932 UTC,"vagrant","postgres",22625,"[local]",55cb70b8.5861,3,"ALTER ROLE",2015-08-12 16:13:44 UTC,3/41,1905,NOTICE,00000,"AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_relation = on;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.933 UTC,"vagrant","postgres",22625,"[local]",55cb70b8.5861,4,"ALTER ROLE",2015-08-12 16:13:44 UTC,3/42,1906,NOTICE,00000,"AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,""ALTER ROLE user1 SET pgaudit.log = 'read, WRITE';"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.934 UTC,,,22626,"",55cb70b8.5862,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.934 UTC,"user1","postgres",22626,"[local]",55cb70b8.5862,2,"authentication",2015-08-12 16:13:44 UTC,2/64,0,LOG,00000,"connection authorized: user=user1 database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.937 UTC,"user1","postgres",22626,"[local]",55cb70b8.5862,3,"SELECT",2015-08-12 16:13:44 UTC,2/67,0,NOTICE,00000,"AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,""SELECT account.password,
+	   account_role_map.role_id
+  FROM account
+	   INNER JOIN account_role_map
+			on account.id = account_role_map.account_id;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.937 UTC,"user1","postgres",22626,"[local]",55cb70b8.5862,4,"SELECT",2015-08-12 16:13:44 UTC,2/67,0,NOTICE,00000,"AUDIT: SESSION,1,1,READ,SELECT,TABLE,public.account,""SELECT account.password,
+	   account_role_map.role_id
+  FROM account
+	   INNER JOIN account_role_map
+			on account.id = account_role_map.account_id;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.937 UTC,"user1","postgres",22626,"[local]",55cb70b8.5862,5,"SELECT",2015-08-12 16:13:44 UTC,2/67,0,NOTICE,00000,"AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account_role_map,""SELECT account.password,
+	   account_role_map.role_id
+  FROM account
+	   INNER JOIN account_role_map
+			on account.id = account_role_map.account_id;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.937 UTC,"user1","postgres",22626,"[local]",55cb70b8.5862,6,"SELECT",2015-08-12 16:13:44 UTC,2/67,0,NOTICE,00000,"AUDIT: SESSION,1,1,READ,SELECT,TABLE,public.account_role_map,""SELECT account.password,
+	   account_role_map.role_id
+  FROM account
+	   INNER JOIN account_role_map
+			on account.id = account_role_map.account_id;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.937 UTC,"user1","postgres",22626,"[local]",55cb70b8.5862,7,"SELECT",2015-08-12 16:13:44 UTC,2/68,0,NOTICE,00000,"AUDIT: OBJECT,2,1,READ,SELECT,TABLE,public.account,""SELECT password
+  FROM account;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.937 UTC,"user1","postgres",22626,"[local]",55cb70b8.5862,8,"SELECT",2015-08-12 16:13:44 UTC,2/68,0,NOTICE,00000,"AUDIT: SESSION,2,1,READ,SELECT,TABLE,public.account,""SELECT password
+  FROM account;"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.938 UTC,"user1","postgres",22626,"[local]",55cb70b8.5862,9,"UPDATE",2015-08-12 16:13:44 UTC,2/69,0,NOTICE,00000,"AUDIT: SESSION,3,1,WRITE,UPDATE,TABLE,public.account,""UPDATE account
+   SET description = 'yada, yada';"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.938 UTC,"user1","postgres",22626,"[local]",55cb70b8.5862,10,"UPDATE",2015-08-12 16:13:44 UTC,2/70,0,NOTICE,00000,"AUDIT: OBJECT,4,1,WRITE,UPDATE,TABLE,public.account,""UPDATE account
+   SET description = 'yada, yada'
+ where password = 'HASH2';"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.938 UTC,"user1","postgres",22626,"[local]",55cb70b8.5862,11,"UPDATE",2015-08-12 16:13:44 UTC,2/70,0,NOTICE,00000,"AUDIT: SESSION,4,1,WRITE,UPDATE,TABLE,public.account,""UPDATE account
+   SET description = 'yada, yada'
+ where password = 'HASH2';"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.939 UTC,"user1","postgres",22626,"[local]",55cb70b8.5862,12,"UPDATE",2015-08-12 16:13:44 UTC,2/71,0,NOTICE,00000,"AUDIT: OBJECT,5,1,WRITE,UPDATE,TABLE,public.account,""UPDATE account
+   SET password = 'HASH2';"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.939 UTC,"user1","postgres",22626,"[local]",55cb70b8.5862,13,"UPDATE",2015-08-12 16:13:44 UTC,2/71,0,NOTICE,00000,"AUDIT: SESSION,5,1,WRITE,UPDATE,TABLE,public.account,""UPDATE account
+   SET password = 'HASH2';"",<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.940 UTC,,,22627,"",55cb70b8.5863,1,"",2015-08-12 16:13:44 UTC,,0,LOG,00000,"connection received: host=[local]",,,,,,,,"BackendInitialize, postmaster.c:4074",""
+2015-08-12 16:13:44.940 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,2,"authentication",2015-08-12 16:13:44 UTC,3/43,0,LOG,00000,"connection authorized: user=vagrant database=postgres",,,,,,,,"PerformAuthentication, postinit.c:259",""
+2015-08-12 16:13:44.941 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,3,"SET",2015-08-12 16:13:44 UTC,3/44,0,NOTICE,00000,"AUDIT: SESSION,1,1,MISC,SET,,,SET pgaudit.log = 'ALL';,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.941 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,4,"SET",2015-08-12 16:13:44 UTC,3/45,0,NOTICE,00000,"AUDIT: SESSION,2,1,MISC,SET,,,SET pgaudit.log_level = 'notice';,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.941 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,5,"SET",2015-08-12 16:13:44 UTC,3/46,0,NOTICE,00000,"AUDIT: SESSION,3,1,MISC,SET,,,SET pgaudit.log_relation = ON;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.941 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,6,"SET",2015-08-12 16:13:44 UTC,3/47,0,NOTICE,00000,"AUDIT: SESSION,4,1,MISC,SET,,,SET pgaudit.log_parameter = ON;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.942 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,7,"DO",2015-08-12 16:13:44 UTC,3/48,0,NOTICE,00000,"AUDIT: SESSION,5,1,FUNCTION,DO,,,""DO $$
+BEGIN
+	raise notice 'test';
+END $$;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.942 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,8,"DO",2015-08-12 16:13:44 UTC,3/48,0,NOTICE,00000,"test",,,,,,,,"exec_stmt_raise, pl_exec.c:3210","psql"
+2015-08-12 16:13:44.943 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,9,"CREATE SCHEMA",2015-08-12 16:13:44 UTC,3/49,1912,NOTICE,00000,"AUDIT: SESSION,6,1,DDL,CREATE SCHEMA,,,CREATE SCHEMA test;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.944 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,10,"COPY",2015-08-12 16:13:44 UTC,3/50,0,NOTICE,00000,"AUDIT: SESSION,7,1,READ,SELECT,TABLE,public.account,COPY account TO stdout;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.944 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,11,"CREATE TABLE AS",2015-08-12 16:13:44 UTC,3/51,0,NOTICE,00000,"AUDIT: SESSION,8,1,READ,SELECT,TABLE,public.account,""CREATE TABLE test.account_copy AS
+SELECT *
+  FROM account;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.947 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,12,"CREATE TABLE AS",2015-08-12 16:13:44 UTC,3/51,1913,NOTICE,00000,"AUDIT: SESSION,8,1,WRITE,INSERT,TABLE,test.account_copy,""CREATE TABLE test.account_copy AS
+SELECT *
+  FROM account;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.948 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,13,"CREATE TABLE AS",2015-08-12 16:13:44 UTC,3/51,1913,NOTICE,00000,"AUDIT: SESSION,8,2,DDL,CREATE TABLE AS,,,""CREATE TABLE test.account_copy AS
+SELECT *
+  FROM account;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.949 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,14,"COPY",2015-08-12 16:13:44 UTC,3/52,0,NOTICE,00000,"AUDIT: SESSION,9,1,WRITE,INSERT,TABLE,test.account_copy,COPY test.account_copy from stdin;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.951 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,15,"PREPARE",2015-08-12 16:13:44 UTC,3/53,0,NOTICE,00000,"AUDIT: SESSION,10,1,READ,PREPARE,,,""PREPARE pgclassstmt (oid) AS
+SELECT *
+  FROM account
+ WHERE id = $1;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.951 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,16,"EXECUTE",2015-08-12 16:13:44 UTC,3/54,0,NOTICE,00000,"AUDIT: SESSION,11,1,READ,SELECT,TABLE,public.account,""PREPARE pgclassstmt (oid) AS
+SELECT *
+  FROM account
+ WHERE id = $1;"",1",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.952 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,17,"EXECUTE",2015-08-12 16:13:44 UTC,3/54,0,NOTICE,00000,"AUDIT: SESSION,11,2,MISC,EXECUTE,,,EXECUTE pgclassstmt (1);,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.952 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,18,"DEALLOCATE",2015-08-12 16:13:44 UTC,3/55,0,NOTICE,00000,"AUDIT: SESSION,12,1,MISC,DEALLOCATE,,,DEALLOCATE pgclassstmt;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.952 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,19,"BEGIN",2015-08-12 16:13:44 UTC,3/56,0,NOTICE,00000,"AUDIT: SESSION,13,1,MISC,BEGIN,,,BEGIN;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.952 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,20,"DECLARE CURSOR",2015-08-12 16:13:44 UTC,3/56,0,NOTICE,00000,"AUDIT: SESSION,14,1,READ,SELECT,TABLE,pg_catalog.pg_class,""DECLARE ctest SCROLL CURSOR FOR
+SELECT count(*)
+  FROM
+(
+	SELECT relname
+	  FROM pg_class
+	 LIMIT 1
+ ) subquery;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.952 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,21,"DECLARE CURSOR",2015-08-12 16:13:44 UTC,3/56,0,NOTICE,00000,"AUDIT: SESSION,14,2,READ,DECLARE CURSOR,,,""DECLARE ctest SCROLL CURSOR FOR
+SELECT count(*)
+  FROM
+(
+	SELECT relname
+	  FROM pg_class
+	 LIMIT 1
+ ) subquery;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.952 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,22,"FETCH",2015-08-12 16:13:44 UTC,3/56,0,NOTICE,00000,"AUDIT: SESSION,15,1,MISC,FETCH,,,FETCH NEXT FROM ctest;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.952 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,23,"CLOSE CURSOR",2015-08-12 16:13:44 UTC,3/56,0,NOTICE,00000,"AUDIT: SESSION,16,1,MISC,CLOSE CURSOR,,,CLOSE ctest;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.952 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,24,"COMMIT",2015-08-12 16:13:44 UTC,3/56,0,NOTICE,00000,"AUDIT: SESSION,17,1,MISC,COMMIT,,,COMMIT;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.953 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,25,"SET",2015-08-12 16:13:44 UTC,3/57,0,NOTICE,00000,"AUDIT: SESSION,18,1,MISC,SET,,,SET pgaudit.log_catalog = OFF;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.953 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,26,"CREATE TABLE",2015-08-12 16:13:44 UTC,3/59,1915,NOTICE,00000,"AUDIT: SESSION,19,1,DDL,CREATE TABLE,,,""CREATE TABLE test.test_insert
+(
+	id INT
+);"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.954 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,27,"PREPARE",2015-08-12 16:13:44 UTC,3/60,0,NOTICE,00000,"AUDIT: SESSION,20,1,WRITE,PREPARE,,,""PREPARE pgclassstmt (oid) AS
+INSERT INTO test.test_insert (id)
+					  VALUES ($1);"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.954 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,28,"EXECUTE",2015-08-12 16:13:44 UTC,3/61,0,NOTICE,00000,"AUDIT: SESSION,21,1,WRITE,INSERT,TABLE,test.test_insert,""PREPARE pgclassstmt (oid) AS
+INSERT INTO test.test_insert (id)
+					  VALUES ($1);"",1",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.955 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,29,"EXECUTE",2015-08-12 16:13:44 UTC,3/61,1916,NOTICE,00000,"AUDIT: SESSION,21,2,MISC,EXECUTE,,,EXECUTE pgclassstmt (1);,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.957 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,30,"CREATE TABLE",2015-08-12 16:13:44 UTC,3/62,1917,NOTICE,00000,"AUDIT: SESSION,22,1,DDL,CREATE TABLE,,,""CREATE TABLE public.test
+(
+	id INT,
+	name TEXT,
+	description TEXT,
+	CONSTRAINT test_pkey PRIMARY KEY (id)
+);"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.959 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,31,"ANALYZE",2015-08-12 16:13:44 UTC,3/63,0,NOTICE,00000,"AUDIT: SESSION,23,1,MISC,ANALYZE,,,ANALYZE test;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.959 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,32,"GRANT",2015-08-12 16:13:44 UTC,3/64,1918,NOTICE,00000,"AUDIT: SESSION,24,1,ROLE,GRANT,,,""GRANT SELECT
+  ON TABLE public.test
+  TO PUBLIC;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.960 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,33,"SELECT",2015-08-12 16:13:44 UTC,3/65,0,NOTICE,00000,"AUDIT: SESSION,25,1,READ,SELECT,TABLE,public.test,""SELECT *
+  FROM test;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.960 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,34,"SELECT",2015-08-12 16:13:44 UTC,3/66,0,NOTICE,00000,"AUDIT: SESSION,26,1,READ,SELECT,TABLE,public.test,""SELECT
+  FROM test;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.961 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,35,"SELECT",2015-08-12 16:13:44 UTC,3/67,0,NOTICE,00000,"AUDIT: SESSION,27,1,READ,SELECT,,,""SELECT 1,
+	   substring('Thomas' from 2 for 3);"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.961 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,36,"DO",2015-08-12 16:13:44 UTC,3/68,0,NOTICE,00000,"AUDIT: SESSION,28,1,FUNCTION,DO,,,""DO $$
+DECLARE
+	test INT;
+BEGIN
+	SELECT 1
+	  INTO test;
+END $$;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.961 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,37,"DO",2015-08-12 16:13:44 UTC,3/68,0,NOTICE,00000,"AUDIT: SESSION,28,2,READ,SELECT,,,SELECT 1,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.961 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,38,"EXPLAIN",2015-08-12 16:13:44 UTC,3/69,0,NOTICE,00000,"AUDIT: SESSION,29,1,READ,SELECT,,,explain select 1;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.961 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,39,"EXPLAIN",2015-08-12 16:13:44 UTC,3/69,0,NOTICE,00000,"AUDIT: SESSION,29,2,MISC,EXPLAIN,,,explain select 1;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.961 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,40,"INSERT",2015-08-12 16:13:44 UTC,3/70,0,NOTICE,00000,"AUDIT: SESSION,30,1,WRITE,INSERT,TABLE,public.test,""INSERT INTO TEST (id)
+		  VALUES (1);"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.962 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,41,"INSERT",2015-08-12 16:13:44 UTC,3/71,0,NOTICE,00000,"AUDIT: SESSION,31,1,WRITE,INSERT,TABLE,public.test,""INSERT INTO TEST (id)
+		  VALUES (2);"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.963 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,42,"INSERT",2015-08-12 16:13:44 UTC,3/72,0,NOTICE,00000,"AUDIT: SESSION,32,1,WRITE,INSERT,TABLE,public.test,""INSERT INTO TEST (id)
+		  VALUES (3);"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.964 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,43,"DO",2015-08-12 16:13:44 UTC,3/73,0,NOTICE,00000,"AUDIT: SESSION,33,1,FUNCTION,DO,,,""DO $$
+DECLARE
+	result RECORD;
+BEGIN
+	FOR result IN
+		SELECT id
+		  FROM test
+	LOOP
+		INSERT INTO test (id)
+			 VALUES (result.id + 100);
+	END LOOP;
+END $$;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.964 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,44,"DO",2015-08-12 16:13:44 UTC,3/73,0,NOTICE,00000,"AUDIT: SESSION,33,2,READ,SELECT,TABLE,public.test,""SELECT id
+		  FROM test"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.964 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,45,"DO",2015-08-12 16:13:44 UTC,3/73,0,NOTICE,00000,"AUDIT: SESSION,33,3,WRITE,INSERT,TABLE,public.test,""INSERT INTO test (id)
+			 VALUES (result.id + 100)"","",,""",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.964 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,46,"DO",2015-08-12 16:13:44 UTC,3/73,1922,NOTICE,00000,"AUDIT: SESSION,33,4,WRITE,INSERT,TABLE,public.test,""INSERT INTO test (id)
+			 VALUES (result.id + 100)"","",,""",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.964 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,47,"DO",2015-08-12 16:13:44 UTC,3/73,1922,NOTICE,00000,"AUDIT: SESSION,33,5,WRITE,INSERT,TABLE,public.test,""INSERT INTO test (id)
+			 VALUES (result.id + 100)"","",,""",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.964 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,48,"DO",2015-08-12 16:13:44 UTC,3/74,0,NOTICE,00000,"AUDIT: SESSION,34,1,FUNCTION,DO,,,""DO $$
+DECLARE
+	table_name TEXT = 'do_table';
+BEGIN
+	EXECUTE 'CREATE TABLE ' || table_name || ' (""""weird name"""" INT)';
+	EXECUTE 'DROP table ' || table_name;
+END $$;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.965 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,49,"DO",2015-08-12 16:13:44 UTC,3/74,1923,NOTICE,00000,"AUDIT: SESSION,34,2,DDL,CREATE TABLE,,,""CREATE TABLE do_table (""""weird name"""" INT)"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.965 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,50,"DO",2015-08-12 16:13:44 UTC,3/74,1923,NOTICE,00000,"AUDIT: SESSION,34,3,DDL,DROP TABLE,,,DROP table do_table,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.966 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,51,"DO",2015-08-12 16:13:44 UTC,3/75,0,NOTICE,00000,"AUDIT: SESSION,35,1,FUNCTION,DO,,,""DO $$
+BEGIN
+	CREATE TABLE bogus.test_block
+	(
+		id INT
+	);
+END $$;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.966 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,52,"DO",2015-08-12 16:13:44 UTC,3/75,0,ERROR,3F000,"schema ""bogus"" does not exist",,,"CREATE TABLE bogus.test_block
+	(
+		id INT
+	)",14,"PL/pgSQL function inline_code_block line 3 at SQL statement","DO $$
+BEGIN
+	CREATE TABLE bogus.test_block
+	(
+		id INT
+	);
+END $$;",,"get_namespace_oid, namespace.c:2873","psql"
+2015-08-12 16:13:44.966 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,53,"ALTER TABLE",2015-08-12 16:13:44 UTC,3/76,1924,NOTICE,00000,"AUDIT: SESSION,36,1,DDL,ALTER TABLE,,,""ALTER TABLE public.test
+	DROP COLUMN description ;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.967 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,54,"ALTER TABLE",2015-08-12 16:13:44 UTC,3/77,1925,NOTICE,00000,"AUDIT: SESSION,37,1,DDL,ALTER TABLE,,,""ALTER TABLE public.test
+	RENAME TO test2;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.967 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,55,"ALTER TABLE",2015-08-12 16:13:44 UTC,3/78,1926,NOTICE,00000,"AUDIT: SESSION,38,1,DDL,ALTER TABLE,,,""ALTER TABLE public.test2
+	SET SCHEMA test;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.968 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,56,"ALTER TABLE",2015-08-12 16:13:44 UTC,3/79,1927,NOTICE,00000,"AUDIT: SESSION,39,1,DDL,ALTER TABLE,,,""ALTER TABLE test.test2
+	ADD COLUMN description TEXT;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.968 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,57,"ALTER TABLE",2015-08-12 16:13:44 UTC,3/80,1928,NOTICE,00000,"AUDIT: SESSION,40,1,DDL,ALTER TABLE,,,""ALTER TABLE test.test2
+	DROP COLUMN description;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.969 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,58,"DROP TABLE",2015-08-12 16:13:44 UTC,3/81,1929,NOTICE,00000,"AUDIT: SESSION,41,1,DDL,DROP TABLE,,,DROP TABLE test.test2;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.970 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,59,"CREATE SCHEMA",2015-08-12 16:13:44 UTC,3/82,1930,NOTICE,00000,"AUDIT: SESSION,42,1,DDL,CREATE SCHEMA,,,""CREATE SCHEMA foo
+	CREATE TABLE foo.bar (id int)
+	CREATE TABLE foo.baz (id int);"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.971 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,60,"CREATE FUNCTION",2015-08-12 16:13:44 UTC,3/83,1931,NOTICE,00000,"AUDIT: SESSION,43,1,DDL,CREATE FUNCTION,,,""CREATE FUNCTION public.int_add
+(
+	a INT,
+	b INT
+)
+	RETURNS INT LANGUAGE plpgsql AS $$
+BEGIN
+	return a + b;
+END $$;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.972 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,61,"SELECT",2015-08-12 16:13:44 UTC,3/84,0,NOTICE,00000,"AUDIT: SESSION,44,1,READ,SELECT,,,""SELECT int_add(1, 1);"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.972 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,62,"SELECT",2015-08-12 16:13:44 UTC,3/84,0,NOTICE,00000,"AUDIT: SESSION,44,2,FUNCTION,EXECUTE,FUNCTION,public.int_add,""SELECT int_add(1, 1);"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.972 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,63,"CREATE AGGREGATE",2015-08-12 16:13:44 UTC,3/85,1932,NOTICE,00000,"AUDIT: SESSION,45,1,DDL,CREATE AGGREGATE,,,""CREATE AGGREGATE public.sum_test(INT) (SFUNC=public.int_add, STYPE=INT, INITCOND='0');"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.973 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,64,"ALTER AGGREGATE",2015-08-12 16:13:44 UTC,3/86,1933,NOTICE,00000,"AUDIT: SESSION,46,1,DDL,ALTER AGGREGATE,,,ALTER AGGREGATE public.sum_test(integer) RENAME TO sum_test2;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.973 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,65,"CREATE CONVERSION",2015-08-12 16:13:44 UTC,3/87,1934,NOTICE,00000,"AUDIT: SESSION,47,1,DDL,CREATE CONVERSION,,,CREATE CONVERSION public.conversion_test FOR 'SQL_ASCII' TO 'MULE_INTERNAL' FROM pg_catalog.ascii_to_mic;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:44.974 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,66,"ALTER CONVERSION",2015-08-12 16:13:44 UTC,3/88,1935,NOTICE,00000,"AUDIT: SESSION,48,1,DDL,ALTER CONVERSION,,,ALTER CONVERSION public.conversion_test RENAME TO conversion_test2;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.235 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,67,"CREATE DATABASE",2015-08-12 16:13:44 UTC,3/89,1936,NOTICE,00000,"AUDIT: SESSION,49,1,DDL,CREATE DATABASE,,,CREATE DATABASE contrib_regression_pgaudit;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.237 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,68,"ALTER DATABASE",2015-08-12 16:13:44 UTC,3/90,1937,NOTICE,00000,"AUDIT: SESSION,50,1,DDL,ALTER DATABASE,,,ALTER DATABASE contrib_regression_pgaudit RENAME TO contrib_regression_pgaudit2;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.342 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,69,"DROP DATABASE",2015-08-12 16:13:44 UTC,3/91,1938,NOTICE,00000,"AUDIT: SESSION,51,1,DDL,DROP DATABASE,,,DROP DATABASE contrib_regression_pgaudit2;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.349 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,70,"CREATE ROLE",2015-08-12 16:13:44 UTC,3/94,1940,NOTICE,00000,"AUDIT: SESSION,52,1,ROLE,CREATE ROLE,,,CREATE ROLE alice;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.352 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,71,"DROP ROLE",2015-08-12 16:13:44 UTC,3/97,1943,NOTICE,00000,"AUDIT: SESSION,53,1,ROLE,DROP ROLE,,,drop role alice;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.353 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,72,"SET",2015-08-12 16:13:44 UTC,3/98,0,NOTICE,00000,"AUDIT: SESSION,54,1,MISC,SET,,,SET pgaudit.log = 'ALL';,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.354 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,73,"CREATE TABLE",2015-08-12 16:13:44 UTC,3/99,1944,NOTICE,00000,"AUDIT: SESSION,55,1,DDL,CREATE TABLE,,,""CREATE TABLE hoge
+(
+	id int
+);"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.355 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,74,"CREATE FUNCTION",2015-08-12 16:13:44 UTC,3/100,1945,NOTICE,00000,"AUDIT: SESSION,56,1,DDL,CREATE FUNCTION,,,""CREATE FUNCTION test()
+	RETURNS INT AS $$
+DECLARE
+	cur1 cursor for select * from hoge;
+	tmp int;
+BEGIN
+	OPEN cur1;
+	FETCH cur1 into tmp;
+	RETURN tmp;
+END $$
+LANGUAGE plpgsql ;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.356 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,75,"SELECT",2015-08-12 16:13:44 UTC,3/101,0,NOTICE,00000,"AUDIT: SESSION,57,1,READ,SELECT,,,SELECT test();,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.356 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,76,"SELECT",2015-08-12 16:13:44 UTC,3/101,0,NOTICE,00000,"AUDIT: SESSION,57,2,FUNCTION,EXECUTE,FUNCTION,public.test,SELECT test();,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.356 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,77,"SELECT",2015-08-12 16:13:44 UTC,3/101,0,NOTICE,00000,"AUDIT: SESSION,57,3,READ,SELECT,TABLE,public.hoge,select * from hoge,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.358 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,78,"INSERT",2015-08-12 16:13:44 UTC,3/106,0,NOTICE,00000,"AUDIT: SESSION,58,1,WRITE,INSERT,TABLE,public.bar,""insert into bar (col)
+		 values (1);"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.358 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,79,"DELETE",2015-08-12 16:13:44 UTC,3/107,0,NOTICE,00000,"AUDIT: OBJECT,59,1,WRITE,DELETE,TABLE,public.bar,delete from bar;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.359 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,80,"DELETE",2015-08-12 16:13:44 UTC,3/107,0,NOTICE,00000,"AUDIT: SESSION,59,1,WRITE,DELETE,TABLE,public.bar,delete from bar;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.359 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,81,"INSERT",2015-08-12 16:13:44 UTC,3/108,0,NOTICE,00000,"AUDIT: SESSION,60,1,WRITE,INSERT,TABLE,public.bar,""insert into bar (col)
+		 values (1);"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.360 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,82,"DELETE",2015-08-12 16:13:44 UTC,3/109,0,NOTICE,00000,"AUDIT: OBJECT,61,1,WRITE,DELETE,TABLE,public.bar,""delete from bar
+ where col = 1;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.360 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,83,"DELETE",2015-08-12 16:13:44 UTC,3/109,0,NOTICE,00000,"AUDIT: SESSION,61,1,WRITE,DELETE,TABLE,public.bar,""delete from bar
+ where col = 1;"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.362 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,84,"GRANT ROLE",2015-08-12 16:13:44 UTC,3/112,1953,NOTICE,00000,"AUDIT: SESSION,62,1,ROLE,GRANT ROLE,,,GRANT user1 TO user2;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.362 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,85,"REVOKE ROLE",2015-08-12 16:13:44 UTC,3/113,1954,NOTICE,00000,"AUDIT: SESSION,63,1,ROLE,REVOKE ROLE,,,REVOKE user1 FROM user2;,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.369 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,86,"INSERT",2015-08-12 16:13:44 UTC,3/122,0,NOTICE,00000,"AUDIT: SESSION,64,1,WRITE,INSERT,TABLE,public.aaa,""INSERT INTO aaa VALUES (generate_series(1,100));"",<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.371 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,87,"INSERT",2015-08-12 16:13:44 UTC,3/123,0,NOTICE,00000,"AUDIT: SESSION,65,1,WRITE,INSERT,TABLE,public.bbb,INSERT INTO bbb VALUES (1);,<none>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.371 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,88,"INSERT",2015-08-12 16:13:44 UTC,3/123,1962,NOTICE,00000,"AUDIT: OBJECT,65,2,WRITE,UPDATE,TABLE,public.aaa,""SELECT 1 FROM ONLY """"public"""".""""aaa"""" x WHERE """"id"""" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x"",1",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.371 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,89,"INSERT",2015-08-12 16:13:44 UTC,3/123,1962,NOTICE,00000,"AUDIT: SESSION,65,2,WRITE,UPDATE,TABLE,public.aaa,""SELECT 1 FROM ONLY """"public"""".""""aaa"""" x WHERE """"id"""" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x"",1",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.371 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,90,"INSERT",2015-08-12 16:13:44 UTC,3/123,1962,NOTICE,00000,"AUDIT: OBJECT,65,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,"",,,,,,,,,,,,,""",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.371 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,91,"INSERT",2015-08-12 16:13:44 UTC,3/123,1962,NOTICE,00000,"AUDIT: SESSION,65,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,"",,,,,,,,,,,,,""",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.371 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,92,"INSERT",2015-08-12 16:13:44 UTC,3/123,1962,NOTICE,00000,"AUDIT: OBJECT,65,4,WRITE,UPDATE,TABLE,public.aaa,""SELECT 1 FROM ONLY """"public"""".""""aaa"""" x WHERE """"id"""" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x"",2",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.371 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,93,"INSERT",2015-08-12 16:13:44 UTC,3/123,1962,NOTICE,00000,"AUDIT: SESSION,65,4,WRITE,UPDATE,TABLE,public.aaa,""SELECT 1 FROM ONLY """"public"""".""""aaa"""" x WHERE """"id"""" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x"",2",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.386 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,94,"DROP ROLE",2015-08-12 16:13:44 UTC,3/150,1977,NOTICE,00000,"AUDIT: SESSION,66,1,ROLE,DROP ROLE,,,DROP USER user2;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.386 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,95,"DROP ROLE",2015-08-12 16:13:44 UTC,3/151,1978,NOTICE,00000,"AUDIT: SESSION,67,1,ROLE,DROP ROLE,,,DROP USER user1;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
+2015-08-12 16:13:45.387 UTC,"vagrant","postgres",22627,"[local]",55cb70b8.5863,96,"DROP ROLE",2015-08-12 16:13:44 UTC,3/152,1979,NOTICE,00000,"AUDIT: SESSION,68,1,ROLE,DROP ROLE,,,DROP ROLE auditor;,<not logged>",,,,,,,,"log_audit_event, pgaudit.c:686","psql"
