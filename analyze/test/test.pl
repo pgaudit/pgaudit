@@ -10,12 +10,16 @@ use strict;
 use warnings FATAL => qw(all);
 use Carp;
 
-use Getopt::Long;
-use Pod::Usage;
-use DBI;
-use File::Basename qw(dirname);
 use Cwd qw(abs_path);
+use DBI;
+use Getopt::Long;
+use File::Basename qw(dirname);
+use Pod::Usage;
+use IPC::Open3 qw(open3);
 use IPC::System::Simple qw(capture);
+
+use lib dirname(abs_path($0)) . '/../lib';
+use PgAudit::Wait;
 
 ####################################################################################################################################
 # Constants
@@ -141,21 +145,62 @@ sub pgDisconnect
 }
 
 ####################################################################################################################################
-# pgQuery
+# pgQueryRow
 ####################################################################################################################################
-# sub pgQuery
-# {
-#     my $strSql = shift;
-#
-#     # Log the statement
-#     &log("  SQL: ${strSql}");
-#
-#     # Execute the statement
-#     my $hStatement = $hDb->prepare($strSql);
-#
-#     $hStatement->execute();
-#     $hStatement->finish();
-# }
+sub pgQueryRow
+{
+    my $strSql = shift;
+    my $hDbParam = shift;
+
+    # Log the statement
+    &log("  SQL: ${strSql}");
+
+    # Execute the statement
+    my $hStatement = ($hDbParam ? $hDbParam : $hDb)->prepare($strSql);
+
+    $hStatement->execute();
+    my @stryResult = $hStatement->fetchrow_array();
+
+    $hStatement->execute();
+    $hStatement->finish();
+
+    return @stryResult;
+}
+
+####################################################################################################################################
+# pgQueryTest
+####################################################################################################################################
+sub pgQueryTest
+{
+    my $strSql = shift;
+    my $hDbParam = shift;
+    #
+    # # Log the statement
+    # &log("  SQL TEST: ${strSql}");
+
+    my $oWait = waitInit(5);
+
+    do
+    {
+        my @stryResult = pgQueryRow($strSql, $hDbParam);
+
+        if (@stryResult > 0)
+        {
+            for (my $iIndex = 0; $iIndex < @stryResult; $iIndex++)
+            {
+                # if (!stryResult[$iIndex])
+                # {
+                #     confess 'test failed: column ' . ($iIndex + 1) . ' is not true';
+                # }
+            }
+
+            return;
+        }
+    }
+    while (waitMore($oWait));
+
+    confess 'test failed: test query must return at least one boolean column';
+}
 
 ####################################################################################################################################
 # pgExecute
@@ -278,6 +323,7 @@ sub pgPsql
 ####################################################################################################################################
 my $strBasePath = dirname(dirname(abs_path($0)));
 my $strAnalyzeExe = "${strBasePath}/bin/pgaudit_analyze";
+my $strSql;
 
 # Drop the old cluster, build the code, and create a new cluster
 pgDrop();
@@ -286,6 +332,9 @@ pgStart();
 
 # Load the audit schema
 pgPsql("-f ${strBasePath}/sql/audit.sql");
+
+# Start pgaudit_analyze
+my $pId = IPC::Open3::open3(undef, undef, undef, "${strBasePath}/bin/pgaudit_analyze $strTestPath/pg_log");
 
 use constant LOCALHOST => '127.0.0.1';
 
@@ -300,6 +349,14 @@ pgExecute('create user ' . USER1 . " with password '" . USER1 . "'");
 #-------------------------------------------------------------------------------
 my $hUserDb = pgConnect(USER1, USER1, LOCALHOST);
 
+$strSql =
+    "select last_success is not null and last_success <= current_timestamp,\n" .
+    "       last_failure is null,\n" .
+    "       failures_since_last_success = 0\n" .
+    "  from pgaudit.logon_info();";
+
+pgQueryTest($strSql, $hUserDb);
+
 pgDisconnect($hUserDb);
 
 # Verify that successful logons are logged
@@ -307,10 +364,12 @@ pgDisconnect($hUserDb);
 pgConnect(USER1, 'bogus-password', LOCALHOST, undef, false);
 pgConnect(USER1, 'another-bogus-password', LOCALHOST, undef, false);
 
-commandExecute("${strAnalyzeExe} $strTestPath/pg_log");
-
 # Stop the database
 if (!$bNoCleanup)
 {
     pgDrop();
 }
+
+# Send kill to pgaudit_analyze
+kill 'KILL', $pId;
+waitpid($pId, 0);

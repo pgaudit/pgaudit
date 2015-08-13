@@ -16,6 +16,7 @@ use File::Basename qw(dirname);
 
 use lib dirname($0) . '/../lib';
 use PgAudit::CSV;
+use PgAudit::Wait;
 
 ####################################################################################################################################
 # Handle die as a confess instead to get more detailed error information
@@ -556,9 +557,7 @@ while(!$bDone)
         {
             $strNextLogFile = nextLogFile($strLogPath, $strLogFile);
 
-            $bDone = true;
-
-#            sleep(1);
+            waitHiRes(.1);
         }
         else
         {

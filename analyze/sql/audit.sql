@@ -14,7 +14,7 @@ set session authorization pgaudit_owner;
 
 grant usage
    on schema pgaudit
-   to pgaudit_etl;
+   to public;
 
 create table pgaudit.session
 (
