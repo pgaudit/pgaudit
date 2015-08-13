@@ -36,6 +36,7 @@ use constant
 my $strPgSqlBin = '/usr/local/pgsql/bin';       # Path of PG binaries to use for this test
 my $strTestPath = 'test';                       # Path where testing will occur
 my $strUser = getpwuid($>);                     # PG user name
+my $strHost = '/tmp';                           # PG default host
 my $strDatabase = 'postgres';                   # PG database
 my $iPort = 5432;                               # Port to run Postgres on
 my $bHelp = false;                              # Display help
@@ -61,7 +62,7 @@ if ($bHelp)
 ####################################################################################################################################
 # Global variables
 ####################################################################################################################################
-my $hDb;                    # Connection to Postgres
+my $hDb;                                        # Master connection to Postgres
 
 ####################################################################################################################################
 # commandExecute
@@ -75,12 +76,19 @@ sub commandExecute
     $bSuppressError = defined($bSuppressError) ? $bSuppressError : false;
 
     # Run the command
-    my $iResult = system($strCommand);
+    my $strResult;
 
-    if ($iResult != 0 && !$bSuppressError)
+    eval
     {
-        confess "command '${strCommand}' failed with error ${iResult}";
+        $strResult = capture($strCommand);
+    };
+
+    if ($@ && !$bSuppressError)
+    {
+        confess $@;
     }
+
+    return $strResult;
 }
 
 ####################################################################################################################################
@@ -96,6 +104,8 @@ sub log
 
     if (!$bQuiet)
     {
+        $strMessage =~ s/\n/\n          /g;
+
         print "${strMessage}\n";
     }
 
@@ -110,26 +120,28 @@ sub log
 ####################################################################################################################################
 sub pgConnect
 {
-    my $strUserParam = shift;
-    my $strPasswordParam = shift;
-    my $strHostParam = shift;
-    my $strDatabaseParam = shift;
+    my $strUserLocal = shift;
+    my $strPasswordLocal = shift;
+    my $strHostLocal = shift;
+    my $strDatabaseLocal = shift;
     my $bRaiseError = shift;
 
     # Set defaults
+    $strUserLocal = defined($strUserLocal) ? $strUserLocal : $strUser;
+    $strPasswordLocal = defined($strPasswordLocal) ? $strPasswordLocal : undef;
+    $strHostLocal = defined($strHostLocal) ? $strHostLocal : $strHost;
+    $strDatabaseLocal = defined($strDatabaseLocal) ? $strDatabaseLocal : $strDatabase;
     $bRaiseError = defined($bRaiseError) ? $bRaiseError : true;
 
     # Log Connection
-    &log("   DB: connect user ${strUser}, database ${strDatabase}");
+    &log("      DB: connect user ${strUser}, database ${strDatabase}");
 
     # Disconnect user session
     pgDisconnect();
 
     # Connect to the db
-    return DBI->connect('dbi:Pg:dbname=' . (defined($strDatabaseParam) ? $strDatabaseParam : $strDatabase) .
-                        ";port=${iPort};host=" . (defined($strHostParam) ? $strHostParam : '/tmp'),
-                        defined($strUserParam) ? $strUserParam : $strUser,
-                        defined($strPasswordParam) ? $strPasswordParam : undef,
+    return DBI->connect("dbi:Pg:dbname=${strDatabaseLocal};port=${iPort};host=${strHostLocal}",
+                        $strUserLocal, $strPasswordLocal,
                         {AutoCommit => true, RaiseError => $bRaiseError, PrintError => $bRaiseError});
 }
 
@@ -138,12 +150,12 @@ sub pgConnect
 ####################################################################################################################################
 sub pgDisconnect
 {
-    my $hDbParam = shift;
+    my $hDbLocal = shift;
 
     # Connect to the db (whether it is local or remote)
-    if (defined($hDbParam ? $hDbParam : $hDb))
+    if (defined($hDbLocal ? $hDbLocal : $hDb))
     {
-        ($hDbParam ? $hDbParam : $hDb)->disconnect;
+        ($hDbLocal ? $hDbLocal : $hDb)->disconnect;
     }
 }
 
@@ -153,13 +165,17 @@ sub pgDisconnect
 sub pgQueryRow
 {
     my $strSql = shift;
-    my $hDbParam = shift;
+    my $hDbLocal = shift;
+    my $bLog = shift;
 
     # Log the statement
-    &log("  SQL: ${strSql}");
+    if (!defined($bLog) || $bLog)
+    {
+        &log("  SQL: ${strSql}");
+    }
 
     # Execute the statement
-    my $hStatement = ($hDbParam ? $hDbParam : $hDb)->prepare($strSql);
+    my $hStatement = ($hDbLocal ? $hDbLocal : $hDb)->prepare($strSql);
 
     $hStatement->execute();
     my @stryResult = $hStatement->fetchrow_array();
@@ -176,16 +192,16 @@ sub pgQueryRow
 sub pgQueryTest
 {
     my $strSql = shift;
-    my $hDbParam = shift;
-    #
-    # # Log the statement
-    # &log("  SQL TEST: ${strSql}");
+    my $hDbLocal = shift;
+
+    # Log the statement
+    &log("SQL TEST: ${strSql}");
 
     my $oWait = waitInit(5);
 
     do
     {
-        my @stryResult = pgQueryRow($strSql, $hDbParam);
+        my @stryResult = pgQueryRow($strSql, $hDbLocal, false);
 
         if (@stryResult > 0)
         {
@@ -211,13 +227,13 @@ sub pgQueryTest
 sub pgExecute
 {
     my $strSql = shift;
-    my $hDbParam = shift;
+    my $hDbLocal = shift;
 
     # Log the statement
-    &log("  SQL: ${strSql}");
+    &log("     SQL: ${strSql}");
 
     # Execute the statement
-    ($hDbParam ? $hDbParam : $hDb)->do($strSql);
+    ($hDbLocal ? $hDbLocal : $hDb)->do($strSql);
 }
 
 ####################################################################################################################################
@@ -328,6 +344,8 @@ my $strBasePath = dirname(dirname(abs_path($0)));
 my $strAnalyzeExe = "${strBasePath}/bin/pgaudit_analyze";
 my $strSql;
 
+print "INIT:\n\n";
+
 # Drop the old cluster, build the code, and create a new cluster
 pgDrop();
 pgCreate();
@@ -348,9 +366,9 @@ use constant USER1 => 'user1';
 pgExecute('create user ' . USER1 . " with password '" . USER1 . "'");
 #pgExecute('create user ' . USER2 . " with password '" . USER2 . "'");
 
-# logon - verify that successful logons are logged
+# Verify that successful logons are logged
 #-------------------------------------------------------------------------------
-print "\nTEST: logon\n\n";
+print "\nTEST: logon-success\n\n";
 my $hUserDb = pgConnect(USER1, USER1, LOCALHOST);
 
 $strSql =
@@ -363,7 +381,7 @@ pgQueryTest($strSql, $hUserDb);
 
 pgDisconnect($hUserDb);
 
-# logon-fail - Verify that failed logons are logged
+# Verify that failed logons are logged (and cleared on a successfuly logon)
 #-------------------------------------------------------------------------------
 print "\nTEST: logon-fail\n\n";
 
@@ -409,4 +427,4 @@ kill 'KILL', $pId;
 waitpid($pId, 0);
 
 # Print success
-print "\nTESTS COMPLETED SUCCESSFULLY\n"
+print "\nTESTS COMPLETED SUCCESSFULLY!\n"
