@@ -116,6 +116,9 @@ sub pgConnect
     my $strDatabaseParam = shift;
     my $bRaiseError = shift;
 
+    # Set defaults
+    $bRaiseError = defined($bRaiseError) ? $bRaiseError : true;
+
     # Log Connection
     &log("   DB: connect user ${strUser}, database ${strDatabase}");
 
@@ -127,7 +130,7 @@ sub pgConnect
                         ";port=${iPort};host=" . (defined($strHostParam) ? $strHostParam : '/tmp'),
                         defined($strUserParam) ? $strUserParam : $strUser,
                         defined($strPasswordParam) ? $strPasswordParam : undef,
-                        {AutoCommit => true, RaiseError => defined($bRaiseError) ? $bRaiseError : true});
+                        {AutoCommit => true, RaiseError => $bRaiseError, PrintError => $bRaiseError});
 }
 
 ####################################################################################################################################
@@ -347,6 +350,7 @@ pgExecute('create user ' . USER1 . " with password '" . USER1 . "'");
 
 # logon - verify that successful logons are logged
 #-------------------------------------------------------------------------------
+print "\nTEST: logon\n\n";
 my $hUserDb = pgConnect(USER1, USER1, LOCALHOST);
 
 $strSql =
@@ -359,11 +363,41 @@ pgQueryTest($strSql, $hUserDb);
 
 pgDisconnect($hUserDb);
 
-# Verify that successful logons are logged
+# logon-fail - Verify that failed logons are logged
 #-------------------------------------------------------------------------------
+print "\nTEST: logon-fail\n\n";
+
+# Test that a logon failure is correctly logged
 pgConnect(USER1, 'bogus-password', LOCALHOST, undef, false);
 pgConnect(USER1, 'another-bogus-password', LOCALHOST, undef, false);
 
+$hUserDb = pgConnect(USER1, USER1, LOCALHOST);
+
+$strSql =
+    "select last_success is not null and last_success <= current_timestamp,\n" .
+    "       last_failure is not null and last_failure >= last_success,\n" .
+    "       failures_since_last_success = 2\n" .
+    "  from pgaudit.logon_info();";
+
+pgQueryTest($strSql, $hUserDb);
+
+pgDisconnect($hUserDb);
+
+# Test that logon failures are cleared after another successful logon
+$hUserDb = pgConnect(USER1, USER1, LOCALHOST);
+
+$strSql =
+    "select last_success is not null and last_success <= current_timestamp,\n" .
+    "       last_failure is null,\n" .
+    "       failures_since_last_success = 0\n" .
+    "  from pgaudit.logon_info();";
+
+pgQueryTest($strSql, $hUserDb);
+
+pgDisconnect($hUserDb);
+
+# Cleanup
+#-------------------------------------------------------------------------------
 # Stop the database
 if (!$bNoCleanup)
 {
@@ -373,3 +407,6 @@ if (!$bNoCleanup)
 # Send kill to pgaudit_analyze
 kill 'KILL', $pId;
 waitpid($pId, 0);
+
+# Print success
+print "\nTESTS COMPLETED SUCCESSFULLY\n"
