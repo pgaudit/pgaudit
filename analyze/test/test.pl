@@ -140,9 +140,16 @@ sub pgConnect
     # pgDisconnect();
 
     # Connect to the db
-    return DBI->connect("dbi:Pg:dbname=${strDatabaseLocal};port=${iPort};host=${strHostLocal}",
-                        $strUserLocal, $strPasswordLocal,
-                        {AutoCommit => true, RaiseError => $bRaiseError, PrintError => $bRaiseError});
+    my $hDbLocal = DBI->connect("dbi:Pg:dbname=${strDatabaseLocal};port=${iPort};host=${strHostLocal}",
+                                $strUserLocal, $strPasswordLocal,
+                                {AutoCommit => true, RaiseError => 0, PrintError => 0});
+
+    if (!$hDbLocal && $bRaiseError)
+    {
+        &log('          unable to connect: ' . $DBI::errstr, true);
+    }
+
+    return $hDbLocal;
 }
 
 ####################################################################################################################################
@@ -234,12 +241,20 @@ sub pgExecute
 {
     my $strSql = shift;
     my $hDbLocal = shift;
+    my $bRaiseError = shift;
+
+    $bRaiseError = defined($bRaiseError) ? $bRaiseError : true;
 
     # Log the statement
     &log("     SQL: ${strSql}");
 
     # Execute the statement
     ($hDbLocal ? $hDbLocal : $hDb)->do($strSql);
+
+    if ($DBI::errstr)
+    {
+        &log('          ' . ($bRaiseError ? 'got expected error' : 'unable to execute') . ': ' . $DBI::errstr, $bRaiseError);
+    }
 }
 
 ####################################################################################################################################
@@ -431,7 +446,7 @@ pgQueryTest($strSql, $hUserDb);
 
 pgDisconnect($hUserDb);
 
-# Verify that certain fields are logged with the audit record
+# Verify that correct fields are logged with the audit record
 #-------------------------------------------------------------------------------
 print "\nTEST: audit-record\n\n";
 
@@ -441,13 +456,6 @@ pgExecute('create table test_table (id int)');
 pgExecute('grant select on test_table to user1');
 
 $hUserDb = pgConnect(USER1, USER1, LOCALHOST);
-
-# $strSql =
-#     "select setting = 'read'\n" .
-#     "  from pg_settings\n" .
-#     " where name = 'pgaudit.log'";
-#
-# pgQueryTest($strSql, $hUserDb);
 
 $strSql =
     "select count(*) = 0\n" .
@@ -466,6 +474,54 @@ $strSql =
     "   and command = 'select'\n" .
     "   and object_type = 'table'\n" .
     "   and object_name = 'public.test_table'";
+
+pgQueryTest($strSql);
+
+# Verify that a user cannot change audit settings
+#-------------------------------------------------------------------------------
+print "\nTEST: audit-modify\n\n";
+
+# A user can check their audit settings
+$strSql =
+    "select setting = 'read'\n" .
+    "  from pg_settings\n" .
+    " where name = 'pgaudit.log'";
+
+pgQueryTest($strSql, $hUserDb);
+
+# But not modify them
+$strSql =
+    "set pgaudit.log = 'read, write'";
+
+pgExecute($strSql, $hUserDb, false);
+
+# Superuser can change them of course
+pgExecute($strSql);
+
+pgDisconnect($hUserDb);
+
+# Verify that a role change error is logged
+#-------------------------------------------------------------------------------
+print "\nTEST: audit-role-error\n\n";
+
+# Set role auditing on
+pgExecute('alter user ' . USER1 . " reset pgaudit.log");
+pgExecute("set pgaudit.log = 'role'");
+
+$hUserDb = pgConnect(USER1, USER1, LOCALHOST);
+
+# Create an error modifying a role
+$strSql =
+    'alter role ' . USER1 . ' nologin';
+
+pgExecute($strSql, $hUserDb, false);
+
+$strSql =
+    "select count(*) = 1\n" .
+    "  from pgaudit.log_event\n" .
+    " where error_severity = 'error'\n" .
+    "   and command = 'alter role'\n" .
+    "   and query = 'alter role " . USER1 . " nologin'";
 
 pgQueryTest($strSql);
 
