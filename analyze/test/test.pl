@@ -521,7 +521,55 @@ $strSql =
     "  from pgaudit.log_event\n" .
     " where error_severity = 'error'\n" .
     "   and command = 'alter role'\n" .
-    "   and query = 'alter role " . USER1 . " nologin'";
+    "   and query = '${strSql}'";
+
+pgQueryTest($strSql);
+
+# Verify that a role change is logged
+#-------------------------------------------------------------------------------
+print "\nTEST: audit-role-log\n\n";
+
+# Alter a role
+$strSql =
+    'alter role ' . USER1 . ' createdb';
+
+pgExecute($strSql);
+
+# Make sure the alter was audited
+$strSql =
+    "select count(*) = 1\n" .
+    "  from pgaudit.vw_audit_event\n" .
+    " where log_time is not null\n" .
+    "   and state = 'ok'\n" .
+    "   and audit_type = 'session'\n" .
+    "   and class = 'role'\n" .
+    "   and command = 'alter role'\n" .
+    "   and substatement = '${strSql}'";
+
+pgQueryTest($strSql);
+
+# Verify that users added to a role are logged
+#-------------------------------------------------------------------------------
+print "\nTEST: audit-role-user\n\n";
+
+pgExecute('create role test_group');
+
+# Add a user to the test role
+
+$strSql =
+    'grant test_group to ' . USER1;
+
+pgExecute($strSql);
+
+$strSql =
+    "select count(*) = 1\n" .
+    "  from pgaudit.vw_audit_event\n" .
+    " where log_time is not null\n" .
+    "   and state = 'ok'\n" .
+    "   and audit_type = 'session'\n" .
+    "   and class = 'role'\n" .
+    "   and command = 'grant role'\n" .
+    "   and substatement = '${strSql}'";
 
 pgQueryTest($strSql);
 
