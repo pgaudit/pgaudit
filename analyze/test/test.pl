@@ -134,7 +134,7 @@ sub pgConnect
     $bRaiseError = defined($bRaiseError) ? $bRaiseError : true;
 
     # Log Connection
-    &log("      DB: connect user ${strUser}, database ${strDatabase}");
+    &log("      DB: connect user ${strUserLocal}, database ${strDatabaseLocal}");
 
     # Disconnect user session
     # pgDisconnect();
@@ -442,12 +442,12 @@ pgExecute('grant select on test_table to user1');
 
 $hUserDb = pgConnect(USER1, USER1, LOCALHOST);
 
-$strSql =
-    "select setting = 'read'\n" .
-    "  from pg_settings\n" .
-    " where name = 'pgaudit.log'";
-
-pgQueryTest($strSql, $hUserDb);
+# $strSql =
+#     "select setting = 'read'\n" .
+#     "  from pg_settings\n" .
+#     " where name = 'pgaudit.log'";
+#
+# pgQueryTest($strSql, $hUserDb);
 
 $strSql =
     "select count(*) = 0\n" .
@@ -455,15 +455,19 @@ $strSql =
 
 pgExecute($strSql, $hUserDb);
 
-sleep(2);
+$strSql =
+    "select count(*) = 1\n" .
+    "  from pgaudit.vw_audit_event\n" .
+    " where log_time is not null\n" .
+    "   and user_name = '" . USER1 . "'\n" .
+    "   and state = 'ok'\n" .
+    "   and audit_type = 'session'\n" .
+    "   and class = 'read'\n" .
+    "   and command = 'select'\n" .
+    "   and object_type = 'table'\n" .
+    "   and object_name = 'public.test_table'";
 
-# $strSql =
-#     "select count(*) = 1\n" .
-#     "  from pgaudit.session\n" .
-#     "       inner join pgaudit.log\n" .
-#     " where "
-#
-# pgQueryTest($strSql, $hUserDb);
+pgQueryTest($strSql);
 
 # Cleanup
 #-------------------------------------------------------------------------------

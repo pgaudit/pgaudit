@@ -235,7 +235,7 @@ sub databaseGet
         ")");
 
     $oDbHash{$strDatabaseName}{hSqlAuditSubStmtInsert} = $oDbHash{$strDatabaseName}{hDb}->prepare(
-        "insert into pgaudit.audit_substatement (session_id, statement_id, substatement_id, statement)\n" .
+        "insert into pgaudit.audit_substatement (session_id, statement_id, substatement_id, substatement)\n" .
         "                                values (?, ?, ?, ?)");
 
     $oDbHash{$strDatabaseName}{hSqlAuditSubStmtDetailInsert} = $oDbHash{$strDatabaseName}{hDb}->prepare(

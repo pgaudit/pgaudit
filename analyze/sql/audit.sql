@@ -135,7 +135,7 @@ create table pgaudit.audit_substatement
     session_id text not null,
     statement_id numeric not null,
     substatement_id numeric not null,
-    statement text,
+    substatement text,
     parameter text[],
 
     constraint auditsubstatement_pk
@@ -181,3 +181,32 @@ grant select,
       insert
    on pgaudit.audit_substatement_detail
    to pgaudit_etl;
+
+create view pgaudit.vw_audit_event as
+select session.session_id,
+       log_event.session_line_num,
+       log_event.log_time,
+       session.user_name,
+       audit_statement.statement_id,
+       audit_statement.state,
+       audit_statement.error_session_line_num,
+       audit_substatement.substatement_id,
+       audit_substatement.substatement,
+       audit_substatement_detail.audit_type,
+       audit_substatement_detail.class,
+       audit_substatement_detail.command,
+       audit_substatement_detail.object_type,
+       audit_substatement_detail.object_name
+  from pgaudit.audit_substatement_detail
+       inner join pgaudit.log_event
+            on log_event.session_id = audit_substatement_detail.session_id
+           and log_event.session_line_num = audit_substatement_detail.session_line_num
+       inner join pgaudit.session
+            on session.session_id = audit_substatement_detail.session_id
+       inner join pgaudit.audit_substatement
+            on audit_substatement.session_id = audit_substatement_detail.session_id
+           and audit_substatement.statement_id = audit_substatement_detail.statement_id
+           and audit_substatement.substatement_id = audit_substatement_detail.substatement_id
+       inner join pgaudit.audit_statement
+            on audit_statement.session_id = audit_substatement_detail.session_id
+           and audit_statement.statement_id = audit_substatement_detail.statement_id;
