@@ -137,7 +137,7 @@ sub pgConnect
     &log("      DB: connect user ${strUser}, database ${strDatabase}");
 
     # Disconnect user session
-    pgDisconnect();
+    # pgDisconnect();
 
     # Connect to the db
     return DBI->connect("dbi:Pg:dbname=${strDatabaseLocal};port=${iPort};host=${strHostLocal}",
@@ -180,7 +180,6 @@ sub pgQueryRow
     $hStatement->execute();
     my @stryResult = $hStatement->fetchrow_array();
 
-    $hStatement->execute();
     $hStatement->finish();
 
     return @stryResult;
@@ -198,27 +197,34 @@ sub pgQueryTest
     &log("SQL TEST: ${strSql}");
 
     my $oWait = waitInit(5);
+    my $strError;
 
     do
     {
+        undef($strError);
         my @stryResult = pgQueryRow($strSql, $hDbLocal, false);
 
         if (@stryResult > 0)
         {
             for (my $iIndex = 0; $iIndex < @stryResult; $iIndex++)
             {
-                # if (!stryResult[$iIndex])
-                # {
-                #     confess 'test failed: column ' . ($iIndex + 1) . ' is not true';
-                # }
+                if (!$stryResult[$iIndex])
+                {
+                    $strError = 'column ' . ($iIndex + 1) . ' is not true';
+                    &log("          retry - ${strError} (yet)");
+                    last;
+                }
             }
 
-            return;
+            if (!defined($strError))
+            {
+                return;
+            }
         }
     }
     while (waitMore($oWait));
 
-    confess 'test failed: test query must return at least one boolean column';
+    confess 'test failed: ' . (defined($strError) ? $strError : 'test query must return at least one boolean column');
 }
 
 ####################################################################################################################################
@@ -287,7 +293,7 @@ sub pgStop
     # If postmaster process is running then stop the cluster
     if (-e $strPath . '/postmaster.pid')
     {
-        commandExecute("${strPgSqlBin}/pg_ctl stop -D ${strPath} -w -s -m " . ($bImmediate ? 'immediate' : 'fast'));
+        commandExecute("${strPgSqlBin}/pg_ctl stop -D ${strPath} -w -s -m " . ($bImmediate ? 'immediate' : 'fast'), true);
     }
 }
 
@@ -317,7 +323,7 @@ sub pgStart
                    " -c log_connections=on" .
                    " -c log_destination=csvlog" .
                    " -c logging_collector=on" .
-                   " -c log_rotation_age=1" .
+                   " -c log_rotation_age=15" .
                    " -c log_connections=on" .
                    " -c unix_socket_directories='/tmp'" .
                    "\" -D ${strPath} -l ${strPath}/postgresql.log -w -s");
@@ -372,10 +378,21 @@ print "\nTEST: logon-success\n\n";
 my $hUserDb = pgConnect(USER1, USER1, LOCALHOST);
 
 $strSql =
+    "select last_success is null,\n" .
+    "       last_failure is null,\n" .
+    "       failures_since_last_success = 0\n" .
+    "  from pgaudit.logon_info()";
+
+pgQueryTest($strSql, $hUserDb);
+
+pgDisconnect($hUserDb);
+$hUserDb = pgConnect(USER1, USER1, LOCALHOST);
+
+$strSql =
     "select last_success is not null and last_success <= current_timestamp,\n" .
     "       last_failure is null,\n" .
     "       failures_since_last_success = 0\n" .
-    "  from pgaudit.logon_info();";
+    "  from pgaudit.logon_info()";
 
 pgQueryTest($strSql, $hUserDb);
 
@@ -395,7 +412,7 @@ $strSql =
     "select last_success is not null and last_success <= current_timestamp,\n" .
     "       last_failure is not null and last_failure >= last_success,\n" .
     "       failures_since_last_success = 2\n" .
-    "  from pgaudit.logon_info();";
+    "  from pgaudit.logon_info()";
 
 pgQueryTest($strSql, $hUserDb);
 
@@ -408,11 +425,45 @@ $strSql =
     "select last_success is not null and last_success <= current_timestamp,\n" .
     "       last_failure is null,\n" .
     "       failures_since_last_success = 0\n" .
-    "  from pgaudit.logon_info();";
+    "  from pgaudit.logon_info()";
 
 pgQueryTest($strSql, $hUserDb);
 
 pgDisconnect($hUserDb);
+
+# Verify that certain fields are logged with the audit record
+#-------------------------------------------------------------------------------
+print "\nTEST: audit-record\n\n";
+
+pgExecute('alter user ' . USER1 . " set pgaudit.log = 'read'");
+pgExecute('alter user ' . USER1 . " set pgaudit.log_relation = on");
+pgExecute('create table test_table (id int)');
+pgExecute('grant select on test_table to user1');
+
+$hUserDb = pgConnect(USER1, USER1, LOCALHOST);
+
+$strSql =
+    "select setting = 'read'\n" .
+    "  from pg_settings\n" .
+    " where name = 'pgaudit.log'";
+
+pgQueryTest($strSql, $hUserDb);
+
+$strSql =
+    "select count(*) = 0\n" .
+    "  from test_table";
+
+pgExecute($strSql, $hUserDb);
+
+sleep(2);
+
+# $strSql =
+#     "select count(*) = 1\n" .
+#     "  from pgaudit.session\n" .
+#     "       inner join pgaudit.log\n" .
+#     " where "
+#
+# pgQueryTest($strSql, $hUserDb);
 
 # Cleanup
 #-------------------------------------------------------------------------------
