@@ -376,7 +376,9 @@ pgStart();
 pgPsql("-f ${strBasePath}/sql/audit.sql");
 
 # Start pgaudit_analyze
-my $pId = IPC::Open3::open3(undef, undef, undef, "${strBasePath}/bin/pgaudit_analyze $strTestPath/pg_log");
+my $pId = IPC::Open3::open3(undef, undef, undef,
+                            "${strBasePath}/bin/pgaudit_analyze --socket-path=/tmp" .
+                            " --log-file=${strTestPath}/pgaudit_analyze.log ${strTestPath}/pg_log");
 
 use constant LOCALHOST => '127.0.0.1';
 

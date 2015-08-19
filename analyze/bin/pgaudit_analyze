@@ -12,7 +12,8 @@ use Carp qw(confess);
 
 use DBI;
 use File::Basename qw(dirname);
-#use Getopt::Long qw(GetOptions);
+use POSIX qw(setsid);
+use Getopt::Long qw(GetOptions);
 
 use lib dirname($0) . '/../lib';
 use PgAudit::CSV;
@@ -93,10 +94,35 @@ use constant
 };
 
 ####################################################################################################################################
+# Parse options
+####################################################################################################################################
+my $bHelp = false;
+my $bDaemon = false;
+my $iPort = 5432;
+my $strSocketPath;
+my $strLogOutFile = '/var/log/pgaudit_analyze.log';
+
+GetOptions ('help' => \$bHelp,
+            'daemon' => \$bDaemon,
+            'port=s' => \$iPort,
+            'socket-path=s' => \$strSocketPath,
+            'log-file=s' => \$strLogOutFile)
+    or pod2usage(2);
+
+# Display version and exit if requested
+if ($bHelp)
+{
+    print 'pgaudit log analyzer\n\n';
+    pod2usage();
+
+    exit 0;
+}
+
+####################################################################################################################################
 # Connect to Postgres
 ####################################################################################################################################
 my %oDbHash;
-my $strAuditUserName = 'pgaudit';
+my $strAuditUserName = 'pgaudit_etl';
 my $strAuditSchemaName = 'pgaudit';
 
 sub databaseGet
@@ -115,14 +141,21 @@ sub databaseGet
     }
 
     # Connect to the database
-    $oDbHash{$strDatabaseName}{hDb} = DBI->connect("dbi:Pg:dbname=${strDatabaseName};port=5432;host=/tmp", $strAuditUserName, undef,
-                                                   {AutoCommit => 0, RaiseError => 1});
+    my $strDbUser = getpwuid($<);
+
+    $oDbHash{$strDatabaseName}{hDb} = DBI->connect(
+        "dbi:Pg:dbname=${strDatabaseName};port=${iPort};" .
+        (defined($strSocketPath) ? "host=${strSocketPath}" : ''),
+        $strDbUser, undef,
+        {AutoCommit => 0, RaiseError => 1});
 
     # Check for the audit schema to determine whether or not to log this database
     my $hSqlSchemaSelect = $oDbHash{$strDatabaseName}{hDb}->prepare(
         "select count(*) = 1\n" .
         "  from pg_namespace\n" .
         " where nspname = ?");
+
+    $oDbHash{$strDatabaseName}{hDb}->do("set session authorization ${strAuditUserName}");
 
     $hSqlSchemaSelect->execute($strAuditSchemaName);
 
@@ -531,6 +564,33 @@ sub nextLogFile
     return undef;
 }
 
+
+####################################################################################################################################
+# Daemonize this process
+####################################################################################################################################
+sub daemonInit
+{
+    my $pid;
+
+    chdir '/'
+        or confess "chdir() failed: $!";
+
+    # close stdin/stdout
+    open STDIN, '<', '/dev/null'
+        or confess "Couldn't close standard input: $!";
+    open STDOUT, '>', '/var/log/pgaudit_analyze.log'
+        or confess "Couldn't close standard output: $!";
+
+    # create new process
+    defined($pid = fork)
+        or confess "fork() failed: $!";
+
+    exit if $pid;
+
+    # create new session group
+    setsid() or confess("setsid() failed: $!");
+}
+
 ####################################################################################################################################
 # Main loop
 ####################################################################################################################################
@@ -538,77 +598,106 @@ my $strLogPath = $ARGV[0];
 
 if (!defined($strLogPath))
 {
-    confess "log file/path must be passed";
+    confess "log path must be passed";
 }
 
 my $hFile;
-my $strNextLogFile;
 my $strLogFile;
 my $oLogCSV;
 my $bDone = false;
 
-$strNextLogFile = -d $strLogPath ? nextLogFile($strLogPath) : $strLogPath;
+# Find the first log file
+my $strNextLogFile = nextLogFile($strLogPath);
+
+# Open log file
+open(my $hLog, '>', $strLogOutFile)
+    or confess "Unable to open log file: $!";
+
+# Daemonize the process
+# daemonInit();
 
 while(!$bDone)
 {
-    if (!defined($strNextLogFile))
+    eval
     {
-        if (-d $strLogPath)
+        if (!defined($strNextLogFile))
         {
-            $strNextLogFile = nextLogFile($strLogPath, $strLogFile);
+            if (-d $strLogPath)
+            {
+                $strNextLogFile = nextLogFile($strLogPath, $strLogFile);
 
-            waitHiRes(.1);
+                waitHiRes(.1);
+            }
+            else
+            {
+                $bDone = true;
+            }
         }
         else
         {
-            $bDone = true;
+            if (defined($hFile))
+            {
+                close($hFile);
+            }
+
+            $strLogFile = $strNextLogFile;
+            undef($strNextLogFile);
+
+            syswrite($hLog, "reading ${strLogFile}\n");
+
+            # Read updating file
+            # http://stackoverflow.com/questions/1425223/how-do-i-read-a-file-which-is-constantly-updating
+
+            open($hFile, '<', "${strLogPath}/${strLogFile}")
+                or confess "unable to open ${strLogPath}/${strLogFile}";
+
+            # Read the log file
+            $oLogCSV = new PgAudit::CSV({binary => 1, empty_is_undef => 1});
         }
-    }
-    else
-    {
-        $strLogFile = $strNextLogFile;
-        undef($strNextLogFile);
 
-        print "opening ${strLogFile}\n";
-
-        # Read updating file
-        # http://stackoverflow.com/questions/1425223/how-do-i-read-a-file-which-is-constantly-updating
-
-        open($hFile, '<', "${strLogPath}/${strLogFile}")
-            or confess "unable to open ${strLogPath}/${strLogFile}";
-
-        # Read the log file
-        $oLogCSV = new PgAudit::CSV({binary => 1, empty_is_undef => 1});
-    }
-
-    # Parse all rows in the file into CSV
-    while (my $stryRow = $oLogCSV->getline($hFile))
-    {
-        my $strSessionId = $$stryRow[LOG_FIELD_SESSION_ID];
-        my $lSessionLineNum = $$stryRow[LOG_FIELD_SESSION_LINE_NUM];
-        my $strUserName = $$stryRow[LOG_FIELD_USER_NAME];
-        my $strDatabaseName = $$stryRow[LOG_FIELD_DATABASE_NAME];
-
-        if (defined($strUserName) && $strAuditUserName ne $strUserName &&
-            defined($strDatabaseName) && databaseGet($strDatabaseName) &&
-            (!defined($oSessionHash{$strSessionId}) || !defined($oSessionHash{$strSessionId}{session_line_num}) ||
-             $lSessionLineNum > $oSessionHash{$strSessionId}{session_line_num}))
+        # Parse all rows in the file into CSV
+        while (my $stryRow = $oLogCSV->getline($hFile))
         {
-            sessionGet($strSessionId, $lSessionLineNum, $$stryRow[LOG_FIELD_PROCESS_ID], $$stryRow[LOG_FIELD_SESSION_START_TIME],
-                       $strUserName, $strDatabaseName, $$stryRow[LOG_FIELD_APPLICATION_NAME], $$stryRow[LOG_FIELD_CONNECTION_FROM],
-                       $$stryRow[LOG_FIELD_COMMAND_TAG], $$stryRow[LOG_FIELD_ERROR_SEVERITY]);
+            my $strSessionId = $$stryRow[LOG_FIELD_SESSION_ID];
+            my $lSessionLineNum = $$stryRow[LOG_FIELD_SESSION_LINE_NUM];
+            my $strUserName = $$stryRow[LOG_FIELD_USER_NAME];
+            my $strDatabaseName = $$stryRow[LOG_FIELD_DATABASE_NAME];
 
-            logWrite($strSessionId, $strDatabaseName, $$stryRow[LOG_FIELD_LOG_TIME], $lSessionLineNum,
-                     lc($$stryRow[LOG_FIELD_COMMAND_TAG]), lc($$stryRow[LOG_FIELD_ERROR_SEVERITY]),
-                     lc($$stryRow[LOG_FIELD_SQL_STATE_CODE]), $$stryRow[LOG_FIELD_VIRTUAL_TRANSACTION_ID],
-                     $$stryRow[LOG_FIELD_TRANSACTION_ID], $$stryRow[LOG_FIELD_MESSAGE], $$stryRow[LOG_FIELD_DETAIL],
-                     $$stryRow[LOG_FIELD_HINT], $$stryRow[LOG_FIELD_QUERY], $$stryRow[LOG_FIELD_QUERY_POS],
-                     $$stryRow[LOG_FIELD_INTERNAL_QUERY], $$stryRow[LOG_FIELD_INTERNAL_QUERY_POS], $$stryRow[LOG_FIELD_CONTEXT],
-                     $$stryRow[LOG_FIELD_LOCATION]);
+            if (defined($strUserName) && $strAuditUserName ne $strUserName &&
+                defined($strDatabaseName) && databaseGet($strDatabaseName) &&
+                (!defined($oSessionHash{$strSessionId}) || !defined($oSessionHash{$strSessionId}{session_line_num}) ||
+                 $lSessionLineNum > $oSessionHash{$strSessionId}{session_line_num}))
+            {
+                sessionGet($strSessionId, $lSessionLineNum, $$stryRow[LOG_FIELD_PROCESS_ID], $$stryRow[LOG_FIELD_SESSION_START_TIME],
+                           $strUserName, $strDatabaseName, $$stryRow[LOG_FIELD_APPLICATION_NAME], $$stryRow[LOG_FIELD_CONNECTION_FROM],
+                           $$stryRow[LOG_FIELD_COMMAND_TAG], $$stryRow[LOG_FIELD_ERROR_SEVERITY]);
 
-            $oDbHash{$strDatabaseName}{hDb}->commit();
+                logWrite($strSessionId, $strDatabaseName, $$stryRow[LOG_FIELD_LOG_TIME], $lSessionLineNum,
+                         lc($$stryRow[LOG_FIELD_COMMAND_TAG]), lc($$stryRow[LOG_FIELD_ERROR_SEVERITY]),
+                         lc($$stryRow[LOG_FIELD_SQL_STATE_CODE]), $$stryRow[LOG_FIELD_VIRTUAL_TRANSACTION_ID],
+                         $$stryRow[LOG_FIELD_TRANSACTION_ID], $$stryRow[LOG_FIELD_MESSAGE], $$stryRow[LOG_FIELD_DETAIL],
+                         $$stryRow[LOG_FIELD_HINT], $$stryRow[LOG_FIELD_QUERY], $$stryRow[LOG_FIELD_QUERY_POS],
+                         $$stryRow[LOG_FIELD_INTERNAL_QUERY], $$stryRow[LOG_FIELD_INTERNAL_QUERY_POS], $$stryRow[LOG_FIELD_CONTEXT],
+                         $$stryRow[LOG_FIELD_LOCATION]);
+
+                $oDbHash{$strDatabaseName}{hDb}->commit();
+            }
         }
+    };
+
+    # If there was an error then log it and reset
+    if ($@)
+    {
+        my $strMessage = $@;
+
+        syswrite($hLog, "$@\n");
+        sleep(5);
+
+        # Reset everything and start again
+        undef($oAuditCSV);
+        undef(%oDbHash);
+        undef(%oSessionHash);
+        undef(%oLogonHash);
+        $strNextLogFile = nextLogFile($strLogPath)
     }
 }
-
-close($hFile);
