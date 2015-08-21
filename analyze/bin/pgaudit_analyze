@@ -12,12 +12,30 @@ use Carp qw(confess);
 
 use DBI;
 use File::Basename qw(dirname);
-use POSIX qw(setsid);
 use Getopt::Long qw(GetOptions);
+use Pod::Usage;
+use POSIX qw(setsid);
 
 use lib dirname($0) . '/../lib';
 use PgAudit::CSV;
 use PgAudit::Wait;
+
+####################################################################################################################################
+# Usage
+####################################################################################################################################
+=head1 SYNOPSIS
+
+pgaudit_analyze [options]
+
+ Configuration Options:
+   --daemon             run as a daemon (consider running under upstart or systemctl)
+   --port               port that PostgreSQL is running on (defaults to 5432)
+   --socket-path        socket directory used by PostgreSQL (default to system default directory)
+   --log-file           location of the log file for pgaudit_analyze (defaults to /var/log/pgaudit_analyze.log)
+
+ General Options:
+   --help               display usage and exit
+=cut
 
 ####################################################################################################################################
 # Handle die as a confess instead to get more detailed error information
@@ -112,7 +130,7 @@ GetOptions ('help' => \$bHelp,
 # Display version and exit if requested
 if ($bHelp)
 {
-    print 'pgaudit log analyzer\n\n';
+    syswrite(*STDOUT, "PostgreSQL Audit Log Analyzer\n\n");
     pod2usage();
 
     exit 0;

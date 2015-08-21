@@ -22,6 +22,30 @@ use lib dirname(abs_path($0)) . '/../lib';
 use PgAudit::Wait;
 
 ####################################################################################################################################
+# Usage
+####################################################################################################################################
+
+=head1 NAME
+
+test.pl - PostgreSQL Audit Log Analyzer Regression Tests
+
+=head1 SYNOPSIS
+
+test.pl [options]
+
+ Test Options:
+   --no-cleanup         don't cleaup after the last test is complete - useful for debugging
+
+ Configuration Options:
+   --psql-bin           path to the psql executables (defaults to /usr/local/pgsql/bin)
+   --test-path          path where tests are executed (defaults to ./test)
+   --quiet, -q          suppress non-error output
+
+ General Options:
+   --help               display usage and exit
+=cut
+
+####################################################################################################################################
 # Constants
 ####################################################################################################################################
 use constant
@@ -38,7 +62,7 @@ my $strTestPath = 'test';                       # Path where testing will occur
 my $strUser = getpwuid($>);                     # PG user name
 my $strHost = '/tmp';                           # PG default host
 my $strDatabase = 'postgres';                   # PG database
-my $iPort = 5432;                               # Port to run Postgres on
+my $iPort = 6543;                               # Port to run Postgres on
 my $bHelp = false;                              # Display help
 my $bQuiet = false;                             # Supress output except for errors
 my $bNoCleanup = false;                         # Cleanup database on exit
@@ -53,7 +77,7 @@ GetOptions ('q|quiet' => \$bQuiet,
 # Display version and exit if requested
 if ($bHelp)
 {
-    print 'pgaudit log analyzer regression test\n\n';
+    syswrite(*STDOUT, "PostgreSQL Audit Log Analyzer Regression Tests\n\n");
     pod2usage();
 
     exit 0;
@@ -106,7 +130,7 @@ sub log
     {
         $strMessage =~ s/\n/\n          /g;
 
-        print "${strMessage}\n";
+        syswrite(*STDOUT, "${strMessage}\n");
     }
 
     if ($bError)
@@ -331,7 +355,6 @@ sub pgStart
     # Start the cluster
     commandExecute("${strPgSqlBin}/pg_ctl start -o \"" .
                    " -c port=${iPort}" .
-                   " -c unix_socket_directories='/tmp'" .
                    " -c shared_preload_libraries='pgaudit'" .
                    " -c log_min_messages=notice" .
                    " -c log_error_verbosity=verbose" .
@@ -365,7 +388,7 @@ my $strBasePath = dirname(dirname(abs_path($0)));
 my $strAnalyzeExe = "${strBasePath}/bin/pgaudit_analyze";
 my $strSql;
 
-print "INIT:\n\n";
+&log("INIT:\n");
 
 # Drop the old cluster, build the code, and create a new cluster
 pgDrop();
@@ -377,7 +400,7 @@ pgPsql("-f ${strBasePath}/sql/audit.sql");
 
 # Start pgaudit_analyze
 my $pId = IPC::Open3::open3(undef, undef, undef,
-                            "${strBasePath}/bin/pgaudit_analyze --socket-path=/tmp" .
+                            "${strBasePath}/bin/pgaudit_analyze --port=${iPort} --socket-path=/tmp" .
                             " --log-file=${strTestPath}/pgaudit_analyze.log ${strTestPath}/pg_log");
 
 use constant LOCALHOST => '127.0.0.1';
@@ -391,7 +414,7 @@ pgExecute('create user ' . USER1 . " with password '" . USER1 . "'");
 
 # Verify that successful logons are logged
 #-------------------------------------------------------------------------------
-print "\nTEST: logon-success\n\n";
+&log("\nTEST: logon-success\n");
 my $hUserDb = pgConnect(USER1, USER1, LOCALHOST);
 
 $strSql =
@@ -417,7 +440,7 @@ pgDisconnect($hUserDb);
 
 # Verify that failed logons are logged (and cleared on a successfuly logon)
 #-------------------------------------------------------------------------------
-print "\nTEST: logon-fail\n\n";
+&log("\nTEST: logon-fail\n");
 
 # Test that a logon failure is correctly logged
 pgConnect(USER1, 'bogus-password', LOCALHOST, undef, false);
@@ -450,7 +473,7 @@ pgDisconnect($hUserDb);
 
 # Verify that correct fields are logged with the audit record
 #-------------------------------------------------------------------------------
-print "\nTEST: audit-record\n\n";
+&log("\nTEST: audit-record\n");
 
 pgExecute('alter user ' . USER1 . " set pgaudit.log = 'read'");
 pgExecute('alter user ' . USER1 . " set pgaudit.log_relation = on");
@@ -481,7 +504,7 @@ pgQueryTest($strSql);
 
 # Verify that a user cannot change audit settings
 #-------------------------------------------------------------------------------
-print "\nTEST: audit-modify\n\n";
+&log("\nTEST: audit-modify\n");
 
 # A user can check their audit settings
 $strSql =
@@ -504,7 +527,7 @@ pgDisconnect($hUserDb);
 
 # Verify that a role change error is logged
 #-------------------------------------------------------------------------------
-print "\nTEST: audit-role-error\n\n";
+&log("\nTEST: audit-role-error\n");
 
 # Set role auditing on
 pgExecute('alter user ' . USER1 . " reset pgaudit.log");
@@ -529,7 +552,7 @@ pgQueryTest($strSql);
 
 # Verify that a role change is logged
 #-------------------------------------------------------------------------------
-print "\nTEST: audit-role-log\n\n";
+&log("\nTEST: audit-role-log\n");
 
 # Alter a role
 $strSql =
@@ -552,7 +575,7 @@ pgQueryTest($strSql);
 
 # Verify that users added to a role are logged
 #-------------------------------------------------------------------------------
-print "\nTEST: audit-role-user\n\n";
+&log("\nTEST: audit-role-user\n");
 
 pgExecute('create role test_group');
 
@@ -588,4 +611,4 @@ kill 'KILL', $pId;
 waitpid($pId, 0);
 
 # Print success
-print "\nTESTS COMPLETED SUCCESSFULLY!\n"
+&log("\nTESTS COMPLETED SUCCESSFULLY!");
