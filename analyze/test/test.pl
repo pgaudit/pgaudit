@@ -497,7 +497,7 @@ pgExecute($strSql, $hUserDb);
 $strSql =
     "select count(*) = 1\n" .
     "  from pgaudit.vw_audit_event\n" .
-    " where log_time is not null\n" .
+    " where log_time is not null and log_time <= current_timestamp\n" .
     "   and user_name = '" . USER1 . "'\n" .
     "   and state = 'ok'\n" .
     "   and audit_type = 'session'\n" .
@@ -570,7 +570,7 @@ pgExecute($strSql);
 $strSql =
     "select count(*) = 1\n" .
     "  from pgaudit.vw_audit_event\n" .
-    " where log_time is not null\n" .
+    " where log_time is not null and log_time <= current_timestamp\n" .
     "   and state = 'ok'\n" .
     "   and audit_type = 'session'\n" .
     "   and class = 'role'\n" .
@@ -595,7 +595,7 @@ pgExecute($strSql);
 $strSql =
     "select count(*) = 1\n" .
     "  from pgaudit.vw_audit_event\n" .
-    " where log_time is not null\n" .
+    " where log_time is not null and log_time <= current_timestamp\n" .
     "   and state = 'ok'\n" .
     "   and audit_type = 'session'\n" .
     "   and class = 'role'\n" .
