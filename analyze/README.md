@@ -12,7 +12,7 @@ log_destination = csvlog
 logging_collector = on
 log_connections = on
 ```
-The log files must end with .csv and follow a naming convention that ensures files will sort alphabetically with respect to creation time.  Log location is customizable with calling pgaudit_analyze
+The log files must end with `.csv` and follow a naming convention that ensures files will sort alphabetically with respect to creation time.  Log location is customizable when calling `pgaudit_analyze`.
 
 * Install `pgaudit_analyze`:
 
@@ -23,20 +23,22 @@ Copy the bin and lib directories to any location you prefer but make sure there 
 psql -U postgres -f sql/audit.sql <db name>
 ```
 ## Running
-
+```
 ./pgaudit_analyze --daemon /path/to/log/files
-
+```
 ## Testing
 
-Regression tests are located at test/test.pl.  You may need to set --pgsql-bin depending on your local configuration.
+Regression tests are located at test/test.pl.  You may need to set `--pgsql-bin` depending on your local configuration.
 
-A Vagrantfile has been included in the test directory which gives the exact steps needed to get the regression rests running on CentOS 7.  After logging on to the vagrant box simply run:
+A `Vagrantfile` has been included in the test directory which gives the exact steps needed to get the regression rests running on `CentOS 7`.  After logging on to the `vagrant` box simply run:
 ```
 /pgaudit/analyze/test/test.pl
 ```
 ## Caveats
 
 * The pgaudit.logon table contains the logon information for users of the database.  If a user is renamed they must also be renamed in this table or the logon history will be lost.
+
+* Reads and writes to the pgaudit schema by the user running `pgaudit_analyze` are never logged.
 
 ## Authors
 
