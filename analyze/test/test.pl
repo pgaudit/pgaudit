@@ -128,6 +128,12 @@ sub log
 
     if (!$bQuiet)
     {
+        if ($strMessage =~ /^\n/)
+        {
+            syswrite(*STDOUT, "\n");
+            $strMessage = substr($strMessage, 1);
+        }
+
         $strMessage =~ s/\n/\n          /g;
 
         syswrite(*STDOUT, "${strMessage}\n");
@@ -242,7 +248,7 @@ sub pgQueryTest
                 if (!$stryResult[$iIndex])
                 {
                     $strError = 'column ' . ($iIndex + 1) . ' is not true';
-                    &log("          retry - ${strError} (yet)");
+                    # &log("          retry - ${strError} (yet)");
                     last;
                 }
             }
