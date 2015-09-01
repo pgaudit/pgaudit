@@ -37,7 +37,7 @@ test.pl [options]
    --no-cleanup         don't cleaup after the last test is complete - useful for debugging
 
  Configuration Options:
-   --psql-bin           path to the psql executables (defaults to /usr/local/pgsql/bin)
+   --pgsql-bin          path to the psql executables (defaults to /usr/local/pgsql/bin)
    --test-path          path where tests are executed (defaults to ./test)
    --quiet, -q          suppress non-error output
 
