@@ -4,6 +4,9 @@
 -- Make sure that errors are detected and not automatically rolled back
 \set ON_ERROR_ROLLBACK off
 
+-- Create pgaudit extension
+CREATE EXTENSION IF NOT EXISTS pgaudit;
+
 create role pgaudit_owner;
 create role pgaudit_etl;
 create user pgaudit in role pgaudit_etl;
