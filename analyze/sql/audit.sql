@@ -7,10 +7,39 @@
 -- Create pgaudit extension
 CREATE EXTENSION IF NOT EXISTS pgaudit;
 
-create role pgaudit_owner;
-create role pgaudit_etl;
-create user pgaudit in role pgaudit_etl;
+-- Create a function to check for role exists
+create function pg_temp.role_exists
+(
+    role_name text
+)
+    returns boolean as $$
+begin
+    return
+    (
+        select count(*) = 1
+          from pg_roles
+         where rolname = role_name
+    );
+end
+$$ language plpgsql security definer;
 
+-- Create cluster-wide roles if they do no exist yet
+do $$
+begin
+    if not pg_temp.role_exists('pgaudit_owner') then
+        create role pgaudit_owner;
+    end if;
+
+    if not pg_temp.role_exists('pgaudit_etl') then
+        create role pgaudit_etl;
+    end if;
+
+    if not pg_temp.role_exists('pgaudit') then
+        create user pgaudit in role pgaudit_etl;
+    end if;
+end $$;
+
+-- Create pgaudit schema
 create schema pgaudit authorization pgaudit_owner;
 
 set session authorization pgaudit_owner;
