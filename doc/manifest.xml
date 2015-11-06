@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE doc SYSTEM "manifest.dtd">
+<doc>
+    <!-- System-wide variables  -->
+    <variable-list>
+        <variable key="project">pgAudit</variable>
+        <variable key="project-subtitle">Enterprise PostgreSQL Audit Extension</variable>
+        <variable key="version">1.0</variable>
+        <!-- <variable key="project-exe">pg_backrest</variable>
+        <variable key="project-url-root">/</variable>
+        <variable key="postgres">PostgreSQL</variable>
+        <variable key="dash">-</variable> -->
+
+        <!-- Logo locations -->
+        <variable key="crunchy-logo">/backrest/doc/output/latex/logo</variable>
+
+        <!-- PDF variables  -->
+        <variable key="pdf-title">{[project]} User Guide</variable>
+        <variable key="pdf-subtitle">{[project-subtitle]}</variable>
+    </variable-list>
+
+    <source-list>
+        <source key="user-guide"/>
+    </source-list>
+
+    <render-list>
+        <render type="pdf" file="{[project]}-UserGuide-{[version]}">
+            <render-source key="user-guide"/>
+        </render>
+    </render-list>
+</doc>
