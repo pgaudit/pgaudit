@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE doc SYSTEM "doc.dtd">
+
 <doc subtitle="{[project-subtitle]}" toc="n">
     <section id="introduction">
         <title>Introduction</title>
@@ -48,139 +49,182 @@ AUDIT: SESSION,33,2,DDL,CREATE TABLE,TABLE,public.important_table,CREATE TABLE i
         <p>When logging <code>SELECT</code> and <code>DML</code> statements, {[project]} can be configured to log a separate entry for each relation referenced in a statement.  No parsing is required to find all statements that touch a particular table.  In fact, the goal is that the statement text is provided primarily for deep forensics and should not be required for an audit.</p>
     </section>
 
-<!--## Usage Considerations
+    <section id="usage-considerations">
+        <title>Usage Considerations</title>
 
-Depending on settings, it is possible for {[project]} to generate an enormous volume of logging.  Be careful to determine exactly what needs to be audit logged in your environment to avoid logging too much.
+        <p>Depending on settings, it is possible for {[project]} to generate an enormous volume of logging.  Be careful to determine exactly what needs to be audit logged in your environment to avoid logging too much.</p>
 
-For example, when working in an OLAP environment it would probably not be wise to audit log inserts into a large fact table.  The size of the log file will likely be many times the actual data size of the inserts because the log file is expressed as text.  Since logs are generally stored with the OS this may lead to disk space being exhausted very quickly.  In cases where it is not possible to limit audit logging to certain tables, be sure to assess the performance impact while testing and allocate plenty of space on the log volume.  This may also be true for OLTP environments.  Even if the insert volume is not as high, the performance impact of audit logging may still noticeably affect latency.
+        <p>For example, when working in an OLAP environment it would probably not be wise to audit log inserts into a large fact table.  The size of the log file will likely be many times the actual data size of the inserts because the log file is expressed as text.  Since logs are generally stored with the OS this may lead to disk space being exhausted very quickly.  In cases where it is not possible to limit audit logging to certain tables, be sure to assess the performance impact while testing and allocate plenty of space on the log volume.  This may also be true for OLTP environments.  Even if the insert volume is not as high, the performance impact of audit logging may still noticeably affect latency.</p>
 
-To limit the number of relations audit logged for `SELECT` and `DML` statments, consider using object audit logging (see [Object Auditing](#object-auditing)).  Object audit logging allows selection of the relations to be logged allowing for reduction of the overall log volume.  However, when new relations are added they must be explicitly added to object audit logging.  A programmatic solution where specified tables are excluded from logging and all others are included may be a good option in this case.
+        <p>To limit the number of relations audit logged for <code>SELECT</code> and <code>DML</code> statements, consider using object audit logging (see <link page="#object-auditing">Object Auditing</link>).  Object audit logging allows selection of the relations to be logged allowing for reduction of the overall log volume.  However, when new relations are added they must be explicitly added to object audit logging.  A programmatic solution where specified tables are excluded from logging and all others are included may be a good option in this case.</p>
+    </section>
 
-## Compile and Install
+    <section id="compile-install">
+        <title>Compile and Install</title>
 
-Clone the PostgreSQL repository:
-```
+        <p>Clone the PostgreSQL repository:</p>
+
+        <code-block title="">
 git clone https://github.com/postgres/postgres.git
-```
-Checkout REL9_5_STABLE branch:
-```
+        </code-block>
+
+        <p>Checkout <id>REL9_5_STABLE</id> branch:</p>
+
+        <code-block title="">
 git checkout REL9_5_STABLE
-```
-Make PostgreSQL:
-```
+        </code-block>
+
+        <p>Make PostgreSQL:</p>
+
+        <code-block title="">
 ./configure
 make install -s
-```
-Change to the contrib directory:
-```
+        </code-block>
+
+    <p>Change to the contrib directory:</p>
+
+        <code-block title="">
 cd contrib
-```
-Clone the {[project]} extension:
-```
+        </code-block>
+
+    <p>Clone the {[project]} extension:</p>
+
+        <code-block title="">
 git clone https://github.com/pgaudit/pgaudit.git
-```
-Change to {[project]} directory:
-```
+        </code-block>
+
+    <p>Change to {[project]} directory:</p>
+
+        <code-block title="">
 cd pgaudit
-```
-Build `{[project]}` and run regression tests:
-```
+        </code-block>
+
+    <p>Build {[project]} and run regression tests:</p>
+
+        <code-block title="">
 make -s check
-```
-Install {[project]}:
-```
+        </code-block>
+
+    <p>Install {[project]}:</p>
+
+        <code-block title="">
 make install
-```
+        </code-block>
+    </section>
 
-## Settings
+    <section id="Settings">
+        <title>Settings</title>
 
-Settings may be modified only by a superuser. Allowing normal users to change their settings would defeat the point of an audit log.
+        <p>Settings may be modified only by a superuser. Allowing normal users to change their settings would defeat the point of an audit log.</p>
 
-Settings can be specified globally (in `postgresql.conf` or using `ALTER SYSTEM ... SET`), at the database level (using `ALTER DATABASE ... SET`), or at the role level (using `ALTER ROLE ... SET`).  Note that settings are not inherited through normal role inheritance and `SET ROLE` will not alter a user's {[project]} settings.  This is a limitation of the roles system and not inherent to {[project]}.
+        <p>Settings can be specified globally (in <file>postgresql.conf</file> or using <code>ALTER SYSTEM ... SET</code>), at the database level (using <code>ALTER DATABASE ... SET</code>), or at the role level (using <code>ALTER ROLE ... SET</code>).  Note that settings are not inherited through normal role inheritance and <code>SET ROLE</code> will not alter a user's {[project]} settings.  This is a limitation of the roles system and not inherent to {[project]}.</p>
 
-The {[project]} extension must be loaded in [shared_preload_libraries](http://www.postgresql.org/docs/9.5/static/runtime-config-client.html#GUC-SHARED-PRELOAD-LIBRARIES).  Otherwise, an error will be raised at load time and no audit logging will occur.
+        <p>The {[project]} extension must be loaded in <link url="http://www.postgresql.org/docs/9.5/static/runtime-config-client.html#GUC-SHARED-PRELOAD-LIBRARIES">shared_preload_libraries</link>.  Otherwise, an error will be raised at load time and no audit logging will occur.</p>
 
-### pgaudit.log
+        <section id="option-log">
+            <title>pgaudit.log</title>
 
-Specifies which classes of statements will be logged by session audit logging.  Possible values are:
+            <p>Specifies which classes of statements will be logged by session audit logging.  Possible values are:</p>
 
-* __READ__: `SELECT` and `COPY` when the source is a relation or a query.
+            <p>* <b>READ</b>: <code>SELECT</code> and <code>COPY</code> when the source is a relation or a query.
 
-* __WRITE__: `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, and `COPY` when the destination is a relation.
+            * <b>WRITE</b>: <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>TRUNCATE</code>, and <code>COPY</code> when the destination is a relation.
 
-* __FUNCTION__: Function calls and `DO` blocks.
+            * <b>FUNCTION</b>: Function calls and <code>DO</code> blocks.
 
-* __ROLE__: Statements related to roles and privileges: `GRANT`, `REVOKE`, `CREATE/ALTER/DROP ROLE`.
+            * <b>ROLE</b>: Statements related to roles and privileges: <code>GRANT</code>, <code>REVOKE</code>, <code>CREATE/ALTER/DROP ROLE</code>.
 
-* __DDL__: All `DDL` that is not included in the `ROLE` class.
+            * <b>DDL</b>: All <code>DDL</code> that is not included in the <code>ROLE</code> class.
 
-* __MISC__: Miscellaneous commands, e.g. `DISCARD`, `FETCH`, `CHECKPOINT`, `VACUUM`.
+            * <b>MISC</b>: Miscellaneous commands, e.g. <code>DISCARD</code>, <code>FETCH</code>, <code>CHECKPOINT</code>, <code>VACUUM</code>.</p>
 
-Multiple classes can be provided using a comma-separated list and classes can be subtracted by prefacing the class with a `-` sign (see [Session Audit Logging](#session-audit-logging)).
+            <p>Multiple classes can be provided using a comma-separated list and classes can be subtracted by prefacing the class with a <code>-</code> sign (see <link page="#session-audit-logging">Session Audit Logging</link>).</p>
 
-The default is `none`.
+            <p>The default is <pg-setting>none</pg-setting>.</p>
+        </section>
 
-### pgaudit.log_catalog
+        <section id="option-log-catalog">
+            <title>pgaudit.log_catalog</title>
 
-Specifies that session logging should be enabled in the case where all relations in a statement are in pg_catalog.  Disabling this setting will reduce noise in the log from tools like psql and PgAdmin that query the catalog heavily.
+            <p>Specifies that session logging should be enabled in the case where all relations in a statement are in pg_catalog.  Disabling this setting will reduce noise in the log from tools like psql and PgAdmin that query the catalog heavily.</p>
 
-The default is `on`.
+            <p>The default is <pg-setting>on</pg-setting>.</p>
+        </section>
 
-### pgaudit.log_level
+        <section id="option-log-level">
+            <title>pgaudit.log_level</title>
 
-Specifies the log level that will be used for log entries (see [Message Severity Levels] (http://www.postgresql.org/docs/9.1/static/runtime-config-logging.html#RUNTIME-CONFIG-SEVERITY-LEVELS) for valid levels but note that `ERROR`, `FATAL`, and `PANIC` are not allowed). This setting is used for regression testing and may also be useful to end users for testing or other purposes.
+            <p>Specifies the log level that will be used for log entries (see <link url="http://www.postgresql.org/docs/9.4/static/runtime-config-logging.html#RUNTIME-CONFIG-SEVERITY-LEVELS">Message Severity Levels</link> for valid levels) but note that <code>ERROR</code>, <code>FATAL</code>, and <code>PANIC</code> are not allowed). This setting is used for regression testing and may also be useful to end users for testing or other purposes.</p>
 
-The default is `log`.
+            <p>The default is <pg-setting>log</pg-setting>.</p>
+        </section>
 
-### pgaudit.log_parameter
+        <section id="option-log-parameter">
+            <title>pgaudit.log_parameter</title>
 
-Specifies that audit logging should include the parameters that were passed with the statement.  When parameters are present they will be included in CSV format after the statement text.
+            <p>Specifies that audit logging should include the parameters that were passed with the statement.  When parameters are present they will be included in <id>CSV</id> format after the statement text.</p>
 
-The default is `off`.
+            <p>The default is <pg-setting>off</pg-setting>.</p>
+        </section>
 
-### pgaudit.log_relation
+        <section id="option-log-relation">
+            <title>pgaudit.log_relation</title>
 
-Specifies whether session audit logging should create a separate log entry for each relation (`TABLE`, `VIEW`, etc.) referenced in a `SELECT` or `DML` statement.  This is a useful shortcut for exhaustive logging without using object audit logging.
+            <p>Specifies whether session audit logging should create a separate log entry for each relation (<code>TABLE</code>, <code>VIEW</code>, etc.) referenced in a <code>SELECT</code> or <code>DML</code> statement.  This is a useful shortcut for exhaustive logging without using object audit logging.</p>
 
-The default is `off`.
+            <p>The default is <pg-setting>off</pg-setting>.</p>
+        </section>
 
-### pgaudit.log_statement_once
+        <section id="option-log-statement-once">
+            <title>pgaudit.log_statement_once</title>
 
-Specifies whether logging will include the statement text and parameters with the first log entry for a statement/substatement combination or with every entry.  Disabling this setting will result in less verbose logging but may make it more difficult to determine the statement that generated a log entry, though the statement/substatement pair along with the process id should suffice to identify the statement text logged with a previous entry.
+            <p>Specifies whether logging will include the statement text and parameters with the first log entry for a statement/substatement combination or with every entry.  Disabling this setting will result in less verbose logging but may make it more difficult to determine the statement that generated a log entry, though the statement/substatement pair along with the process id should suffice to identify the statement text logged with a previous entry.</p>
 
-The default is `off`.
+            <p>The default is <pg-setting>off</pg-setting>.</p>
+        </section>
 
-### pgaudit.role
+        <section id="option-role">
+            <title>pgaudit.role</title>
 
-Specifies the master role to use for object audit logging.  Muliple audit roles can be defined by granting them to the master role. This allows multiple groups to be in charge of different aspects of audit logging.
+            <p>Specifies the master role to use for object audit logging.  Multiple audit roles can be defined by granting them to the master role. This allows multiple groups to be in charge of different aspects of audit logging.</p>
 
-There is no default.
+            <p>There is no default.</p>
+        </section>
+    </section>
 
-## Session Audit Logging
+    <section id="session-audit-logging">
+        <title>Session Audit Logging</title>
 
-Session audit logging provides detailed logs of all statements executed by a user in the backend.
+        <p>Session audit logging provides detailed logs of all statements executed by a user in the backend.</p>
 
-### Configuration
+        <section id="configuration">
+            <title>Configuration</title>
 
-Session logging is enabled with the [pgaudit.log](#pgauditlog) setting.
+            <p>Session logging is enabled with the <link page="#pgauditlog">pgaudit.log</link> setting.</p>
 
-Enable session logging for all `DML` and `DDL` and log all relations in `DML` statements:
-```
+            <p>Enable session logging for all <code>DML</code> and <code>DDL</code> and log all relations in <code>DML</code> statements:</p>
+
+            <code-block title="">
 set pgaudit.log = 'write, ddl';
 set pgaudit.log_relation = on;
-```
-Enable session logging for all commands except `MISC` and raise audit log messages as `NOTICE`:
-```
+            </code-block>
+
+            <p>Enable session logging for all commands except <code>MISC</code> and raise audit log messages as <code>NOTICE</code>:</p>
+
+            <code-block title="">
 set pgaudit.log = 'all, -misc';
 set pgaudit.log_level = notice;
-```
+            </code-block>
+        </section>
 
-### Example
+        <section id="example">
+            <title>Example</title>
 
-In this example session audit logging is used for logging `DDL` and `SELECT` statements.  Note that the insert statement is not logged since the `WRITE` class is not enabled
+            <p>In this example session audit logging is used for logging <code>DDL</code> and <code>SELECT</code> statements.  Note that the insert statement is not logged since the <code>WRITE</code> class is not enabled</p>
 
-SQL:
-```
+            <p>SQL:</p>
+
+            <code-block title="">
 set pgaudit.log = 'read, ddl';
 
 create table account
@@ -196,9 +240,11 @@ insert into account (id, name, password, description)
 
 select *
     from account;
-```
-Log Output:
-```
+            </code-block>
+
+            <p>Log Output:</p>
+
+            <code-block title="">
 AUDIT: SESSION,1,1,DDL,CREATE TABLE,TABLE,public.account,create table account
 (
     id int,
@@ -208,9 +254,11 @@ AUDIT: SESSION,1,1,DDL,CREATE TABLE,TABLE,public.account,create table account
 );
 AUDIT: SESSION,2,1,READ,SELECT,,,select *
     from account
-```
+            </code-block>
+        </section>
+    </section>
 
-## Object Auditing
+<!--## Object Auditing
 
 Object audit logging logs statements that affect a particular relation. Only `SELECT`, `INSERT`, `UPDATE` and `DELETE` commands are supported.  `TRUNCATE` is not included in object audit logging.
 

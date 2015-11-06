@@ -4,7 +4,7 @@
     <!-- System-wide variables  -->
     <variable-list>
         <variable key="project">pgAudit</variable>
-        <variable key="project-subtitle">Enterprise PostgreSQL Audit Extension</variable>
+        <variable key="project-subtitle">Open Source PostgreSQL Audit Extension</variable>
         <variable key="version">1.0</variable>
         <!-- <variable key="project-exe">pg_backrest</variable>
         <variable key="project-url-root">/</variable>
