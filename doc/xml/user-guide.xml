@@ -401,9 +401,71 @@ AUDIT: SESSION,36,1,DDL,ALTER TABLE,TABLE,public.test2,ALTER TABLE test RENAME T
         * Statements that are executed after a transaction enters an aborted state will not be audit logged.  However, the statement that caused the error and any subsequent statements executed in the aborted transaction will be logged as ERRORs by the standard logging facility.</p>
     </section>
 
-    <section id="authors">
+    <!-- <section id="authors">
         <title>Authors</title>
 
         <p>The PostgreSQL Audit Extension is based on the pgaudit project at https://github.com/2ndQuadrant authored by Abhijit Menon-Sen and Ian Barwick.  Further development has been done by David Steele.</p>
+    </section> -->
+
+    <section id="log-analyzer">
+        <title>PostgreSQL Audit Log Analyzer</title>
+
+        <p>The PostgreSQL Audit extension ({[project]}) provides detailed session and/or object audit logging via the standard PostgreSQL logging facility.  However, logs are not the ideal place to store audit information.  The PostgreSQL Audit Log Analyzer ({[project-analyze]}) reads audit entries from the PostgreSQL logs and loads them into a database schema to aid in analysis and auditing.</p>
+
+        <section id="installing">
+            <title>Installing</title>
+
+            <p>* Install {[project]} following the instructions included with the extension.
+
+            * Update the log settings in <file>postgresql.conf</file> as follows:</p>
+
+            <code-block title="">
+log_destination = csvlog
+logging_collector = on
+log_connections = on
+            </code-block>
+
+            <p>The log files must end with `.csv` and follow a naming convention that ensures files will sort alphabetically with respect to creation time.  Log location is customizable when calling {[project-analyze]}.
+
+            * Install {[project-analyze]}:
+
+            Copy the bin and lib directories to any location you prefer but make sure there are in the same directory.
+
+            * Execute audit.sql in the database you want to audit as <user>postgres</user>:</p>
+
+            <code-block title="">
+psql -U postgres -f sql/audit.sql &lt;db name&gt;
+            </code-block>
+        </section>
+
+        <section id="running">
+            <title>Running</title>
+
+            <p>{[project-analyze]} is intended to be run as a daemon process.</p>
+
+            <code-block title="">
+./pgaudit_analyze {[dash]}-daemon /path/to/log/files
+            </code-block>
+        </section>
+
+        <section id="testing">
+            <title>Testing</title>
+
+            <p>Regression tests are located at test/test.pl.  You may need to set <code>{[dash]}-pgsql-bin</code> depending on your local configuration.
+
+A <file>Vagrantfile</file> has been included in the test directory which gives the exact steps needed to get the regression rests running on <id>CentOS 7</id>.  After logging on to the <id>vagrant</id> box simply run:</p>
+
+            <code-block title="">
+/pgaudit/analyze/test/test.pl
+            </code-block>
+        </section>
+
+        <section id="caveats">
+            <title>Caveats</title>
+
+            <p>* The pgaudit.logon table contains the logon information for users of the database.  If a user is renamed they must also be renamed in this table or the logon history will be lost.</p>
+
+            <p>* Reads and writes to the {[project]} schema by the user running {[project-analyze]} are never logged.</p>
+        </section>
     </section>
 </doc>
