@@ -383,23 +383,27 @@ AUDIT: OBJECT,3,1,READ,SELECT,TABLE,public.account_role_map,select account.passw
         <p>Use <link url="http://www.postgresql.org/docs/9.5/static/runtime-config-logging.html#GUC-LOG-LINE-PREFIX">log_line_prefix</link> to add any other fields that are needed to satisfy your audit log requirements.  A typical log line prefix might be <id>'\%m \%u \%d: '</id> which would provide the date/time, user name, and database name for each audit log.</p>
     </section>
 
-<!--## Caveats
+    <section id="caveats">
+        <title>Caveats</title>
 
-* Object renames are logged under the name they were renamed to. For example, renaming a table will produce the following result:
+        <p>* Object renames are logged under the name they were renamed to. For example, renaming a table will produce the following result:</p>
 
-```
+        <code-block title="">
 ALTER TABLE test RENAME TO test2;
 
 AUDIT: SESSION,36,1,DDL,ALTER TABLE,TABLE,public.test2,ALTER TABLE test RENAME TO test2
-```
-* It is possible to have a command logged more than once.  For example, when a table is created with a primary key specified at creation time the index for the primary key will be logged independently and another audit log will be made for the index under the create entry.  The multiple entries will however be contained within one statement ID.
+        </code-block>
 
-* Autovacuum and Autoanalyze are not logged.
+        <p>* It is possible to have a command logged more than once.  For example, when a table is created with a primary key specified at creation time the index for the primary key will be logged independently and another audit log will be made for the index under the create entry.  The multiple entries will however be contained within one statement ID.
 
-* Statements that are executed after a transaction enters an aborted state will not be audit logged.  However, the statement that caused the error and any subsequent statements executed in the aborted transaction will be logged as ERRORs by the standard logging facility.
+        * Autovacuum and Autoanalyze are not logged.
 
-## Authors
+        * Statements that are executed after a transaction enters an aborted state will not be audit logged.  However, the statement that caused the error and any subsequent statements executed in the aborted transaction will be logged as ERRORs by the standard logging facility.</p>
+    </section>
 
-The PostgreSQL Audit Extension is based on the pgaudit project at https://github.com/2ndQuadrant authored by Abhijit Menon-Sen and Ian Barwick.  Further development has been done by David Steele. -->
+    <section id="authors">
+        <title>Authors</title>
 
+        <p>The PostgreSQL Audit Extension is based on the pgaudit project at https://github.com/2ndQuadrant authored by Abhijit Menon-Sen and Ian Barwick.  Further development has been done by David Steele.</p>
+    </section>
 </doc>
