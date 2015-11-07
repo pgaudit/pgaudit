@@ -5,7 +5,7 @@
     <variable-list>
         <variable key="project">pgAudit</variable>
         <variable key="project-subtitle">Open Source PostgreSQL Audit Extension</variable>
-        <variable key="version">1.0</variable>
+        <variable key="version">1.0 Beta</variable>
         <!-- <variable key="project-exe">pg_backrest</variable>
         <variable key="project-url-root">/</variable>
         <variable key="postgres">PostgreSQL</variable>
