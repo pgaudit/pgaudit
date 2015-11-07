@@ -357,31 +357,33 @@ AUDIT: OBJECT,3,1,READ,SELECT,TABLE,public.account_role_map,select account.passw
         </section>
     </section>
 
-<!--## Format
+    <section id="format">
+        <title>Format</title>
 
-Audit entries are written to the standard logging facility and contain the following columns in comma-separated format:
+        <p>Audit entries are written to the standard logging facility and contain the following columns in comma-separated format.  Output is compliant CSV format only if the log line prefix portion of each log entry is removed.</p>
 
-Output is compliant CSV format only if the log line prefix portion of each log entry is removed.
+        <p>* <b>AUDIT_TYPE</b> - <code>SESSION</code> or <code>OBJECT</code>.
 
-* __AUDIT_TYPE__ - `SESSION` or `OBJECT`.
-* __STATEMENT_ID__ - Unique statement ID for this session. Each statement ID represents a backend call.  Statement IDs are sequential even if some statements are not logged.  There may be multiple entries for a statement ID when more than one relation is logged.
+        * <b>STATEMENT_ID</b> - Unique statement ID for this session. Each statement ID represents a backend call.  Statement IDs are sequential even if some statements are not logged.  There may be multiple entries for a statement ID when more than one relation is logged.
 
-* __SUBSTATEMENT_ID__ - Sequential ID for each substatement within the main statement.  For example, calling a function from a query.  Substatement IDs are continuous even if some substatements are not logged.  There may be multiple entries for a substatement ID when more than one relation is logged.
+        * <b>SUBSTATEMENT_ID</b> - Sequential ID for each sub-statement within the main statement.  For example, calling a function from a query.  Sub-statement IDs are continuous even if some sub-statements are not logged.  There may be multiple entries for a sub-statement ID when more than one relation is logged.
 
-* __CLASS__ - e.g. (`READ`, `ROLE`) (see [pgaudit.log](#pgauditlog)).
-* __COMMAND__ - e.g. `ALTER TABLE`, `SELECT`.
+        * <b>CLASS</b> - e.g. <code>READ</code>, <code>ROLE</code> (see <link page="#pgauditlog">pgaudit.log</link>).
 
-* __OBJECT_TYPE__ - `TABLE`, `INDEX`, `VIEW`, etc. Available for `SELECT`, `DML` and most `DDL` statements.
+        * <b>COMMAND</b> - e.g. <code>ALTER TABLE</code>, <code>SELECT</code>.
 
-* __OBJECT_NAME__ - The fully-qualified object name (e.g. public.account).  Available for `SELECT`, `DML` and most `DDL` statements.
+        * <b>OBJECT_TYPE</b> - <code>TABLE</code>, <code>INDEX</code>, <code>VIEW</code>, etc. Available for <code>SELECT</code>, <code>DML</code> and most <code>DDL</code> statements.
 
-* __STATEMENT__ - Statement executed on the backend.
+        * <b>OBJECT_NAME</b> - The fully-qualified object name (e.g. public.account).  Available for <code>SELECT</code>, <code>DML</code> and most <code>DDL</code> statements.
 
-* __PARAMETER__ - If `pgaudit.log_parameter` is set then this field will contain the statement parameters as quoted CSV.
+        * <b>STATEMENT</b> - Statement executed on the backend.
 
-Use [log_line_prefix](http://www.postgresql.org/docs/9.5/static/runtime-config-logging.html#GUC-LOG-LINE-PREFIX) to add any other fields that are needed to satisfy your audit log requirements.  A typical log line prefix might be `'%m %u %d: '` which would provide the date/time, user name, and database name for each audit log.
+        * <b>PARAMETER</b> - If <pg-setting>pgaudit.log_parameter</pg-setting> is set then this field will contain the statement parameters as quoted CSV.</p>
 
-## Caveats
+        <p>Use <link url="http://www.postgresql.org/docs/9.5/static/runtime-config-logging.html#GUC-LOG-LINE-PREFIX">log_line_prefix</link> to add any other fields that are needed to satisfy your audit log requirements.  A typical log line prefix might be <id>'\%m \%u \%d: '</id> which would provide the date/time, user name, and database name for each audit log.</p>
+    </section>
+
+<!--## Caveats
 
 * Object renames are logged under the name they were renamed to. For example, renaming a table will produce the following result:
 
