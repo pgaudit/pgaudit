@@ -470,25 +470,25 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <title>Tables</title>
 
                 <section id="session-table">
-                    <title><id>session</id> table</title>
+                    <title>session table</title>
 
                     <p></p>
                 </section>
 
                 <section id="logon-table">
-                    <title><id>logon</id> table</title>
+                    <title>logon table</title>
 
                     <p></p>
                 </section>
 
                 <section id="log-event-table">
-                    <title><id>log_event</id> table</title>
+                    <title>log_event table</title>
 
                     <p></p>
                 </section>
 
                 <section id="audit-statement-table">
-                    <title><id>audit_statement</id> table</title>
+                    <title>audit_statement table</title>
 
                     <p></p>
 
@@ -533,7 +533,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 </section>
 
                 <section id="audit-substatement-table">
-                    <title><id>audit_substatement</id> table</title>
+                    <title>audit_substatement table</title>
 
                     <p></p>
 
@@ -585,7 +585,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 </section>
 
                 <section id="audit-substatement-detail-table">
-                    <title><id>audit_substatement_detail</id> table</title>
+                    <title>audit_substatement_detail table</title>
 
                     <p>Contains detail about sub-statements.</p>
 
@@ -662,6 +662,26 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                             </table-row>
                         </table-data>
                     </table>
+                </section>
+            </section>
+
+            <section id="views">
+                <title>Views</title>
+
+                <section id="audit-event-view">
+                    <title>vw_audit_event view</title>
+
+                    <p></p>
+                </section>
+            </section>
+
+            <section id="function">
+                <title>Functions</title>
+
+                <section id="logon-info-function">
+                    <title>logon_info function</title>
+
+                    <p></p>
                 </section>
             </section>
         </section>
