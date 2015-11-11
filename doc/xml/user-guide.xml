@@ -490,7 +490,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <section id="audit-statement-table">
                     <title>audit_statement table</title>
 
-                    <p></p>
+                    <p>[TABLE DESCRIPTION]</p>
 
                     <table>
                         <table-header>
@@ -535,7 +535,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <section id="audit-substatement-table">
                     <title>audit_substatement table</title>
 
-                    <p></p>
+                    <p>[TABLE DESCRIPTION]</p>
 
                     <table>
                         <table-header>
