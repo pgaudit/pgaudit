@@ -472,19 +472,248 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <section id="session-table">
                     <title>session table</title>
 
-                    <p></p>
+                    <p>[TABLE DESCRIPTION]</p>
+
+                    <table>
+                        <table-header>
+                            <table-column>Column</table-column>
+                            <table-column>Type</table-column>
+                            <table-column align="center">Nullable</table-column>
+                            <table-column fill="y">Description</table-column>
+                        </table-header>
+
+                        <table-data>
+                            <table-row>
+                                <table-cell>session_id</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>N</table-cell>
+                                <table-cell><postgres/> session identifier.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>session_start_time</table-cell>
+                                <table-cell>timestamp</table-cell>
+                                <table-cell>N</table-cell>
+                                <table-cell>Timestamp of session start.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>user_name</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>N</table-cell>
+                                <table-cell><postgres/> user name.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>application_name</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Session application name.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>connection_from</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>IP/Host that the session was initiated from.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>state</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>N</table-cell>
+                                <table-cell>Was the connection successful: <id>OK</id> or <id>ERROR</id>.</table-cell>
+                            </table-row>
+                        </table-data>
+                    </table>
                 </section>
 
                 <section id="logon-table">
                     <title>logon table</title>
 
-                    <p></p>
+                    <p>[TABLE DESCRIPTION]</p>
+
+                    <table>
+                        <table-header>
+                            <table-column>Column</table-column>
+                            <table-column>Type</table-column>
+                            <table-column align="center">Nullable</table-column>
+                            <table-column fill="y">Description</table-column>
+                        </table-header>
+
+                        <table-data>
+                            <table-row>
+                                <table-cell>user_name</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>N</table-cell>
+                                <table-cell><postgres/> user name.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>last_success</table-cell>
+                                <table-cell>timestamp</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Timestamp of last successful logon.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>current_success</table-cell>
+                                <table-cell>timestamp</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Timestamp of current successful logon.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>last_failure</table-cell>
+                                <table-cell>timestamp</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Timestamp of last logon failure.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>failures_since_last_success</table-cell>
+                                <table-cell>int</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Number of failed logon attempts since the last successful logon.</table-cell>
+                            </table-row>
+                        </table-data>
+                    </table>
                 </section>
 
                 <section id="log-event-table">
                     <title>log_event table</title>
 
-                    <p></p>
+                    <p>[TABLE DESCRIPTION]</p>
+
+                    <table>
+                        <table-header>
+                            <table-column>Column</table-column>
+                            <table-column>Type</table-column>
+                            <table-column align="center">Nullable</table-column>
+                            <table-column fill="y">Description</table-column>
+                        </table-header>
+
+                        <table-data>
+                            <table-row>
+                                <table-cell>session_id</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>N</table-cell>
+                                <table-cell><postgres/> session identifier.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>session_line_num</table-cell>
+                                <table-cell>numeric</table-cell>
+                                <table-cell>N</table-cell>
+                                <table-cell>Sequential statement id generated by <postgres/>.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>log_time</table-cell>
+                                <table-cell>timestamp(3)</table-cell>
+                                <table-cell>N</table-cell>
+                                <table-cell>Time stamp with milliseconds.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>command</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Command tag - type of session's command.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>error_severity</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Type of error (e.g. <id>ERROR</id>, <id>PANIC</id>).</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>sql_state_code</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>SQLSTATE error code.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>virtual_transaction_id</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Virtual transaction ID (backendID/localXID).</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>transaction_id</table-cell>
+                                <table-cell>bigint</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Transaction ID (0 if none is assigned).</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>message</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Text of the log message.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>detail</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Additional detail for the log message.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>hint</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>A hint for interpreting the log message.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>query</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Text of the current query.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>query_pos</table-cell>
+                                <table-cell>int</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>On error, position in the query where the error occurred.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>internal_query</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Text of the internal current query.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>internal_query_pos</table-cell>
+                                <table-cell>int</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>On error, position in the internal query where the error occurred.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>context</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Additional information about where the query was executed.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>location</table-cell>
+                                <table-cell>text</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>On error, location in the <postgres/> source code where the error occurred.</table-cell>
+                            </table-row>
+                        </table-data>
+                    </table>
                 </section>
 
                 <section id="audit-statement-table">
@@ -671,7 +900,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <section id="audit-event-view">
                     <title>vw_audit_event view</title>
 
-                    <p></p>
+                    <p>[VIEW DESCRIPTION]</p>
                 </section>
             </section>
 
@@ -681,7 +910,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <section id="logon-info-function">
                     <title>logon_info function</title>
 
-                    <p></p>
+                    <p>[FUNCTION DESCRIPTION]</p>
                 </section>
             </section>
         </section>

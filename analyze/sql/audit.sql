@@ -126,7 +126,7 @@ create table pgaudit.log_event
     error_severity text,
     sql_state_code text,
     virtual_transaction_id text,
-    transaction_id int,
+    transaction_id bigint,
     message text,
     detail text,
     hint text,
