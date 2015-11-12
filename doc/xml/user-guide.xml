@@ -59,7 +59,7 @@ AUDIT: SESSION,33,2,DDL,CREATE TABLE,TABLE,public.important_table,CREATE TABLE i
         <p>To limit the number of relations audit logged for <code>SELECT</code> and <code>DML</code> statements, consider using object audit logging (see <link page="#object-auditing">Object Auditing</link>).  Object audit logging allows selection of the relations to be logged allowing for reduction of the overall log volume.  However, when new relations are added they must be explicitly added to object audit logging.  A programmatic solution where specified tables are excluded from logging and all others are included may be a good option in this case.</p>
     </section>
 
-    <section id="compile-install">
+    <!-- <section id="compile-install">
         <title>Compile and Install</title>
 
         <p>Clone the PostgreSQL repository:</p>
@@ -110,6 +110,12 @@ make -s check
         <code-block title="">
 make install
         </code-block>
+    </section> -->
+
+    <section id="install">
+        <title>Installation</title>
+
+        <p>Please refer to section 4.8 of the Crunchy Certified <postgres/> Secure Installation and Configuration Guide.</p>
     </section>
 
     <section id="Settings">
@@ -404,7 +410,7 @@ AUDIT: SESSION,36,1,DDL,ALTER TABLE,TABLE,public.test2,ALTER TABLE test RENAME T
 
         <p>The PostgreSQL Audit extension ({[project]}) provides detailed session and/or object audit logging via the standard PostgreSQL logging facility.  However, logs are not the ideal place to store audit information.  The PostgreSQL Audit Log Analyzer ({[project-analyze]}) reads audit entries from the PostgreSQL logs and loads them into a database schema to aid in analysis and auditing.</p>
 
-        <section id="installing">
+        <!-- <section id="installation">
             <title>Installing</title>
 
             <p>* Install {[project]} following the instructions included with the extension.
@@ -451,12 +457,20 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
             <code-block title="">
 /pgaudit/analyze/test/test.pl
             </code-block>
+        </section> -->
+
+        <section id="install">
+            <title>Installation</title>
+
+            <p>Please refer to section 4.9 of the Crunchy Certified <postgres/> Secure Installation and Configuration Guide.</p>
         </section>
 
         <section id="schema">
-            <title>{[project]} Schema and Tables</title>
+            <title>{[project]} Schema</title>
 
-            <p>The <code>pgaudit</code> schema ...</p>
+            <p>The <id>pgaudit_analyze</id> processes monitors the <postgres/> <id>CSV</id> log output and loads all log and audit events into the <id>pgaudit</id> schema.</p>
+
+            <p>In addition, logon information for users on each audited database is collected and stored.</p>
 
             <section id="tables">
                 <title>Tables</title>
@@ -524,8 +538,6 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                     <title>logon table</title>
 
                     <p>Tracks information about user logons.</p>
-
-                    <p>The <code>logon_info()</code> function allows a user to query information about their logons.</p>
 
                     <table>
                         <table-header>
@@ -606,7 +618,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                                 <table-cell>log_time</table-cell>
                                 <table-cell>timestamp(3)</table-cell>
                                 <table-cell>N</table-cell>
-                                <table-cell>Time stamp with milliseconds.</table-cell>
+                                <table-cell>Timestamp with milliseconds.</table-cell>
                             </table-row>
 
                             <table-row>
@@ -669,7 +681,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                                 <table-cell>query</table-cell>
                                 <table-cell>text</table-cell>
                                 <table-cell>Y</table-cell>
-                                <table-cell>Text of the current query.</table-cell>
+                                <table-cell>Text of the query.</table-cell>
                             </table-row>
 
                             <table-row>
@@ -683,7 +695,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                                 <table-cell>internal_query</table-cell>
                                 <table-cell>text</table-cell>
                                 <table-cell>Y</table-cell>
-                                <table-cell>Text of the internal current query.</table-cell>
+                                <table-cell>Text of the internal query.</table-cell>
                             </table-row>
 
                             <table-row>
@@ -713,7 +725,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <section id="audit-statement-table">
                     <title>audit_statement table</title>
 
-                    <p>Contains the stop-level statement information for a user request.  A statement may contain numerous sub-statements which are tracked in the <id>audit_substatement</id> table.</p>
+                    <p>Contains the top-level statement information.  A statement may contain numerous sub-statements which are tracked in the <id>audit_substatement</id> table.</p>
 
                     <table>
                         <table-header>
@@ -934,9 +946,43 @@ select session.session_id,
                 <title>Functions</title>
 
                 <section id="logon-info-function">
-                    <title>logon_info function</title>
+                    <title>logon_info() function</title>
 
-                    <p>[FUNCTION DESCRIPTION]</p>
+                    <p>Allows the user to query logon information for the current database. The function returns the following values:</p>
+
+                    <table>
+                        <!-- <title>Function returns</title> -->
+
+                        <table-header>
+                            <table-column>Column</table-column>
+                            <table-column>Type</table-column>
+                            <table-column align="center">Nullable</table-column>
+                            <table-column fill="y">Description</table-column>
+                        </table-header>
+
+                        <table-data>
+                            <table-row>
+                                <table-cell>last_success</table-cell>
+                                <table-cell>timestamp</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Timestamp of last successful logon.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>last_failure</table-cell>
+                                <table-cell>timestamp</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Timestamp of last logon failure.</table-cell>
+                            </table-row>
+
+                            <table-row>
+                                <table-cell>failures_since_last_success</table-cell>
+                                <table-cell>int</table-cell>
+                                <table-cell>Y</table-cell>
+                                <table-cell>Number of failed logon attempts since the last successful logon.</table-cell>
+                            </table-row>
+                        </table-data>
+                    </table>
                 </section>
             </section>
         </section>
