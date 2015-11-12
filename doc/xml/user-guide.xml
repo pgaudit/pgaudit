@@ -222,9 +222,7 @@ set pgaudit.log_level = notice;
 
             <p>In this example session audit logging is used for logging <code>DDL</code> and <code>SELECT</code> statements.  Note that the insert statement is not logged since the <code>WRITE</code> class is not enabled</p>
 
-            <p>SQL:</p>
-
-            <code-block title="">
+            <code-block title="SQL">
 set pgaudit.log = 'read, ddl';
 
 create table account
@@ -242,9 +240,7 @@ select *
     from account;
             </code-block>
 
-            <p>Log Output:</p>
-
-            <code-block title="">
+            <code-block title="Log Output">
 AUDIT: SESSION,1,1,DDL,CREATE TABLE,TABLE,public.account,create table account
 (
     id int,
@@ -286,9 +282,7 @@ grant select, delete
 
             <p>In this example object audit logging is used to illustrate how a granular approach may be taken towards logging of <code>SELECT</code> and <code>DML</code> statements.  Note that logging on the <code>account</code> table is controlled by column-level permissions, while logging on the <code>account_role_map</code> table is table-level.</p>
 
-            <p>SQL:</p>
-
-            <code-block title="">
+            <code-block title="SQL">
 set pgaudit.role = 'auditor';
 
 create table account
@@ -336,9 +330,7 @@ select account.password,
             on account.id = account_role_map.account_id
             </code-block>
 
-            <p>Log Output:</p>
-
-            <code-block title="">
+            <code-block title="Log Output">
 AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,select password
   from account
 AUDIT: OBJECT,2,1,WRITE,UPDATE,TABLE,public.account,update account
@@ -472,7 +464,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <section id="session-table">
                     <title>session table</title>
 
-                    <p>[TABLE DESCRIPTION]</p>
+                    <p>Contains information about <postgres/> sessions.</p>
 
                     <table>
                         <table-header>
@@ -531,7 +523,9 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <section id="logon-table">
                     <title>logon table</title>
 
-                    <p>[TABLE DESCRIPTION]</p>
+                    <p>Tracks information about user logons.</p>
+
+                    <p>The <code>logon_info()</code> function allows a user to query information about their logons.</p>
 
                     <table>
                         <table-header>
@@ -583,7 +577,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <section id="log-event-table">
                     <title>log_event table</title>
 
-                    <p>[TABLE DESCRIPTION]</p>
+                    <p>Contains <postgres/> <id>CSV</id> log entries.  Information from the <id>CSV</id> log is loaded into this table and the <id>session</id> table.</p>
 
                     <table>
                         <table-header>
@@ -719,7 +713,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <section id="audit-statement-table">
                     <title>audit_statement table</title>
 
-                    <p>[TABLE DESCRIPTION]</p>
+                    <p>Contains the stop-level statement information for a user request.  A statement may contain numerous sub-statements which are tracked in the <id>audit_substatement</id> table.</p>
 
                     <table>
                         <table-header>
@@ -764,7 +758,9 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <section id="audit-substatement-table">
                     <title>audit_substatement table</title>
 
-                    <p>[TABLE DESCRIPTION]</p>
+                    <p>Contains the sub-statements that make up statement.</p>
+
+                    <p>There are many cases where a user statement can contain multiple sub-statements.  For example, if the user statement contains a <code>DO</code> block or a function call then multiple sub-statements can be generated.</p>
 
                     <table>
                         <table-header>
@@ -816,7 +812,9 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <section id="audit-substatement-detail-table">
                     <title>audit_substatement_detail table</title>
 
-                    <p>Contains detail about sub-statements.</p>
+                    <p>Contains individual sub-statement audit events.</p>
+
+                    <p>There may be multiple auditable events in a single sub-statement.  For example, a query may have a number of tables that are being individually audit logged.  In that case, an <id>audit_substatement_detail</id> record will be created for each table.</p>
 
                     <table>
                         <table-header>
@@ -900,7 +898,35 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                 <section id="audit-event-view">
                     <title>vw_audit_event view</title>
 
-                    <p>[VIEW DESCRIPTION]</p>
+                    <p>Produces a view of the <id>pgaudit</id> schema that brings together all the major information needed for auditing an analysis.</p>
+
+                    <code-block title="View definition (join criteria removed for brevity)">
+create view pgaudit.vw_audit_event as
+select session.session_id,
+         log_event.session_line_num,
+         log_event.log_time,
+         session.user_name,
+         audit_statement.statement_id,
+         audit_statement.state,
+         audit_statement.error_session_line_num,
+         audit_substatement.substatement_id,
+         audit_substatement.substatement,
+         audit_substatement_detail.audit_type,
+         audit_substatement_detail.class,
+         audit_substatement_detail.command,
+         audit_substatement_detail.object_type,
+         audit_substatement_detail.object_name
+  from pgaudit.audit_substatement_detail
+        inner join pgaudit.log_event
+             [...]
+        inner join pgaudit.session
+             [...]
+        inner join pgaudit.audit_substatement
+             [...]
+        inner join pgaudit.audit_statement
+             [...]
+                </code-block>
+
                 </section>
             </section>
 
