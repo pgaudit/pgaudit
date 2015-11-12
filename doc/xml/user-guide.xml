@@ -468,7 +468,7 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
         <section id="schema">
             <title>{[project]} Schema</title>
 
-            <p>The <id>pgaudit_analyze</id> processes monitors the <postgres/> <id>CSV</id> log output and loads all log and audit events into the <id>pgaudit</id> schema.</p>
+            <p>The <id>pgaudit_analyze</id> processes monitors the <postgres/> <id>CSV</id> log output and loads all log and audit events into the <id>pgaudit</id> schema.  Session and statement errors set the <id>state</id> column in the <id>session</id> and <id>audit_statement</id> tables respectively.</p>
 
             <p>In addition, logon information for users on each audited database is collected and stored.</p>
 
@@ -479,6 +479,8 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                     <title>session table</title>
 
                     <p>Contains information about <postgres/> sessions.</p>
+
+                    <p>{[project]} tracks whether connections succeed or fail and the result is stored in the <id>state</id> column.  Additional information about the error can be found by joining to the <id>log_event</id> table on the <id>session_id</id> column.</p>
 
                     <table>
                         <table-header>
@@ -590,6 +592,8 @@ A <file>Vagrantfile</file> has been included in the test directory which gives t
                     <title>log_event table</title>
 
                     <p>Contains <postgres/> <id>CSV</id> log entries.  Information from the <id>CSV</id> log is loaded into this table and the <id>session</id> table.</p>
+
+                    <p>If a statement fails then the <id>state</id> column will be set to <id>error</id>.  Additional information about the error can be found by joining to the <id>log_event</id> table on the <id>session_id</id> and <id>session_line_num</id> columns.</p>
 
                     <table>
                         <table-header>
