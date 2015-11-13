@@ -418,7 +418,7 @@ AUDIT: SESSION,36,1,DDL,ALTER TABLE,TABLE,public.test2,ALTER TABLE test RENAME T
             * Update the log settings in <file>postgresql.conf</file> as follows:</p>
 
             <code-block title="">
-log_destination = csvlog
+log_destination = 'csvlog'
 logging_collector = on
 log_connections = on
             </code-block>
