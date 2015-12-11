@@ -160,7 +160,7 @@ create table pgaudit.audit_statement
     constraint auditstatement_pk
         primary key (session_id, statement_id),
     constraint auditstatement_sessionid_sessionlinenum_fk
-        foreign key (session_id, session_line_num)
+        foreign key (session_id, error_session_line_num)
         references pgaudit.log_event (session_id, session_line_num)
         deferrable initially deferred
 );
