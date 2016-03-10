@@ -58,11 +58,12 @@ Vagrant.configure(2) do |config|
             # apt-get install libdbi-perl libdbd-pg-perl
 
             # Install Perl modules required for building the docs
-            apt-get install -y libxml-checker-perl libxml-writer-perl ghostscript
+            apt-get install -y libxml-checker-perl libxml-writer-perl ghostscript git
 
             # Install texlive
             mkdir /root/texlive
-            wget -q -O - http://mirror.hmc.edu/ctan/systems/texlive/tlnet/install-tl-unx.tar.gz | tar zxv -C /root//texlive --strip-components=1
+            wget -q -O - http://mirror.hmc.edu/ctan/systems/texlive/tlnet/install-tl-unx.tar.gz | \
+                tar zxv -C /root//texlive --strip-components=1
             echo "collection-basic 1" >> /root/texlive/texlive.profile
             echo "collection-latex 1" >> /root/texlive/texlive.profile
             /root/texlive/install-tl -profile=/root/texlive/texlive.profile
@@ -70,7 +71,11 @@ Vagrant.configure(2) do |config|
             echo 'PATH=/usr/local/texlive/2015/bin/x86_64-linux:$PATH' >> /etc/profile
             echo 'export PATH' >> /etc/profile
 
-            /usr/local/texlive/2015/bin/x86_64-linux/tlmgr install caption xcolor listings parskip helvetic ltablex titlesec epstopdf courier
+            /usr/local/texlive/2015/bin/x86_64-linux/tlmgr install caption xcolor listings parskip helvetic ltablex titlesec \
+                epstopdf courier sectsty pgf ms
+
+            # Clone backrest repo to build docs
+            git clone https://github.com/pgmasters/backrest.git /backrest
         SHELL
     end
 
@@ -79,7 +84,4 @@ Vagrant.configure(2) do |config|
 
     # Mount pgaudit path for testing
     config.vm.synced_folder "../..", "/pgaudit"
-
-    # Mount backrest for docs
-    config.vm.synced_folder "../../../../../../../../../Code/backrest", "/backrest"
 end

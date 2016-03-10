@@ -56,7 +56,7 @@ AUDIT: SESSION,33,2,DDL,CREATE TABLE,TABLE,public.important_table,CREATE TABLE i
 
         <p>For example, when working in an OLAP environment it would probably not be wise to audit log inserts into a large fact table.  The size of the log file will likely be many times the actual data size of the inserts because the log file is expressed as text.  Since logs are generally stored with the OS this may lead to disk space being exhausted very quickly.  In cases where it is not possible to limit audit logging to certain tables, be sure to assess the performance impact while testing and allocate plenty of space on the log volume.  This may also be true for OLTP environments.  Even if the insert volume is not as high, the performance impact of audit logging may still noticeably affect latency.</p>
 
-        <p>To limit the number of relations audit logged for <code>SELECT</code> and <code>DML</code> statements, consider using object audit logging (see <link page="#object-auditing">Object Auditing</link>).  Object audit logging allows selection of the relations to be logged allowing for reduction of the overall log volume.  However, when new relations are added they must be explicitly added to object audit logging.  A programmatic solution where specified tables are excluded from logging and all others are included may be a good option in this case.</p>
+        <p>To limit the number of relations audit logged for <code>SELECT</code> and <code>DML</code> statements, consider using object audit logging (see <link section="/object-audit-logging">Object Auditing</link>).  Object audit logging allows selection of the relations to be logged allowing for reduction of the overall log volume.  However, when new relations are added they must be explicitly added to object audit logging.  A programmatic solution where specified tables are excluded from logging and all others are included may be a good option in this case.</p>
     </section>
 
     <!-- <section id="compile-install">
@@ -118,7 +118,7 @@ make install
         <p>Please refer to section 4.8 of the Crunchy Certified <postgres/> Secure Installation and Configuration Guide.</p>
     </section>
 
-    <section id="Settings">
+    <section id="settings">
         <title>Settings</title>
 
         <p>Settings may be modified only by a superuser. Allowing normal users to change their settings would defeat the point of an audit log.</p>
@@ -144,7 +144,7 @@ make install
 
             * <b>MISC</b>: Miscellaneous commands, e.g. <code>DISCARD</code>, <code>FETCH</code>, <code>CHECKPOINT</code>, <code>VACUUM</code>.</p>
 
-            <p>Multiple classes can be provided using a comma-separated list and classes can be subtracted by prefacing the class with a <code>-</code> sign (see <link page="#session-audit-logging">Session Audit Logging</link>).</p>
+            <p>Multiple classes can be provided using a comma-separated list and classes can be subtracted by prefacing the class with a <code>-</code> sign (see <link section="/session-audit-logging">Session Audit Logging</link>).</p>
 
             <p>The default is <pg-setting>none</pg-setting>.</p>
         </section>
@@ -206,7 +206,7 @@ make install
         <section id="configuration">
             <title>Configuration</title>
 
-            <p>Session logging is enabled with the <link page="#pgauditlog">pgaudit.log</link> setting.</p>
+            <p>Session logging is enabled with the <link section="/settings/option-log">pgaudit.log</link> setting.</p>
 
             <p>Enable session logging for all <code>DML</code> and <code>DDL</code> and log all relations in <code>DML</code> statements:</p>
 
@@ -270,9 +270,9 @@ AUDIT: SESSION,2,1,READ,SELECT,,,select *
         <section id="configuration">
             <title>Configuration</title>
 
-            <p>Object-level audit logging is implemented via the roles system.  The <link page="#pgauditrole">pgaudit.role</link> setting defines the role that will be used for audit logging.  A relation (<code>TABLE</code>, <code>VIEW</code>, etc.) will be audit logged when the audit role has permissions for the command executed or inherits the permissions from another role.  This allows you to effectively have multiple audit roles even though there is a single master role in any context.</p>
+            <p>Object-level audit logging is implemented via the roles system.  The <link section="/settings/option-role">pgaudit.role</link> setting defines the role that will be used for audit logging.  A relation (<code>TABLE</code>, <code>VIEW</code>, etc.) will be audit logged when the audit role has permissions for the command executed or inherits the permissions from another role.  This allows you to effectively have multiple audit roles even though there is a single master role in any context.</p>
 
-            <p>Set <link page="#pgauditrole">pgaudit.role</link> to <code>auditor</code> and grant <code>SELECT</code> and <code>DELETE</code> privileges on the <code>account</code> table. Any <code>SELECT</code> or <code>DELETE</code> statements on the <code>account</code> table will now be logged:</p>
+            <p>Set <link section="/settings/option-role">pgaudit.role</link> to <code>auditor</code> and grant <code>SELECT</code> and <code>DELETE</code> privileges on the <code>account</code> table. Any <code>SELECT</code> or <code>DELETE</code> statements on the <code>account</code> table will now be logged:</p>
 
             <code-block title="">
 set pgaudit.role = 'auditor';
@@ -366,7 +366,7 @@ AUDIT: OBJECT,3,1,READ,SELECT,TABLE,public.account_role_map,select account.passw
 
         * <b>SUBSTATEMENT_ID</b> - Sequential ID for each sub-statement within the main statement.  For example, calling a function from a query.  Sub-statement IDs are continuous even if some sub-statements are not logged.  There may be multiple entries for a sub-statement ID when more than one relation is logged.
 
-        * <b>CLASS</b> - e.g. <code>READ</code>, <code>ROLE</code> (see <link page="#pgauditlog">pgaudit.log</link>).
+        * <b>CLASS</b> - e.g. <code>READ</code>, <code>ROLE</code> (see <link section="/settings/option-log">pgaudit.log</link>).
 
         * <b>COMMAND</b> - e.g. <code>ALTER TABLE</code>, <code>SELECT</code>.
 
