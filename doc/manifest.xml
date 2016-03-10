@@ -5,9 +5,10 @@
     <variable-list>
         <variable key="project">pgAudit</variable>
         <variable key="project-subtitle">Open Source PostgreSQL Audit Logging</variable>
-        <variable key="version">1.0beta</variable>
+        <variable key="version">1.0.0</variable>
 
         <variable key="project-analyze">{[project]} Analyze</variable>
+        <variable key="project-setuser">{[project]} Set User</variable>
 
         <variable key="postgres">PostgreSQL</variable>
         <variable key="dash">-</variable>
