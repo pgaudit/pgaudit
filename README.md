@@ -8,6 +8,20 @@ The goal of the pgAudit is to provide PostgreSQL users with capability to produc
 
 An audit is an official inspection of an individual's or organization's accounts, typically by an independent body. The information gathered by pgAudit is properly called an audit trail or audit log. The term audit log is used in this documentation.
 
+## PostgreSQL Version Compatibility
+
+This version of pgaudit was developed to support PostgreSQL 9.5+
+
+In order to support new functionality introduced in new PostgreSQL release, pgaudit provides a different source tree for each PostgreSQL major version (currently PostgreSQL 9.5 and PostgreSQL 9.6) and will continue to be moving forward as we maintain each branch in a manner similar to how PostgreSQL major versions are maintained.
+
+The current pgaudit versions relate to PostgreSQL major versions as follows:
+
+-- **pgaudit v1.1.x** is intended to support PostgreSQL 9.6
+
+-- **pgaudit v1.0.x** is intended to support PostgreSQL 9.5
+
+Absent bug fixes, no further development is planned for the PostgreSQL 9.5 or PostgreSQL 9.6 back branches.  New development, if any, will be strictly for PostgreSQL 10 on a new branch. 
+
 ## Why pgAudit?
 
 Basic statement logging can be provided by the standard logging facility with `log_statement = all`. This is acceptable for monitoring and other usages but does not provide the level of detail generally required for an audit. It is not enough to have a list of all the operations performed against the database. It must also be possible to find particular statements that are of interest to an auditor. The standard logging facility shows what the user requested, while pgAudit focuses on the details of what happened while the database was satisfying the request.
