@@ -88,6 +88,10 @@ Change to pgAudit directory:
 ```
 cd pgaudit
 ```
+Checkout `REL_10_STABLE` branch (note that during development the stable branch may not exist):
+```
+git checkout REL_10_STABLE
+```
 Build pgAudit and run regression tests:
 ```
 make -s check
