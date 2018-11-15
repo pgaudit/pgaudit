@@ -111,7 +111,9 @@ Specifies which classes of statements will be logged by session audit logging. P
 
 - **DDL**: All `DDL` that is not included in the `ROLE` class.
 
-- **MISC**: Miscellaneous commands, e.g. `DISCARD`, `FETCH`, `CHECKPOINT`, `VACUUM`.
+- **MISC**: Miscellaneous commands, e.g. `DISCARD`, `FETCH`, `CHECKPOINT`, `VACUUM`, `SET`.
+
+- **MISC_SET**: Miscellaneous `SET` commands, e.g. `SET ROLE`.
 
 Multiple classes can be provided using a comma-separated list and classes can be subtracted by prefacing the class with a `-` sign (see [Session Audit Logging](#session-audit-logging)).
 
