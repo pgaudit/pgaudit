@@ -613,8 +613,12 @@ log_audit_event(AuditEventStackItem *stackItem)
                     class = LOG_FUNCTION;
                     break;
 
+                /*
+                 * SET statements reported as MISC but filtered by MISC_SET
+                 * flags to maintain existing functionality.
+                 */
                 case T_VariableSetStmt:
-                    className = CLASS_MISC_SET;
+                    className = CLASS_MISC;
                     class = LOG_MISC_SET;
                     break;
 
