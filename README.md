@@ -14,6 +14,7 @@ Basic statement logging can be provided by the standard logging facility with `l
 
 For example, an auditor may want to verify that a particular table was created inside a documented maintenance window. This might seem like a simple job for grep, but what if you are presented with something like this (intentionally obfuscated) example:
 ```
+DO $$
 BEGIN
     EXECUTE 'CREATE TABLE import' || 'ant_table (id INT)';
 END $$;
@@ -112,6 +113,8 @@ Specifies which classes of statements will be logged by session audit logging. P
 - **DDL**: All `DDL` that is not included in the `ROLE` class.
 
 - **MISC**: Miscellaneous commands, e.g. `DISCARD`, `FETCH`, `CHECKPOINT`, `VACUUM`.
+
+- **ALL**: Include all of the above.
 
 Multiple classes can be provided using a comma-separated list and classes can be subtracted by prefacing the class with a `-` sign (see [Session Audit Logging](#session-audit-logging)).
 
@@ -212,9 +215,9 @@ AUDIT: SESSION,1,1,DDL,CREATE TABLE,TABLE,public.account,create table account
     name text,
     password text,
     description text
-);
+);,<not logged>
 AUDIT: SESSION,2,1,READ,SELECT,,,select *
-    from account
+    from account,<not logged>
 ```
 
 ## Object Audit Logging
@@ -291,19 +294,19 @@ select account.password,
 _Log Output_:
 ```
 AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,select password
-  from account
+  from account,<not logged>
 AUDIT: OBJECT,2,1,WRITE,UPDATE,TABLE,public.account,update account
-   set password = 'HASH2'
+   set password = 'HASH2',<not logged>
 AUDIT: OBJECT,3,1,READ,SELECT,TABLE,public.account,select account.password,
        account_role_map.role_id
   from account
        inner join account_role_map
-            on account.id = account_role_map.account_id
+            on account.id = account_role_map.account_id,<not logged>
 AUDIT: OBJECT,3,1,READ,SELECT,TABLE,public.account_role_map,select account.password,
        account_role_map.role_id
   from account
        inner join account_role_map
-            on account.id = account_role_map.account_id
+            on account.id = account_role_map.account_id,<not logged>
 ```
 
 ## Format
@@ -326,9 +329,9 @@ Audit entries are written to the standard logging facility and contain the follo
 
 - **STATEMENT** - Statement executed on the backend.
 
-- **PARAMETER** - If `pgaudit.log_parameter` is set then this field will contain the statement parameters as quoted CSV.
+- **PARAMETER** - If `pgaudit.log_parameter` is set then this field will contain the statement parameters as quoted CSV, or `<none>` if there are no parameters. Otherwise, the field is `<not logged>`.
 
-Use [log_line_prefix](http://www.postgresql.org/docs/11/static/runtime-config-logging.html#GUC-LOG-LINE-PREFIX) to add any other fields that are needed to satisfy your audit log requirements. A typical log line prefix might be `'\%m \%u \%d: '` which would provide the date/time, user name, and database name for each audit log.
+Use [log_line_prefix](http://www.postgresql.org/docs/11/static/runtime-config-logging.html#GUC-LOG-LINE-PREFIX) to add any other fields that are needed to satisfy your audit log requirements. A typical log line prefix might be `'%m %u %d [%p] '` which would provide the date/time, user name, database name, and process id for each audit log.
 
 ## Caveats
 
@@ -336,7 +339,7 @@ Object renames are logged under the name they were renamed to. For example, rena
 ```
 ALTER TABLE test RENAME TO test2;
 
-AUDIT: SESSION,36,1,DDL,ALTER TABLE,TABLE,public.test2,ALTER TABLE test RENAME TO test2
+AUDIT: SESSION,36,1,DDL,ALTER TABLE,TABLE,public.test2,ALTER TABLE test RENAME TO test2,<not logged>
 ```
 It is possible to have a command logged more than once. For example, when a table is created with a primary key specified at creation time the index for the primary key will be logged independently and another audit log will be made for the index under the create entry. The multiple entries will however be contained within one statement ID.
 
