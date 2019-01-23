@@ -76,7 +76,7 @@ Change to pgAudit directory:
 ```
 cd pgaudit
 ```
-Checkout `REL9_5_STABLE` branch (note that the stable branch may not exist for unreleased versions on PostgreSQL):
+Checkout `REL9_5_STABLE` branch (note that the stable branch may not exist for unreleased versions of PostgreSQL):
 ```
 git checkout REL9_5_STABLE
 ```
