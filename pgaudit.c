@@ -150,6 +150,12 @@ bool auditLogStatementOnce = false;
  */
 char *auditRole = NULL;
 
+/**
+ * GUC variable for pgaudit.log_ignore_table
+ * Sepecifies which table will be ignored in audit logfile
+ */
+char *ignoreTableName = NULL;
+
 /*
  * String constants for the audit log fields.
  */
@@ -964,6 +970,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
     ListCell *lr;
     bool first = true;
     bool found = false;
+    char *relname;
 
     /* Do not log if this is an internal statement */
     if (internalStatement)
@@ -999,6 +1006,12 @@ log_select_dml(Oid auditOid, List *rangeTabls)
 
         if (!auditLogCatalog && IsSystemNamespace(RelationGetNamespace(rel)))
         {
+            relation_close(rel, NoLock);
+            continue;
+        }
+
+        relname = RelationGetRelationName(rel);
+        if (ignoreTableName != NULL && 0 == strcmp(ignoreTableName, relname)) {
             relation_close(rel, NoLock);
             continue;
         }
@@ -1954,6 +1967,17 @@ _PG_init(void)
 
         NULL,
         &auditRole,
+        "",
+        PGC_SUSET,
+        GUC_NOT_IN_SAMPLE,
+        NULL, NULL, NULL);
+
+    /* Define pgaudit.log_ignore_table */
+    DefineCustomStringVariable(
+        "pgaudit.log_ignore_table",
+        "Sepecifies which table should be ignored in audit logfile",
+        NULL,
+        &ignoreTableName,
         "",
         PGC_SUSET,
         GUC_NOT_IN_SAMPLE,
