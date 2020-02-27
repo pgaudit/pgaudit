@@ -968,6 +968,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
     ListCell *lr;
     bool first = true;
     bool found = false;
+    char *relname;
 
     /* Do not log if this is an internal statement */
     if (internalStatement)
