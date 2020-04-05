@@ -154,6 +154,38 @@ bool auditLogStatementOnce = false;
 char *auditRole = NULL;
 
 /*
+ * GUC variable for pgaudit.log_to_file
+ * 
+ * Administrators can choose to use PostgreSQL logging features or to log to an
+ * independent file.
+ */
+bool auditLogToFile = false;
+
+/*
+ * GUC variable for pgaudit.log_to_file_name
+ * 
+ * Administrators can choose the filename where to logging if not using PostgreSQL
+ * logging features.
+ */
+char *auditLogToFileName = NULL;
+FILE *fptrLogToFilename = NULL;
+
+/*
+ * GUC variable for pgaudit.log_to_file_prefix_line
+ * 
+ * Administrators can choose the prefix to write in the audit log.
+ */
+char *auditLogToFilePrefixLine = NULL;
+
+
+/*
+ * Those are defined in globals.c and contain information for the prefix log line.
+ */
+extern int			MyProcPid;
+extern pg_time_t	MyStartTime;
+extern struct Port *MyProcPort;
+
+/*
  * String constants for the audit log fields.
  */
 
@@ -423,6 +455,116 @@ stack_valid(int64 stackId)
              " not found - top of stack is " INT64_FORMAT "",
              stackId,
              auditEventStack == NULL ? (int64) -1 : auditEventStack->stackId);
+}
+
+/*
+ * Creates the prefix log line to write to external audit log file.
+ * PostgreSQL functions are not reachable.
+ */
+static char*
+log_pgaudit_prefix_line()
+{
+    char *line;
+    int pos = 0;
+    bool process_next = false;
+    const char *p;
+    
+    line = palloc(sizeof(char) * 1024);
+    
+    for (p = auditLogToFilePrefixLine; *p != '\0'; p++)
+    {
+        if (*p == '%')
+            process_next = true;
+        else
+        {
+            if (process_next)
+            {
+                switch(*p)
+                {
+                    case 'c':
+                        sprintf(line + pos, "%lx.%x", (long) (MyStartTime), MyProcPid);
+                        break;
+                    case 'm':
+                        if (true)
+                        {
+                            char strfbuf[128], msbuf[5];
+                            struct timeval tv;
+                            pg_time_t stamp_time;
+                            
+                            gettimeofday(&tv, NULL);
+                            stamp_time = (pg_time_t) tv.tv_sec;
+                            pg_strftime(strfbuf, sizeof(strfbuf), "%Y-%m-%d %H:%M:%S     %Z", pg_localtime(&stamp_time, log_timezone));
+                            sprintf(msbuf, ".%03d", (int) (tv.tv_usec / 1000));
+                            memcpy(strfbuf + 19, msbuf, 4);
+                            sprintf(line + pos, "%s", strfbuf);
+                        }
+                        break;
+                    case 'd':
+                        if (MyProcPort && MyProcPort->database_name)
+                            sprintf(line + pos, "%s", MyProcPort->database_name);
+                        else
+                            sprintf(line + pos, "[unknown]");
+                        break;
+                    case 'u':
+                        if (MyProcPort && MyProcPort->user_name)
+                            sprintf(line + pos, "%s", MyProcPort->user_name);
+                        else
+                            sprintf(line + pos, "[unknown]");
+                        break;
+                    case 'h':
+                        if (MyProcPort && MyProcPort->remote_host)
+                            sprintf(line + pos, "%s", MyProcPort->remote_host);
+                        else
+                            sprintf(line + pos, "[unknown]");
+                        break;
+                }
+                pos = strlen(line);
+                process_next = false;
+            }
+            else
+            {
+                sprintf(line + pos, "%c", *p);
+                pos++;
+            }
+        }
+    }
+    line[pos] = '\0';
+    
+    return line;
+}
+
+/*
+ * Log audit to an external file instead of PostgreSQL logging system.
+ */
+static void
+log_pgaudit_to_file(const char *audit_type, int64 statementId, int64 substatementId, const char *className, const char *auditStr)
+{
+    if (strlen(auditLogToFileName) == 0)
+    {
+        ereport(WARNING, (errmsg("pgaudit.log_to_postgresql is disabled but pgaudit.log_to_filename is not set"))); 
+    }
+    else
+    {
+        if (fptrLogToFilename == NULL)
+        {
+            fptrLogToFilename = fopen(auditLogToFileName, "a");
+            if (fptrLogToFilename == NULL)            
+                ereport(WARNING, (errmsg("Unable to open pgaudit.log_to_filename for logging")));
+        }
+
+        if (fptrLogToFilename != NULL)
+        {
+            char *prefix = log_pgaudit_prefix_line();
+            pg_fprintf(fptrLogToFilename, "%s AUDIT: %s," INT64_FORMAT "," INT64_FORMAT ",%s,%s\n", 
+                        prefix,
+                        audit_type,
+                        statementId,
+                        substatementId,
+                        className,
+                        auditStr);
+            pfree(prefix);
+        }
+    }
 }
 
 /*
@@ -743,21 +885,34 @@ log_audit_event(AuditEventStackItem *stackItem)
         appendStringInfoString(&auditStr,
                                "<previously logged>,<previously logged>");
 
-    /*
-     * Log the audit entry.  Note: use of INT64_FORMAT here is bad for
-     * translatability, but we currently haven't got translation support in
-     * pgaudit anyway.
-     */
-    ereport(auditLogClient ? auditLogLevel : LOG_SERVER_ONLY,
-            (errmsg("AUDIT: %s," INT64_FORMAT "," INT64_FORMAT ",%s,%s",
-                    stackItem->auditEvent.granted ?
-                    AUDIT_TYPE_OBJECT : AUDIT_TYPE_SESSION,
-                    stackItem->auditEvent.statementId,
-                    stackItem->auditEvent.substatementId,
-                    className,
-                    auditStr.data),
-                    errhidestmt(true),
-                    errhidecontext(true)));
+    
+    if (auditLogToFile)
+    {
+        log_pgaudit_to_file(stackItem->auditEvent.granted ?
+                        AUDIT_TYPE_OBJECT : AUDIT_TYPE_SESSION,
+                        stackItem->auditEvent.statementId,
+                        stackItem->auditEvent.substatementId,
+                        className,
+                        auditStr.data);
+    }
+    else
+    {
+        /*
+        * Log the audit entry.  Note: use of INT64_FORMAT here is bad for
+        * translatability, but we currently haven't got translation support in
+        * pgaudit anyway.
+        */
+        ereport(auditLogClient ? auditLogLevel : LOG_SERVER_ONLY,
+                (errmsg("AUDIT: %s," INT64_FORMAT "," INT64_FORMAT ",%s,%s",
+                        stackItem->auditEvent.granted ?
+                        AUDIT_TYPE_OBJECT : AUDIT_TYPE_SESSION,
+                        stackItem->auditEvent.statementId,
+                        stackItem->auditEvent.substatementId,
+                        className,
+                        auditStr.data),
+                        errhidestmt(true),
+                        errhidecontext(true)));
+    }
 
     stackItem->auditEvent.logged = true;
 
@@ -1817,6 +1972,25 @@ assign_pgaudit_log_level(const char *newVal, void *extra)
 }
 
 /*
+ * Re-Open pgaudit.log_to_filename.
+ */
+static void
+assign_pgaudit_log_to_filename(const char *newVal, void *extra)
+{
+    if (fptrLogToFilename != NULL)
+    {
+        fclose(fptrLogToFilename);
+        fptrLogToFilename = NULL;
+    }
+
+    if (strlen(newVal) > 0)
+    {
+        fptrLogToFilename = fopen(newVal, "a");
+    }
+}
+
+
+/*
  * Define GUC variables and install hooks upon module load.
  */
 void
@@ -1963,6 +2137,50 @@ _PG_init(void)
         NULL,
         &auditRole,
         "",
+        PGC_SUSET,
+        GUC_NOT_IN_SAMPLE,
+        NULL, NULL, NULL);
+    
+    /* Define pgaudit.log_to_file */
+    DefineCustomBoolVariable(
+        "pgaudit.log_to_file",
+        
+        "Specifies whether pgaudit will log to an independent file or will "
+        "use PostgreSQL default logging functionality.",
+        
+        NULL,
+        &auditLogToFile,
+        false,
+        PGC_SUSET,
+        GUC_NOT_IN_SAMPLE,
+        NULL, NULL, NULL);
+    
+    /* Define pgaudit.log_to_file_name */
+    DefineCustomStringVariable(
+        "pgaudit.log_to_file_name",
+        
+        "Specifies the filename where pgaudit will log if pgaudit.log_to_postgresql "
+        "is disabled.",
+        
+        NULL,
+        &auditLogToFileName,
+        "",
+        PGC_SUSET,
+        GUC_NOT_IN_SAMPLE,
+        NULL, 
+        assign_pgaudit_log_to_filename, 
+        NULL);
+    
+    /* Define pgaudit.log_to_file_prefix_line */
+    DefineCustomStringVariable(
+        "pgaudit.log_to_file_prefix_line",
+        
+        "Specifies the prefix for the pgaudit line when logging to an external "
+        "file. Only a subset of PostgreSQL log_prefix_line values are supported.",
+        
+        NULL,
+        &auditLogToFilePrefixLine,
+        "%m %d %u %h",
         PGC_SUSET,
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);
