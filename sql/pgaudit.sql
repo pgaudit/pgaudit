@@ -831,6 +831,55 @@ DROP INDEX h_0_idx_y;
 DROP INDEX h_idx;
 DROP TABLE h;
 
+SET pgaudit.log = 'ALL';
+create table h(a int ,b int, c int,d int, e int, f int) partition by hash(a);
+create table h_0 partition of h for values with ( modulus 2, remainder 0) partition by hash(b); 
+create table h_0_0 partition of h_0 for values with(modulus 2, remainder 0) partition by hash(c);
+create table h_0_0_0 partition of h_0_0 for values with (modulus 2, remainder 0);
+create table h_0_0_1 partition of h_0_0 for values with (modulus 2, remainder 1);
+create table h_0_1 partition of h_0 for values with(modulus 2, remainder 1);
+create table h_1 partition of h for values with ( modulus 2, remainder 1) partition by hash(d);
+create table h_1_0 partition of h_1 for values with(modulus 2, remainder 0);
+create table h_1_1 partition of h_1 for values with(modulus 2, remainder 1) partition by hash(e);
+create table h_1_1_0 partition of h_1_1 for values with (modulus 2, remainder 0);
+create table h_1_1_1 partition of h_1_1 for values with (modulus 2, remainder 1) partition by hash(f);
+create table h_1_1_1_0 partition of h_1_1_1 for values with (modulus 2, remainder 0);
+create table h_1_1_1_1 partition of h_1_1_1 for values with (modulus 2, remainder 1);
+select * from h;
+select * from h_0;
+select * from h_1_1_1_1;
+create table g(x int);
+select * from g;
+select * from h,g;
+select * from h_0,g;
+select * from h_0_1,g;
+select * from g,h_1_1_1;
+select * from g,h_1_1_1_0;
+drop table g;
+drop table h;
+
+-- Test inherited table
+CREATE TABLE a(aid  int,aname varchar(20));
+CREATE TABLE b(bid int)INHERITS(a);
+insert into a values(0,'Dava');
+insert into b values(1,'April',100);
+select * from a;
+select * from b;
+
+CREATE TABLE g(x int ,y int) PARTITION BY HASH(x);
+CREATE TABLE g_0 partition OF g FOR VALUES WITH ( MODULUS 2, REMAINDER 0);
+CREATE TABLE g_1 partition OF g FOR VALUES WITH ( MODULUS 2, REMAINDER 1);
+
+select * from a,g;
+select * from b,g;
+select * from g_0,a;
+select * from b,g_1;
+drop table g;
+drop table b;
+drop table a;
+
+
+
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';

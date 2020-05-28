@@ -976,6 +976,8 @@ log_select_dml(Oid auditOid, List *rangeTabls)
     ListCell *lr;
     bool first = true;
     bool found = false;
+    /* record if a partitioned and inherited table exists */
+    bool inheritedExists = false;   
 
     /* Do not log if this is an internal statement */
     if (internalStatement)
@@ -986,6 +988,19 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         Oid relOid;
         Relation rel;
         RangeTblEntry *rte = lfirst(lr);
+        
+        /* 
+         * [Hope] We only show the table in the query, 
+         * there is no need to show partitions or inheritance child. 
+         */        
+        if ( inheritedExists == true && rte->requiredPerms == ACL_NO_RIGHTS)
+            continue;
+         
+        /* [Hope] used for inherited table and partitioned table*/
+        if( rte->inh == true)
+        {
+            inheritedExists = true;           
+        }        
 
         /* We only care about tables, and can ignore subqueries etc. */
         if (rte->rtekind != RTE_RELATION)
@@ -1102,7 +1117,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
             case RELKIND_MATVIEW:
                 auditEventStack->auditEvent.objectType = OBJECT_TYPE_MATVIEW;
                 break;
-	    case RELKIND_PARTITIONED_TABLE:
+            case RELKIND_PARTITIONED_TABLE:
             	auditEventStack->auditEvent.objectType = OBJECT_TYPE_PARTITIONED_TABLE;
             	break;
             case RELKIND_PARTITIONED_INDEX:
