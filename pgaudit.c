@@ -534,7 +534,7 @@ log_audit_event(AuditEventStackItem *stackItem)
                         }
                     }
 
-		    /* Fall through */
+                /* Fall through */
 
                 /* Classify role statements */
                 case T_GrantStmt:
