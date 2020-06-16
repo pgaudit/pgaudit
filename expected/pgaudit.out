@@ -1168,196 +1168,120 @@ DROP TABLE public.t;
 NOTICE:  AUDIT: SESSION,86,1,DDL,DROP TABLE,,,DROP TABLE public.t;,<none>
 DROP ROLE alice;
 NOTICE:  AUDIT: SESSION,87,1,ROLE,DROP ROLE,,,DROP ROLE alice;,<none>
+--
 -- Test PARTITIONED table
+CREATE EXTENSION pgaudit;
+NOTICE:  AUDIT: SESSION,88,5,DDL,CREATE EXTENSION,,,CREATE EXTENSION pgaudit;,<none>
 CREATE TABLE h(x int ,y int) PARTITION BY HASH(x);
-NOTICE:  AUDIT: SESSION,88,1,DDL,CREATE TABLE,,,"CREATE TABLE h(x int ,y int) PARTITION BY HASH(x);",<none>
+NOTICE:  AUDIT: SESSION,89,1,DDL,CREATE TABLE,TABLE,public.h,"CREATE TABLE h(x int ,y int) PARTITION BY HASH(x);",<none>
 CREATE TABLE h_0 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 0); 
-NOTICE:  AUDIT: SESSION,89,1,DDL,CREATE TABLE,,,"CREATE TABLE h_0 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 0);",<none>
+NOTICE:  AUDIT: SESSION,90,1,DDL,CREATE TABLE,TABLE,public.h_0,"CREATE TABLE h_0 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 0);",<none>
 CREATE TABLE h_1 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 1); 
-NOTICE:  AUDIT: SESSION,90,1,DDL,CREATE TABLE,,,"CREATE TABLE h_1 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 1);",<none>
+NOTICE:  AUDIT: SESSION,91,1,DDL,CREATE TABLE,TABLE,public.h_1,"CREATE TABLE h_1 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 1);",<none>
 INSERT INTO h VALUES(1,1);
-NOTICE:  AUDIT: SESSION,91,1,WRITE,INSERT,PARTITIONED TABLE,public.h,"INSERT INTO h VALUES(1,1);",<none>
+NOTICE:  AUDIT: SESSION,92,1,WRITE,INSERT,PARTITIONED TABLE,public.h,"INSERT INTO h VALUES(1,1);",<none>
 SELECT * FROM h;
-NOTICE:  AUDIT: SESSION,92,1,READ,SELECT,PARTITIONED TABLE,public.h,SELECT * FROM h;,<none>
+NOTICE:  AUDIT: SESSION,93,1,READ,SELECT,PARTITIONED TABLE,public.h,SELECT * FROM h;,<none>
  x | y 
 ---+---
  1 | 1
 (1 row)
 
 SELECT * FROM h_0;
-NOTICE:  AUDIT: SESSION,93,1,READ,SELECT,TABLE,public.h_0,SELECT * FROM h_0;,<none>
+NOTICE:  AUDIT: SESSION,94,1,READ,SELECT,TABLE,public.h_0,SELECT * FROM h_0;,<none>
  x | y 
 ---+---
  1 | 1
 (1 row)
 
 CREATE INDEX h_idx ON h (x);
-NOTICE:  AUDIT: SESSION,94,1,DDL,CREATE INDEX,,,CREATE INDEX h_idx ON h (x);,<none>
+NOTICE:  AUDIT: SESSION,95,1,DDL,CREATE INDEX,INDEX,public.h_idx,CREATE INDEX h_idx ON h (x);,<none>
 CREATE INDEX h_0_idx_y on h_0 (y);
-NOTICE:  AUDIT: SESSION,95,1,DDL,CREATE INDEX,,,CREATE INDEX h_0_idx_y on h_0 (y);,<none>
+NOTICE:  AUDIT: SESSION,96,1,DDL,CREATE INDEX,INDEX,public.h_0_idx_y,CREATE INDEX h_0_idx_y on h_0 (y);,<none>
 DROP INDEX h_0_idx_y;
-NOTICE:  AUDIT: SESSION,96,1,DDL,DROP INDEX,,,DROP INDEX h_0_idx_y;,<none>
+NOTICE:  AUDIT: SESSION,97,1,DDL,DROP INDEX,INDEX,public.h_0_idx_y,DROP INDEX h_0_idx_y;,<none>
 DROP INDEX h_idx;
-NOTICE:  AUDIT: SESSION,97,1,DDL,DROP INDEX,,,DROP INDEX h_idx;,<none>
+NOTICE:  AUDIT: SESSION,98,1,DDL,DROP INDEX,INDEX,public.h_idx,DROP INDEX h_idx;,<none>
+NOTICE:  AUDIT: SESSION,98,1,DDL,DROP INDEX,INDEX,public.h_0_x_idx,DROP INDEX h_idx;,<none>
+NOTICE:  AUDIT: SESSION,98,1,DDL,DROP INDEX,INDEX,public.h_1_x_idx,DROP INDEX h_idx;,<none>
 DROP TABLE h;
-NOTICE:  AUDIT: SESSION,98,1,DDL,DROP TABLE,,,DROP TABLE h;,<none>
-SET pgaudit.log = 'ALL';
-NOTICE:  AUDIT: SESSION,99,1,MISC,SET,,,SET pgaudit.log = 'ALL';,<none>
-create table h(a int ,b int, c int,d int, e int, f int) partition by hash(a);
-NOTICE:  AUDIT: SESSION,100,1,DDL,CREATE TABLE,,,"create table h(a int ,b int, c int,d int, e int, f int) partition by hash(a);",<none>
+NOTICE:  AUDIT: SESSION,99,1,DDL,DROP TABLE,TABLE,public.h,DROP TABLE h;,<none>
+NOTICE:  AUDIT: SESSION,99,1,DDL,DROP TABLE,TABLE,public.h_0,DROP TABLE h;,<none>
+NOTICE:  AUDIT: SESSION,99,1,DDL,DROP TABLE,TABLE,public.h_1,DROP TABLE h;,<none>
+--
+-- Test partition table with sub-partitioning and join with normal table
+create table h(a int ,b int) partition by hash(a);
+NOTICE:  AUDIT: SESSION,100,1,DDL,CREATE TABLE,TABLE,public.h,"create table h(a int ,b int) partition by hash(a);",<none>
 create table h_0 partition of h for values with ( modulus 2, remainder 0) partition by hash(b); 
-NOTICE:  AUDIT: SESSION,101,1,DDL,CREATE TABLE,,,"create table h_0 partition of h for values with ( modulus 2, remainder 0) partition by hash(b);",<none>
-create table h_0_0 partition of h_0 for values with(modulus 2, remainder 0) partition by hash(c);
-NOTICE:  AUDIT: SESSION,102,1,DDL,CREATE TABLE,,,"create table h_0_0 partition of h_0 for values with(modulus 2, remainder 0) partition by hash(c);",<none>
-create table h_0_0_0 partition of h_0_0 for values with (modulus 2, remainder 0);
-NOTICE:  AUDIT: SESSION,103,1,DDL,CREATE TABLE,,,"create table h_0_0_0 partition of h_0_0 for values with (modulus 2, remainder 0);",<none>
-create table h_0_0_1 partition of h_0_0 for values with (modulus 2, remainder 1);
-NOTICE:  AUDIT: SESSION,104,1,DDL,CREATE TABLE,,,"create table h_0_0_1 partition of h_0_0 for values with (modulus 2, remainder 1);",<none>
+NOTICE:  AUDIT: SESSION,101,1,DDL,CREATE TABLE,TABLE,public.h_0,"create table h_0 partition of h for values with ( modulus 2, remainder 0) partition by hash(b);",<none>
+create table h_0_0 partition of h_0 for values with(modulus 2, remainder 0);
+NOTICE:  AUDIT: SESSION,102,1,DDL,CREATE TABLE,TABLE,public.h_0_0,"create table h_0_0 partition of h_0 for values with(modulus 2, remainder 0);",<none>
 create table h_0_1 partition of h_0 for values with(modulus 2, remainder 1);
-NOTICE:  AUDIT: SESSION,105,1,DDL,CREATE TABLE,,,"create table h_0_1 partition of h_0 for values with(modulus 2, remainder 1);",<none>
-create table h_1 partition of h for values with ( modulus 2, remainder 1) partition by hash(d);
-NOTICE:  AUDIT: SESSION,106,1,DDL,CREATE TABLE,,,"create table h_1 partition of h for values with ( modulus 2, remainder 1) partition by hash(d);",<none>
-create table h_1_0 partition of h_1 for values with(modulus 2, remainder 0);
-NOTICE:  AUDIT: SESSION,107,1,DDL,CREATE TABLE,,,"create table h_1_0 partition of h_1 for values with(modulus 2, remainder 0);",<none>
-create table h_1_1 partition of h_1 for values with(modulus 2, remainder 1) partition by hash(e);
-NOTICE:  AUDIT: SESSION,108,1,DDL,CREATE TABLE,,,"create table h_1_1 partition of h_1 for values with(modulus 2, remainder 1) partition by hash(e);",<none>
-create table h_1_1_0 partition of h_1_1 for values with (modulus 2, remainder 0);
-NOTICE:  AUDIT: SESSION,109,1,DDL,CREATE TABLE,,,"create table h_1_1_0 partition of h_1_1 for values with (modulus 2, remainder 0);",<none>
-create table h_1_1_1 partition of h_1_1 for values with (modulus 2, remainder 1) partition by hash(f);
-NOTICE:  AUDIT: SESSION,110,1,DDL,CREATE TABLE,,,"create table h_1_1_1 partition of h_1_1 for values with (modulus 2, remainder 1) partition by hash(f);",<none>
-create table h_1_1_1_0 partition of h_1_1_1 for values with (modulus 2, remainder 0);
-NOTICE:  AUDIT: SESSION,111,1,DDL,CREATE TABLE,,,"create table h_1_1_1_0 partition of h_1_1_1 for values with (modulus 2, remainder 0);",<none>
-create table h_1_1_1_1 partition of h_1_1_1 for values with (modulus 2, remainder 1);
-NOTICE:  AUDIT: SESSION,112,1,DDL,CREATE TABLE,,,"create table h_1_1_1_1 partition of h_1_1_1 for values with (modulus 2, remainder 1);",<none>
-select * from h;
-NOTICE:  AUDIT: SESSION,113,1,READ,SELECT,PARTITIONED TABLE,public.h,select * from h;,<none>
- a | b | c | d | e | f 
----+---+---+---+---+---
-(0 rows)
-
-select * from h_0;
-NOTICE:  AUDIT: SESSION,114,1,READ,SELECT,PARTITIONED TABLE,public.h_0,select * from h_0;,<none>
- a | b | c | d | e | f 
----+---+---+---+---+---
-(0 rows)
-
-select * from h_1_1_1_1;
-NOTICE:  AUDIT: SESSION,115,1,READ,SELECT,TABLE,public.h_1_1_1_1,select * from h_1_1_1_1;,<none>
- a | b | c | d | e | f 
----+---+---+---+---+---
-(0 rows)
-
+NOTICE:  AUDIT: SESSION,103,1,DDL,CREATE TABLE,TABLE,public.h_0_1,"create table h_0_1 partition of h_0 for values with(modulus 2, remainder 1);",<none>
+create table h_1 partition of h for values with ( modulus 2, remainder 1);
+NOTICE:  AUDIT: SESSION,104,1,DDL,CREATE TABLE,TABLE,public.h_1,"create table h_1 partition of h for values with ( modulus 2, remainder 1);",<none>
 create table g(x int);
-NOTICE:  AUDIT: SESSION,116,1,DDL,CREATE TABLE,,,create table g(x int);,<none>
-select * from g;
-NOTICE:  AUDIT: SESSION,117,1,READ,SELECT,TABLE,public.g,select * from g;,<none>
- x 
----
+NOTICE:  AUDIT: SESSION,105,1,DDL,CREATE TABLE,TABLE,public.g,create table g(x int);,<none>
+select * from h_0;
+NOTICE:  AUDIT: SESSION,106,1,READ,SELECT,PARTITIONED TABLE,public.h_0,select * from h_0;,<none>
+ a | b 
+---+---
 (0 rows)
 
-select * from h,g;
-NOTICE:  AUDIT: SESSION,118,1,READ,SELECT,PARTITIONED TABLE,public.h,"select * from h,g;",<none>
-NOTICE:  AUDIT: SESSION,118,1,READ,SELECT,TABLE,public.g,"select * from h,g;",<none>
- a | b | c | d | e | f | x 
----+---+---+---+---+---+---
+select * from h_0_0;
+NOTICE:  AUDIT: SESSION,107,1,READ,SELECT,TABLE,public.h_0_0,select * from h_0_0;,<none>
+ a | b 
+---+---
 (0 rows)
 
-select * from h_0,g;
-NOTICE:  AUDIT: SESSION,119,1,READ,SELECT,PARTITIONED TABLE,public.h_0,"select * from h_0,g;",<none>
-NOTICE:  AUDIT: SESSION,119,1,READ,SELECT,TABLE,public.g,"select * from h_0,g;",<none>
- a | b | c | d | e | f | x 
----+---+---+---+---+---+---
-(0 rows)
-
-select * from h_0_1,g;
-NOTICE:  AUDIT: SESSION,120,1,READ,SELECT,TABLE,public.h_0_1,"select * from h_0_1,g;",<none>
-NOTICE:  AUDIT: SESSION,120,1,READ,SELECT,TABLE,public.g,"select * from h_0_1,g;",<none>
- a | b | c | d | e | f | x 
----+---+---+---+---+---+---
-(0 rows)
-
-select * from g,h_1_1_1;
-NOTICE:  AUDIT: SESSION,121,1,READ,SELECT,TABLE,public.g,"select * from g,h_1_1_1;",<none>
-NOTICE:  AUDIT: SESSION,121,1,READ,SELECT,PARTITIONED TABLE,public.h_1_1_1,"select * from g,h_1_1_1;",<none>
- x | a | b | c | d | e | f 
----+---+---+---+---+---+---
-(0 rows)
-
-select * from g,h_1_1_1_0;
-NOTICE:  AUDIT: SESSION,122,1,READ,SELECT,TABLE,public.g,"select * from g,h_1_1_1_0;",<none>
-NOTICE:  AUDIT: SESSION,122,1,READ,SELECT,TABLE,public.h_1_1_1_0,"select * from g,h_1_1_1_0;",<none>
- x | a | b | c | d | e | f 
----+---+---+---+---+---+---
+select * from g,h;
+NOTICE:  AUDIT: SESSION,108,1,READ,SELECT,TABLE,public.g,"select * from g,h;",<none>
+NOTICE:  AUDIT: SESSION,108,1,READ,SELECT,PARTITIONED TABLE,public.h,"select * from g,h;",<none>
+ x | a | b 
+---+---+---
 (0 rows)
 
 drop table g;
-NOTICE:  AUDIT: SESSION,123,1,DDL,DROP TABLE,,,drop table g;,<none>
+NOTICE:  AUDIT: SESSION,109,1,DDL,DROP TABLE,TABLE,public.g,drop table g;,<none>
 drop table h;
-NOTICE:  AUDIT: SESSION,124,1,DDL,DROP TABLE,,,drop table h;,<none>
--- Test inherited table
+NOTICE:  AUDIT: SESSION,110,1,DDL,DROP TABLE,TABLE,public.h,drop table h;,<none>
+NOTICE:  AUDIT: SESSION,110,1,DDL,DROP TABLE,TABLE,public.h_0,drop table h;,<none>
+NOTICE:  AUDIT: SESSION,110,1,DDL,DROP TABLE,TABLE,public.h_0_0,drop table h;,<none>
+NOTICE:  AUDIT: SESSION,110,1,DDL,DROP TABLE,TABLE,public.h_0_1,drop table h;,<none>
+NOTICE:  AUDIT: SESSION,110,1,DDL,DROP TABLE,TABLE,public.h_1,drop table h;,<none>
+--
+-- Test inherited table and join with partitioned table
 CREATE TABLE a(aid  int,aname varchar(20));
-NOTICE:  AUDIT: SESSION,125,1,DDL,CREATE TABLE,,,"CREATE TABLE a(aid  int,aname varchar(20));",<none>
+NOTICE:  AUDIT: SESSION,111,1,DDL,CREATE TABLE,TABLE,public.a,"CREATE TABLE a(aid  int,aname varchar(20));",<none>
 CREATE TABLE b(bid int)INHERITS(a);
-NOTICE:  AUDIT: SESSION,126,1,DDL,CREATE TABLE,,,CREATE TABLE b(bid int)INHERITS(a);,<none>
-insert into a values(0,'Dava');
-NOTICE:  AUDIT: SESSION,127,1,WRITE,INSERT,TABLE,public.a,"insert into a values(0,'Dava');",<none>
-insert into b values(1,'April',100);
-NOTICE:  AUDIT: SESSION,128,1,WRITE,INSERT,TABLE,public.b,"insert into b values(1,'April',100);",<none>
-select * from a;
-NOTICE:  AUDIT: SESSION,129,1,READ,SELECT,TABLE,public.a,select * from a;,<none>
- aid | aname 
------+-------
-   0 | Dava
-   1 | April
-(2 rows)
-
-select * from b;
-NOTICE:  AUDIT: SESSION,130,1,READ,SELECT,TABLE,public.b,select * from b;,<none>
- aid | aname | bid 
------+-------+-----
-   1 | April | 100
-(1 row)
-
+NOTICE:  AUDIT: SESSION,112,1,DDL,CREATE TABLE,TABLE,public.b,CREATE TABLE b(bid int)INHERITS(a);,<none>
 CREATE TABLE g(x int ,y int) PARTITION BY HASH(x);
-NOTICE:  AUDIT: SESSION,131,1,DDL,CREATE TABLE,,,"CREATE TABLE g(x int ,y int) PARTITION BY HASH(x);",<none>
+NOTICE:  AUDIT: SESSION,113,1,DDL,CREATE TABLE,TABLE,public.g,"CREATE TABLE g(x int ,y int) PARTITION BY HASH(x);",<none>
 CREATE TABLE g_0 partition OF g FOR VALUES WITH ( MODULUS 2, REMAINDER 0);
-NOTICE:  AUDIT: SESSION,132,1,DDL,CREATE TABLE,,,"CREATE TABLE g_0 partition OF g FOR VALUES WITH ( MODULUS 2, REMAINDER 0);",<none>
+NOTICE:  AUDIT: SESSION,114,1,DDL,CREATE TABLE,TABLE,public.g_0,"CREATE TABLE g_0 partition OF g FOR VALUES WITH ( MODULUS 2, REMAINDER 0);",<none>
 CREATE TABLE g_1 partition OF g FOR VALUES WITH ( MODULUS 2, REMAINDER 1);
-NOTICE:  AUDIT: SESSION,133,1,DDL,CREATE TABLE,,,"CREATE TABLE g_1 partition OF g FOR VALUES WITH ( MODULUS 2, REMAINDER 1);",<none>
-select * from a,g;
-NOTICE:  AUDIT: SESSION,134,1,READ,SELECT,TABLE,public.a,"select * from a,g;",<none>
-NOTICE:  AUDIT: SESSION,134,1,READ,SELECT,PARTITIONED TABLE,public.g,"select * from a,g;",<none>
- aid | aname | x | y 
------+-------+---+---
-(0 rows)
-
+NOTICE:  AUDIT: SESSION,115,1,DDL,CREATE TABLE,TABLE,public.g_1,"CREATE TABLE g_1 partition OF g FOR VALUES WITH ( MODULUS 2, REMAINDER 1);",<none>
+insert into a values(0,'Dava');
+NOTICE:  AUDIT: SESSION,116,1,WRITE,INSERT,TABLE,public.a,"insert into a values(0,'Dava');",<none>
+insert into b values(1,'April',100);
+NOTICE:  AUDIT: SESSION,117,1,WRITE,INSERT,TABLE,public.b,"insert into b values(1,'April',100);",<none>
 select * from b,g;
-NOTICE:  AUDIT: SESSION,135,1,READ,SELECT,TABLE,public.b,"select * from b,g;",<none>
-NOTICE:  AUDIT: SESSION,135,1,READ,SELECT,PARTITIONED TABLE,public.g,"select * from b,g;",<none>
- aid | aname | bid | x | y 
------+-------+-----+---+---
-(0 rows)
-
-select * from g_0,a;
-NOTICE:  AUDIT: SESSION,136,1,READ,SELECT,TABLE,public.g_0,"select * from g_0,a;",<none>
-NOTICE:  AUDIT: SESSION,136,1,READ,SELECT,TABLE,public.a,"select * from g_0,a;",<none>
- x | y | aid | aname 
----+---+-----+-------
-(0 rows)
-
-select * from b,g_1;
-NOTICE:  AUDIT: SESSION,137,1,READ,SELECT,TABLE,public.b,"select * from b,g_1;",<none>
-NOTICE:  AUDIT: SESSION,137,1,READ,SELECT,TABLE,public.g_1,"select * from b,g_1;",<none>
+NOTICE:  AUDIT: SESSION,118,1,READ,SELECT,TABLE,public.b,"select * from b,g;",<none>
+NOTICE:  AUDIT: SESSION,118,1,READ,SELECT,PARTITIONED TABLE,public.g,"select * from b,g;",<none>
  aid | aname | bid | x | y 
 -----+-------+-----+---+---
 (0 rows)
 
 drop table g;
-NOTICE:  AUDIT: SESSION,138,1,DDL,DROP TABLE,,,drop table g;,<none>
+NOTICE:  AUDIT: SESSION,119,1,DDL,DROP TABLE,TABLE,public.g,drop table g;,<none>
+NOTICE:  AUDIT: SESSION,119,1,DDL,DROP TABLE,TABLE,public.g_0,drop table g;,<none>
+NOTICE:  AUDIT: SESSION,119,1,DDL,DROP TABLE,TABLE,public.g_1,drop table g;,<none>
 drop table b;
-NOTICE:  AUDIT: SESSION,139,1,DDL,DROP TABLE,,,drop table b;,<none>
+NOTICE:  AUDIT: SESSION,120,1,DDL,DROP TABLE,TABLE,public.b,drop table b;,<none>
 drop table a;
-NOTICE:  AUDIT: SESSION,140,1,DDL,DROP TABLE,,,drop table a;,<none>
+NOTICE:  AUDIT: SESSION,121,1,DDL,DROP TABLE,TABLE,public.a,drop table a;,<none>
+DROP EXTENSION pgaudit;
+NOTICE:  AUDIT: SESSION,122,1,DDL,DROP EXTENSION,,,DROP EXTENSION pgaudit;,<none>
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
