@@ -1119,12 +1119,12 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                 break;
 
             case RELKIND_PARTITIONED_TABLE:
-            	auditEventStack->auditEvent.objectType = OBJECT_TYPE_PARTITIONED_TABLE;
-            	break;
+                auditEventStack->auditEvent.objectType = OBJECT_TYPE_PARTITIONED_TABLE;
+                break;
 
             case RELKIND_PARTITIONED_INDEX:
-            	auditEventStack->auditEvent.objectType = OBJECT_TYPE_PARTITIONED_INDEX;
-            	break;
+                auditEventStack->auditEvent.objectType = OBJECT_TYPE_PARTITIONED_INDEX;
+                break;
 
             default:
                 auditEventStack->auditEvent.objectType = OBJECT_TYPE_UNKNOWN;
