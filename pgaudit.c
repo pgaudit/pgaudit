@@ -990,13 +990,13 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         RangeTblEntry *rte = lfirst(lr);
         
         /* 
-         * [Hope] We only show the table in the query, 
+         * We only show the table in the query, 
          * there is no need to show partitions or inheritance child. 
          */        
         if ( inheritedExists == true && rte->requiredPerms == ACL_NO_RIGHTS)
             continue;
          
-        /* [Hope] used for inherited table and partitioned table*/
+        /* used for inherited table and partitioned table*/
         if( rte->inh == true)
         {
             inheritedExists = true;           
@@ -1117,9 +1117,11 @@ log_select_dml(Oid auditOid, List *rangeTabls)
             case RELKIND_MATVIEW:
                 auditEventStack->auditEvent.objectType = OBJECT_TYPE_MATVIEW;
                 break;
+
             case RELKIND_PARTITIONED_TABLE:
             	auditEventStack->auditEvent.objectType = OBJECT_TYPE_PARTITIONED_TABLE;
             	break;
+
             case RELKIND_PARTITIONED_INDEX:
             	auditEventStack->auditEvent.objectType = OBJECT_TYPE_PARTITIONED_INDEX;
             	break;
