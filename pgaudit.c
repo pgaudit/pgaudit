@@ -976,11 +976,11 @@ log_select_dml(Oid auditOid, List *rangeTabls)
          * false) then filter out any system relations here.
          */
         relOid = rte->relid;
-        rel = relation_open(relOid, NoLock);
+        rel = relation_open(relOid, AccessShareLock);
 
         if (!auditLogCatalog && IsCatalogNamespace(RelationGetNamespace(rel)))
         {
-            relation_close(rel, NoLock);
+            relation_close(rel, AccessShareLock);
             continue;
         }
 
@@ -1082,7 +1082,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
             quote_qualified_identifier(get_namespace_name(
                                            RelationGetNamespace(rel)),
                                        RelationGetRelationName(rel));
-        relation_close(rel, NoLock);
+        relation_close(rel, AccessShareLock);
 
         /* Perform object auditing only if the audit role is valid */
         if (auditOid != InvalidOid)
