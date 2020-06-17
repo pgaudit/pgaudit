@@ -1179,9 +1179,9 @@ NOTICE:  AUDIT: SESSION,90,1,DDL,CREATE TABLE,TABLE,public.h_0,"CREATE TABLE h_0
 CREATE TABLE h_1 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 1); 
 NOTICE:  AUDIT: SESSION,91,1,DDL,CREATE TABLE,TABLE,public.h_1,"CREATE TABLE h_1 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 1);",<none>
 INSERT INTO h VALUES(1,1);
-NOTICE:  AUDIT: SESSION,92,1,WRITE,INSERT,PARTITIONED TABLE,public.h,"INSERT INTO h VALUES(1,1);",<none>
+NOTICE:  AUDIT: SESSION,92,1,WRITE,INSERT,TABLE,public.h,"INSERT INTO h VALUES(1,1);",<none>
 SELECT * FROM h;
-NOTICE:  AUDIT: SESSION,93,1,READ,SELECT,PARTITIONED TABLE,public.h,SELECT * FROM h;,<none>
+NOTICE:  AUDIT: SESSION,93,1,READ,SELECT,TABLE,public.h,SELECT * FROM h;,<none>
  x | y 
 ---+---
  1 | 1
@@ -1223,7 +1223,7 @@ NOTICE:  AUDIT: SESSION,104,1,DDL,CREATE TABLE,TABLE,public.h_1,"create table h_
 create table g(x int);
 NOTICE:  AUDIT: SESSION,105,1,DDL,CREATE TABLE,TABLE,public.g,create table g(x int);,<none>
 select * from h_0;
-NOTICE:  AUDIT: SESSION,106,1,READ,SELECT,PARTITIONED TABLE,public.h_0,select * from h_0;,<none>
+NOTICE:  AUDIT: SESSION,106,1,READ,SELECT,TABLE,public.h_0,select * from h_0;,<none>
  a | b 
 ---+---
 (0 rows)
@@ -1236,7 +1236,7 @@ NOTICE:  AUDIT: SESSION,107,1,READ,SELECT,TABLE,public.h_0_0,select * from h_0_0
 
 select * from g,h;
 NOTICE:  AUDIT: SESSION,108,1,READ,SELECT,TABLE,public.g,"select * from g,h;",<none>
-NOTICE:  AUDIT: SESSION,108,1,READ,SELECT,PARTITIONED TABLE,public.h,"select * from g,h;",<none>
+NOTICE:  AUDIT: SESSION,108,1,READ,SELECT,TABLE,public.h,"select * from g,h;",<none>
  x | a | b 
 ---+---+---
 (0 rows)
@@ -1267,7 +1267,7 @@ insert into b values(1,'April',100);
 NOTICE:  AUDIT: SESSION,117,1,WRITE,INSERT,TABLE,public.b,"insert into b values(1,'April',100);",<none>
 select * from b,g;
 NOTICE:  AUDIT: SESSION,118,1,READ,SELECT,TABLE,public.b,"select * from b,g;",<none>
-NOTICE:  AUDIT: SESSION,118,1,READ,SELECT,PARTITIONED TABLE,public.g,"select * from b,g;",<none>
+NOTICE:  AUDIT: SESSION,118,1,READ,SELECT,TABLE,public.g,"select * from b,g;",<none>
  aid | aname | bid | x | y 
 -----+-------+-----+---+---
 (0 rows)

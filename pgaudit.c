@@ -203,8 +203,6 @@ char *auditRole = NULL;
 #define OBJECT_TYPE_FOREIGN_TABLE   "FOREIGN TABLE"
 #define OBJECT_TYPE_FUNCTION        "FUNCTION"
 
-#define OBJECT_TYPE_PARTITIONED_TABLE "PARTITIONED TABLE"
-#define OBJECT_TYPE_PARTITIONED_INDEX "PARTITIONED INDEX"
 #define OBJECT_TYPE_UNKNOWN         "UNKNOWN"
 
 /*
@@ -1119,11 +1117,11 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                 break;
 
             case RELKIND_PARTITIONED_TABLE:
-                auditEventStack->auditEvent.objectType = OBJECT_TYPE_PARTITIONED_TABLE;
+                auditEventStack->auditEvent.objectType = OBJECT_TYPE_TABLE;
                 break;
 
             case RELKIND_PARTITIONED_INDEX:
-                auditEventStack->auditEvent.objectType = OBJECT_TYPE_PARTITIONED_INDEX;
+                auditEventStack->auditEvent.objectType = OBJECT_TYPE_INDEX;
                 break;
 
             default:
