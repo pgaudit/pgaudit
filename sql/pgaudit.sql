@@ -820,47 +820,15 @@ DROP ROLE alice;
 
 --
 -- Test PARTITIONED table
-CREATE EXTENSION pgaudit;
 CREATE TABLE h(x int ,y int) PARTITION BY HASH(x);
-CREATE TABLE h_0 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 0); 
-CREATE TABLE h_1 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 1); 
+CREATE TABLE h_0 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 0);
+CREATE TABLE h_1 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 1);
 INSERT INTO h VALUES(1,1);
 SELECT * FROM h;
 SELECT * FROM h_0;
 CREATE INDEX h_idx ON h (x);
-CREATE INDEX h_0_idx_y on h_0 (y);
-DROP INDEX h_0_idx_y;
 DROP INDEX h_idx;
 DROP TABLE h;
-
---
--- Test partition table with sub-partitioning and join with normal table
-create table h(a int ,b int) partition by hash(a);
-create table h_0 partition of h for values with ( modulus 2, remainder 0) partition by hash(b); 
-create table h_0_0 partition of h_0 for values with(modulus 2, remainder 0);
-create table h_0_1 partition of h_0 for values with(modulus 2, remainder 1);
-create table h_1 partition of h for values with ( modulus 2, remainder 1);
-create table g(x int);
-select * from h_0;
-select * from h_0_0;
-select * from g,h;
-drop table g;
-drop table h;
-
---
--- Test inherited table and join with partitioned table
-CREATE TABLE a(aid  int,aname varchar(20));
-CREATE TABLE b(bid int)INHERITS(a);
-CREATE TABLE g(x int ,y int) PARTITION BY HASH(x);
-CREATE TABLE g_0 partition OF g FOR VALUES WITH ( MODULUS 2, REMAINDER 0);
-CREATE TABLE g_1 partition OF g FOR VALUES WITH ( MODULUS 2, REMAINDER 1);
-insert into a values(0,'Dava');
-insert into b values(1,'April',100);
-select * from b,g;
-drop table g;
-drop table b;
-drop table a;
-DROP EXTENSION pgaudit;
 
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
