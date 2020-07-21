@@ -1057,6 +1057,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         switch (rte->relkind)
         {
             case RELKIND_RELATION:
+            case RELKIND_PARTITIONED_TABLE:
                 auditEventStack->auditEvent.objectType = OBJECT_TYPE_TABLE;
                 break;
 

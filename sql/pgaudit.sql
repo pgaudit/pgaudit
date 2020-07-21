@@ -773,6 +773,16 @@ CREATE TABLE tmp2 AS (SELECT * FROM tmp);
 DROP TABLE tmp;
 DROP TABLE tmp2;
 
+--
+-- Test PARTITIONED table
+CREATE TABLE h(x int) PARTITION BY range(x);
+CREATE TABLE h_0 partition OF h FOR VALUES FROM (0) TO (1);
+CREATE TABLE h_1 partition OF h FOR VALUES FROM (1) TO (2);
+INSERT INTO h VALUES(0);
+SELECT * FROM h;
+SELECT * FROM h_0;
+DROP TABLE h;
+
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
