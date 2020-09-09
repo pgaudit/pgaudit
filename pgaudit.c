@@ -1345,7 +1345,7 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         {
             /*
              * If the stack is not empty then the only allowed entries are open
-             * select cursors
+             * select, show, and explain cursors
              */
             if (auditEventStack != NULL)
             {
@@ -1356,7 +1356,9 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
                     if (nextItem->auditEvent.commandTag != T_SelectStmt &&
                         nextItem->auditEvent.commandTag != T_VariableShowStmt &&
                         nextItem->auditEvent.commandTag != T_ExplainStmt)
+                    {
                         elog(ERROR, "pgaudit stack is not empty");
+                    }
 
                     nextItem = nextItem->next;
                 }
@@ -1385,9 +1387,9 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
             log_audit_event(stackItem);
 
         /*
-         * A close will free the open select cursor which will also free the
-         * close audit entry. Immediately log the close and set stackItem to
-         * NULL so it won't be logged later.
+         * A close will free the open cursor which will also free the close
+         * audit entry. Immediately log the close and set stackItem to NULL so
+         * it won't be logged later.
          */
         if (stackItem->auditEvent.commandTag == T_ClosePortalStmt)
         {
