@@ -994,9 +994,8 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         if (!auditLogCatalog && IsCatalogNamespace(relNamespaceOid))
             continue;
 
-        if (ignoreTableName != NULL && 0 == strcmp(ignoreTableName, get_rel_name(relOid))) {
+        if (ignoreTableName != NULL && 0 == strcmp(ignoreTableName, get_rel_name(relOid))) 
             continue;
-        }
 
         /*
          * Default is that this was not through a grant, to support session
