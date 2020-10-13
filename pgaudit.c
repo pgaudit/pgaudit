@@ -5,7 +5,7 @@
  * object level logging, and fully-qualified object names for all DML and DDL
  * statements where possible (See README.md for details).
  *
- * Copyright (c) 2014-2019, PostgreSQL Global Development Group
+ * Copyright (c) 2014-2020, PostgreSQL Global Development Group
  *------------------------------------------------------------------------------
  */
 #include "postgres.h"
@@ -170,24 +170,6 @@ char *ignoreTableName = NULL;
 #define AUDIT_TYPE_SESSION  "SESSION"
 
 /*
- * Command, used for SELECT/DML and function calls.
- *
- * We hook into the executor, but we do not have access to the parsetree there.
- * Therefore we can't simply call CreateCommandTag() to get the command and have
- * to build it ourselves based on what information we do have.
- *
- * These should be updated if new commands are added to what the exectuor
- * currently handles.  Note that most of the interesting commands do not go
- * through the executor but rather ProcessUtility, where we have the parsetree.
- */
-#define COMMAND_SELECT      "SELECT"
-#define COMMAND_INSERT      "INSERT"
-#define COMMAND_UPDATE      "UPDATE"
-#define COMMAND_DELETE      "DELETE"
-#define COMMAND_EXECUTE     "EXECUTE"
-#define COMMAND_UNKNOWN     "UNKNOWN"
-
-/*
  * Object type, used for SELECT/DML statements and function calls.
  *
  * For relation objects, this is essentially relkind (though we do not have
@@ -212,17 +194,6 @@ char *ignoreTableName = NULL;
 #define OBJECT_TYPE_UNKNOWN         "UNKNOWN"
 
 /*
- * String constants for testing role commands.  Rename and drop role statements
- * are assigned the nodeTag T_RenameStmt and T_DropStmt respectively.  This is
- * not very useful for classification, so we resort to comparing strings
- * against the result of CreateCommandTag(parsetree).
- */
-#define COMMAND_ALTER_ROLE          "ALTER ROLE"
-#define COMMAND_DROP_ROLE           "DROP ROLE"
-#define COMMAND_GRANT               "GRANT"
-#define COMMAND_REVOKE              "REVOKE"
-
-/*
  * String constants used for redacting text after the password token in
  * CREATE/ALTER ROLE commands.
  */
@@ -242,7 +213,7 @@ typedef struct
     LogStmtLevel logStmtLevel;  /* From GetCommandLogLevel when possible,
                                    generated when not. */
     NodeTag commandTag;         /* same here */
-    const char *command;        /* same here */
+    int command;                /* same here */
     const char *objectType;     /* From event trigger when possible,
                                    generated when not. */
     char *objectName;           /* Fully qualified object identification */
@@ -569,6 +540,8 @@ log_audit_event(AuditEventStackItem *stackItem)
                         }
                     }
 
+                /* Fall through */
+
                 /* Classify role statements */
                 case T_GrantStmt:
                 case T_GrantRoleStmt:
@@ -586,10 +559,8 @@ log_audit_event(AuditEventStackItem *stackItem)
                  */
                 case T_RenameStmt:
                 case T_DropStmt:
-                    if (pg_strcasecmp(stackItem->auditEvent.command,
-                                      COMMAND_ALTER_ROLE) == 0 ||
-                        pg_strcasecmp(stackItem->auditEvent.command,
-                                      COMMAND_DROP_ROLE) == 0)
+                    if (stackItem->auditEvent.command == CMDTAG_ALTER_ROLE ||
+                        stackItem->auditEvent.command == CMDTAG_DROP_ROLE)
                     {
                         className = CLASS_ROLE;
                         class = LOG_ROLE;
@@ -677,7 +648,7 @@ log_audit_event(AuditEventStackItem *stackItem)
      * this string is everything else.
      */
     initStringInfo(&auditStr);
-    append_valid_csv(&auditStr, stackItem->auditEvent.command);
+    append_valid_csv(&auditStr, GetCommandTagName(stackItem->auditEvent.command));
 
     appendStringInfoCharMacro(&auditStr, ',');
     append_valid_csv(&auditStr, stackItem->auditEvent.objectType);
@@ -989,7 +960,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
     foreach(lr, rangeTabls)
     {
         Oid relOid;
-        Relation rel;
+        Oid relNamespaceOid;
         RangeTblEntry *rte = lfirst(lr);
 
         /* We only care about tables, and can ignore subqueries etc. */
@@ -1001,24 +972,28 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         /*
          * Don't log if the session user is not a member of the current
          * role.  This prevents contents of security definer functions
-         * from being logged and supresses foreign key queries unless the
-         * session user is the owner of the referenced table.
+         * from being logged.
          */
         if (!is_member_of_role(GetSessionUserId(), GetUserId()))
             return;
+
+        /*
+         * Don't log if this is not a true update UPDATE command, e.g. a
+         * SELECT FOR UPDATE used for foreign key lookups.
+         */
+        if (rte->requiredPerms & ACL_UPDATE &&
+            rte->rellockmode < RowExclusiveLock)
+            continue;
 
         /*
          * If we are not logging all-catalog queries (auditLogCatalog is
          * false) then filter out any system relations here.
          */
         relOid = rte->relid;
-        rel = relation_open(relOid, NoLock);
+        relNamespaceOid = get_rel_namespace(relOid);
 
-        if (!auditLogCatalog && IsCatalogNamespace(RelationGetNamespace(rel)))
-        {
-            relation_close(rel, NoLock);
+        if (!auditLogCatalog && IsCatalogNamespace(relNamespaceOid))
             continue;
-        }
 
         relname = RelationGetRelationName(rel);
         if (ignoreTableName != NULL && 0 == strcmp(ignoreTableName, relname)) {
@@ -1052,41 +1027,43 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
             auditEventStack->auditEvent.commandTag = T_InsertStmt;
-            auditEventStack->auditEvent.command = COMMAND_INSERT;
+            auditEventStack->auditEvent.command = CMDTAG_INSERT;
         }
         else if (rte->requiredPerms & ACL_UPDATE)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
             auditEventStack->auditEvent.commandTag = T_UpdateStmt;
-            auditEventStack->auditEvent.command = COMMAND_UPDATE;
+            auditEventStack->auditEvent.command = CMDTAG_UPDATE;
         }
         else if (rte->requiredPerms & ACL_DELETE)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
             auditEventStack->auditEvent.commandTag = T_DeleteStmt;
-            auditEventStack->auditEvent.command = COMMAND_DELETE;
+            auditEventStack->auditEvent.command = CMDTAG_DELETE;
         }
         else if (rte->requiredPerms & ACL_SELECT)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_ALL;
             auditEventStack->auditEvent.commandTag = T_SelectStmt;
-            auditEventStack->auditEvent.command = COMMAND_SELECT;
+            auditEventStack->auditEvent.command = CMDTAG_SELECT;
         }
         else
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_ALL;
             auditEventStack->auditEvent.commandTag = T_Invalid;
-            auditEventStack->auditEvent.command = COMMAND_UNKNOWN;
+            auditEventStack->auditEvent.command = CMDTAG_UNKNOWN;
         }
 
         /* Use the relation type to assign object type */
         switch (rte->relkind)
         {
             case RELKIND_RELATION:
+            case RELKIND_PARTITIONED_TABLE:
                 auditEventStack->auditEvent.objectType = OBJECT_TYPE_TABLE;
                 break;
 
             case RELKIND_INDEX:
+            case RELKIND_PARTITIONED_INDEX:
                 auditEventStack->auditEvent.objectType = OBJECT_TYPE_INDEX;
                 break;
 
@@ -1121,10 +1098,8 @@ log_select_dml(Oid auditOid, List *rangeTabls)
 
         /* Get a copy of the relation name and assign it to object name */
         auditEventStack->auditEvent.objectName =
-            quote_qualified_identifier(get_namespace_name(
-                                           RelationGetNamespace(rel)),
-                                       RelationGetRelationName(rel));
-        relation_close(rel, NoLock);
+            quote_qualified_identifier(
+                get_namespace_name(relNamespaceOid), get_rel_name(relOid));
 
         /* Perform object auditing only if the audit role is valid */
         if (auditOid != InvalidOid)
@@ -1250,7 +1225,7 @@ log_function_execute(Oid objectId)
     /* Log the function call */
     stackItem->auditEvent.logStmtLevel = LOGSTMT_ALL;
     stackItem->auditEvent.commandTag = T_DoStmt;
-    stackItem->auditEvent.command = COMMAND_EXECUTE;
+    stackItem->auditEvent.command = CMDTAG_EXECUTE;
     stackItem->auditEvent.objectType = OBJECT_TYPE_FUNCTION;
     stackItem->auditEvent.commandText = stackItem->next->auditEvent.commandText;
 
@@ -1289,31 +1264,31 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
             case CMD_SELECT:
                 stackItem->auditEvent.logStmtLevel = LOGSTMT_ALL;
                 stackItem->auditEvent.commandTag = T_SelectStmt;
-                stackItem->auditEvent.command = COMMAND_SELECT;
+                stackItem->auditEvent.command = CMDTAG_SELECT;
                 break;
 
             case CMD_INSERT:
                 stackItem->auditEvent.logStmtLevel = LOGSTMT_MOD;
                 stackItem->auditEvent.commandTag = T_InsertStmt;
-                stackItem->auditEvent.command = COMMAND_INSERT;
+                stackItem->auditEvent.command = CMDTAG_INSERT;
                 break;
 
             case CMD_UPDATE:
                 stackItem->auditEvent.logStmtLevel = LOGSTMT_MOD;
                 stackItem->auditEvent.commandTag = T_UpdateStmt;
-                stackItem->auditEvent.command = COMMAND_UPDATE;
+                stackItem->auditEvent.command = CMDTAG_UPDATE;
                 break;
 
             case CMD_DELETE:
                 stackItem->auditEvent.logStmtLevel = LOGSTMT_MOD;
                 stackItem->auditEvent.commandTag = T_DeleteStmt;
-                stackItem->auditEvent.command = COMMAND_DELETE;
+                stackItem->auditEvent.command = CMDTAG_DELETE;
                 break;
 
             default:
                 stackItem->auditEvent.logStmtLevel = LOGSTMT_ALL;
                 stackItem->auditEvent.commandTag = T_Invalid;
-                stackItem->auditEvent.command = COMMAND_UNKNOWN;
+                stackItem->auditEvent.command = CMDTAG_UNKNOWN;
                 break;
         }
 
@@ -1374,7 +1349,7 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
                             ParamListInfo params,
                             QueryEnvironment *queryEnv,
                             DestReceiver *dest,
-                            char *completionTag)
+                            QueryCompletion *qc)
 {
     AuditEventStackItem *stackItem = NULL;
     int64 stackId = 0;
@@ -1388,8 +1363,27 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         /* Process top level utility statement */
         if (context == PROCESS_UTILITY_TOPLEVEL)
         {
+            /*
+             * If the stack is not empty then the only allowed entries are open
+             * select, show, and explain cursors
+             */
             if (auditEventStack != NULL)
-                elog(ERROR, "pgaudit stack is not empty");
+            {
+                AuditEventStackItem *nextItem = auditEventStack;
+
+                do
+                {
+                    if (nextItem->auditEvent.commandTag != T_SelectStmt &&
+                        nextItem->auditEvent.commandTag != T_VariableShowStmt &&
+                        nextItem->auditEvent.commandTag != T_ExplainStmt)
+                    {
+                        elog(ERROR, "pgaudit stack is not empty");
+                    }
+
+                    nextItem = nextItem->next;
+                }
+                while (nextItem != NULL);
+            }
 
             stackItem = stack_push();
             stackItem->auditEvent.paramList = copyParamList(params);
@@ -1411,15 +1405,28 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
             stackItem->auditEvent.commandTag == T_DoStmt &&
             !IsAbortedTransactionBlockState())
             log_audit_event(stackItem);
+
+        /*
+         * A close will free the open cursor which will also free the close
+         * audit entry. Immediately log the close and set stackItem to NULL so
+         * it won't be logged later.
+         */
+        if (stackItem->auditEvent.commandTag == T_ClosePortalStmt)
+        {
+            if (auditLogBitmap & LOG_MISC && !IsAbortedTransactionBlockState())
+                log_audit_event(stackItem);
+
+            stackItem = NULL;
+        }
     }
 
     /* Call the standard process utility chain. */
     if (next_ProcessUtility_hook)
         (*next_ProcessUtility_hook) (pstmt, queryString, context, params,
-                                     queryEnv, dest, completionTag);
+                                     queryEnv, dest, qc);
     else
         standard_ProcessUtility(pstmt, queryString, context, params,
-                                queryEnv, dest, completionTag);
+                                queryEnv, dest, qc);
 
     /*
      * Process the audit event if there is one.  Also check that this event
@@ -1547,7 +1554,7 @@ pgaudit_ddl_command_end(PG_FUNCTION_ARGS)
         auditEventStack->auditEvent.objectName =
             SPI_getvalue(spiTuple, spiTupDesc, 2);
         auditEventStack->auditEvent.command =
-            SPI_getvalue(spiTuple, spiTupDesc, 3);
+            GetCommandTagEnum(SPI_getvalue(spiTuple, spiTupDesc, 3));
 
         auditEventStack->auditEvent.logged = false;
 
@@ -1555,8 +1562,8 @@ pgaudit_ddl_command_end(PG_FUNCTION_ARGS)
          * Identify grant/revoke commands - these are the only non-DDL class
          * commands that should be coming through the event triggers.
          */
-        if (pg_strcasecmp(auditEventStack->auditEvent.command, COMMAND_GRANT) == 0 ||
-            pg_strcasecmp(auditEventStack->auditEvent.command, COMMAND_REVOKE) == 0)
+        if (auditEventStack->auditEvent.command == CMDTAG_GRANT ||
+            auditEventStack->auditEvent.command == CMDTAG_REVOKE)
         {
             NodeTag currentCommandTag = auditEventStack->auditEvent.commandTag;
 

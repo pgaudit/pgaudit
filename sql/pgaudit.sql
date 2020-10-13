@@ -643,7 +643,7 @@ ALTER AGGREGATE public.sum_test(integer) RENAME TO sum_test2;
 
 --
 -- Test conversion
-CREATE CONVERSION public.conversion_test FOR 'SQL_ASCII' TO 'MULE_INTERNAL' FROM pg_catalog.ascii_to_mic;
+CREATE CONVERSION public.conversion_test FOR 'latin1' TO 'utf8' FROM pg_catalog.iso8859_1_to_utf8;
 ALTER CONVERSION public.conversion_test RENAME TO conversion_test2;
 
 --
@@ -665,6 +665,24 @@ CREATE SCHEMA foo2
 
 drop table public.t;
 drop role alice;
+
+--
+-- Test for non-empty stack error
+CREATE OR REPLACE FUNCTION get_test_id(_ret REFCURSOR) RETURNS REFCURSOR
+LANGUAGE plpgsql IMMUTABLE AS $$
+BEGIN
+    OPEN _ret FOR SELECT 200;
+    RETURN _ret;
+END $$;
+
+BEGIN;
+    SELECT get_test_id('_ret');
+    SELECT get_test_id('_ret2');
+    FETCH ALL FROM _ret;
+    FETCH ALL FROM _ret2;
+    CLOSE _ret;
+    CLOSE _ret2;
+END;
 
 --
 -- Test that frees a memory context earlier than expected
@@ -747,7 +765,7 @@ CREATE TRIGGER bbb_insert_trg
 	AFTER INSERT ON bbb
 	FOR EACH ROW EXECUTE PROCEDURE bbb_insert();
 
-GRANT SELECT
+GRANT SELECT, UPDATE
    ON aaa
    TO auditor;
 
@@ -817,6 +835,18 @@ VACUUM t;
 RESET ROLE;
 DROP TABLE public.t;
 DROP ROLE alice;
+
+--
+-- Test PARTITIONED table
+CREATE TABLE h(x int ,y int) PARTITION BY HASH(x);
+CREATE TABLE h_0 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 0);
+CREATE TABLE h_1 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 1);
+INSERT INTO h VALUES(1,1);
+SELECT * FROM h;
+SELECT * FROM h_0;
+CREATE INDEX h_idx ON h (x);
+DROP INDEX h_idx;
+DROP TABLE h;
 
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
