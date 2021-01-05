@@ -1012,9 +1012,17 @@ log_select_dml(Oid auditOid, List *rangeTabls)
          */
         if (rte->requiredPerms & ACL_INSERT)
         {
-            auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
-            auditEventStack->auditEvent.commandTag = T_InsertStmt;
-            auditEventStack->auditEvent.command = CMDTAG_INSERT;
+            /* Set COPY's command tag */
+            if (auditEventStack->auditEvent.command == CMDTAG_COPY)
+            {
+                auditEventStack->auditEvent.commandTag = T_CopyStmt;
+            }
+            else
+            {
+                auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
+                auditEventStack->auditEvent.commandTag = T_InsertStmt;
+                auditEventStack->auditEvent.command = CMDTAG_INSERT;
+            }
         }
         else if (rte->requiredPerms & ACL_UPDATE)
         {
@@ -1030,9 +1038,17 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         }
         else if (rte->requiredPerms & ACL_SELECT)
         {
-            auditEventStack->auditEvent.logStmtLevel = LOGSTMT_ALL;
-            auditEventStack->auditEvent.commandTag = T_SelectStmt;
-            auditEventStack->auditEvent.command = CMDTAG_SELECT;
+            /* Set COPY's command tag */
+            if (auditEventStack->auditEvent.command == CMDTAG_COPY)
+            {
+                auditEventStack->auditEvent.commandTag = T_CopyStmt;
+            }
+            else
+            {
+                auditEventStack->auditEvent.logStmtLevel = LOGSTMT_ALL;
+                auditEventStack->auditEvent.commandTag = T_SelectStmt;
+                auditEventStack->auditEvent.command = CMDTAG_SELECT;
+            }
         }
         else
         {
