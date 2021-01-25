@@ -178,6 +178,12 @@ Specifies the master role to use for object audit logging. Multiple audit roles 
 
 There is no default.
 
+### pgaudit.log_rows
+
+Specifies that audit logging should include the rows retrieved or affected by a statement. When a rows field is present which will be included after the parameter field.
+
+The default is `off`.
+
 ## Session Audit Logging
 
 Session audit logging provides detailed logs of all statements executed by a user in the backend.
