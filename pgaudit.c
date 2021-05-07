@@ -13,7 +13,6 @@
 #include "access/htup_details.h"
 #include "access/sysattr.h"
 #include "access/xact.h"
-#include "access/relation.h"
 #include "catalog/catalog.h"
 #include "catalog/objectaccess.h"
 #include "catalog/pg_class.h"
@@ -194,6 +193,31 @@ char *auditRole = NULL;
 #define TOKEN_PASSWORD             "password"
 #define TOKEN_REDACTED             "<REDACTED>"
 
+#if PG_VERSION_NUM < 130000
+
+#define CommandTag const char *
+#define QueryCompletion char
+
+#define GetCommandTagName(commandTag) (commandTag)
+#define GetCommandTagEnum(commandname) (commandname)
+
+#define CMDTAG_ALTER_ROLE			"ALTER ROLE"
+#define CMDTAG_DELETE				"DELETE"
+#define CMDTAG_DROP_ROLE			"DROP ROLE"
+#define CMDTAG_EXECUTE				"EXECUTE"
+#define CMDTAG_GRANT				"GRANT"
+#define CMDTAG_INSERT				"INSERT"
+#define CMDTAG_REVOKE				"REVOKE"
+#define CMDTAG_SELECT				"SELECT"
+#define CMDTAG_UPDATE				"UPDATE"
+#define CMDTAG_UNKNOWN				"???"
+
+#endif
+
+#if PG_VERSION_NUM < 120000
+#define IsCatalogNamespace(namespaceId) IsSystemNamespace(namespaceId)
+#endif
+
 /*
  * An AuditEvent represents an operation that potentially affects a single
  * object.  If a statement affects multiple objects then multiple AuditEvents
@@ -207,7 +231,7 @@ typedef struct
     LogStmtLevel logStmtLevel;  /* From GetCommandLogLevel when possible,
                                    generated when not. */
     NodeTag commandTag;         /* same here */
-    int command;                /* same here */
+    CommandTag command;         /* same here */
     const char *objectType;     /* From event trigger when possible,
                                    generated when not. */
     char *objectName;           /* Fully qualified object identification */
@@ -553,8 +577,15 @@ log_audit_event(AuditEventStackItem *stackItem)
                  */
                 case T_RenameStmt:
                 case T_DropStmt:
+#if PG_VERSION_NUM >= 130000
                     if (stackItem->auditEvent.command == CMDTAG_ALTER_ROLE ||
                         stackItem->auditEvent.command == CMDTAG_DROP_ROLE)
+#else
+                    if (pg_strcasecmp(stackItem->auditEvent.command,
+                                      CMDTAG_ALTER_ROLE) == 0 ||
+                        pg_strcasecmp(stackItem->auditEvent.command,
+                                      CMDTAG_DROP_ROLE) == 0)
+#endif
                     {
                         className = CLASS_ROLE;
                         class = LOG_ROLE;
@@ -970,6 +1001,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         if (!is_member_of_role(GetSessionUserId(), GetUserId()))
             return;
 
+#if PG_VERSION_NUM >= 120000
         /*
          * Don't log if this is not a true update UPDATE command, e.g. a
          * SELECT FOR UPDATE used for foreign key lookups.
@@ -977,6 +1009,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         if (rte->requiredPerms & ACL_UPDATE &&
             rte->rellockmode < RowExclusiveLock)
             continue;
+#endif
 
         /*
          * If we are not logging all-catalog queries (auditLogCatalog is
@@ -1050,7 +1083,9 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                 break;
 
             case RELKIND_INDEX:
+#if PG_VERSION_NUM >= 110000
             case RELKIND_PARTITIONED_INDEX:
+#endif
                 auditEventStack->auditEvent.objectType = OBJECT_TYPE_INDEX;
                 break;
 
@@ -1549,8 +1584,13 @@ pgaudit_ddl_command_end(PG_FUNCTION_ARGS)
          * Identify grant/revoke commands - these are the only non-DDL class
          * commands that should be coming through the event triggers.
          */
+#if PG_VERSION_NUM >= 130000
         if (auditEventStack->auditEvent.command == CMDTAG_GRANT ||
             auditEventStack->auditEvent.command == CMDTAG_REVOKE)
+#else
+        if (pg_strcasecmp(auditEventStack->auditEvent.command, CMDTAG_GRANT) == 0 ||
+            pg_strcasecmp(auditEventStack->auditEvent.command, CMDTAG_REVOKE) == 0)
+#endif
         {
             NodeTag currentCommandTag = auditEventStack->auditEvent.commandTag;
 
