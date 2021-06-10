@@ -160,7 +160,7 @@ The default is `off`.
 
 ### pgaudit.log_statement
 
-Specifies whether logging will include the statement text and parameters (if enabled). Depending on requirements, an audit log might not require this and it will make the logs less verbose.
+Specifies whether logging will include the statement text and parameters (if enabled). Depending on requirements, an audit log might not require this and it makes the logs less verbose.
 
 The default is `on`.
 
