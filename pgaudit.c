@@ -1258,7 +1258,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
                  * If there is an into relation then log an insert. This is
                  * required because tables newly created by "create table as"
                  * or "create materialized view" do not call ExecCheckRTPerms()
-                 * so log_select_dml() will not be called by the hook.
+                 * so log_select_dml() will not be called by our hook.
                  */
                 if (stackItem->next != NULL &&
                     stackItem->next->auditEvent.intoRel != NULL)
@@ -1423,7 +1423,7 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
 
         /*
          * Store the relation inserted into for "create table as" and "create
-         * materialized view". This will be needed later to generate the insert
+         * materialized view". This will be used later to generate the insert
          * audit log.
          */
         if (stackItem->auditEvent.command == CMDTAG_CREATE_TABLE_AS ||
