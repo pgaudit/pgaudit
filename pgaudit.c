@@ -163,8 +163,8 @@ char *auditRole = NULL;
 /*
  * GUC variable for pgaudit.log_rows
  *
- * Administrators can choose if the rows retrieved or affected by a statement is
- * included in the audit log.
+ * Administrators can choose if the rows retrieved or affected by a statement 
+ * are included in the audit log.
  */
 bool auditLogRows = false;
 
@@ -234,9 +234,9 @@ typedef struct
                                    post-ProcessUtility to make sure we log */
     bool statementLogged;       /* Track if we have logged the statement */
     int64 rows;                 /* Track rows processed by the statement */
-    MemoryContext queryContext; /* Used for tracking rows processed */
-    Oid auditOid;               /* Used for tracking rows processed */
-    List *rangeTabls;           /* Used for tracking rows processed */
+    MemoryContext queryContext; /* Context for query tracking rows */
+    Oid auditOid;               /* Role running query tracking rows  */
+    List *rangeTabls;           /* Tables in query tracking rows */
 } AuditEvent;
 
 /*
@@ -302,8 +302,8 @@ stack_free(void *stackFree)
             *nextItem = (*nextItem)->next;
 
             /*
-             * If the stack is not empty or
-             * an item for cursor audit events has been freed.
+             * If the stack is not empty or an item for cursor audit events has 
+             * been freed.
              */
             if (*nextItem == NULL ||
                 freeItem->auditEvent.commandTag == T_DeclareCursorStmt ||
@@ -426,7 +426,7 @@ stack_valid(int64 stackId)
  * Find an item on the stack by the specified query memory context.
  */
 static AuditEventStackItem *
-stack_find(MemoryContext findContext)
+stack_find_context(MemoryContext findContext)
 {
     AuditEventStackItem *nextItem = auditEventStack;
 
@@ -435,6 +435,7 @@ stack_find(MemoryContext findContext)
     {
         if (nextItem->auditEvent.queryContext == findContext)
             break;
+
         nextItem = nextItem->next;
     }
 
@@ -761,35 +762,27 @@ log_audit_event(AuditEventStackItem *stackItem)
     else
         appendStringInfoString(&auditStr,
                                "<previously logged>,<previously logged>");
+ 
+    /* Log rows affected */
+    if (auditLogRows)
+        appendStringInfo(&auditStr, "," INT64_FORMAT, 
+                         stackItem->auditEvent.rows);
 
     /*
      * Log the audit entry.  Note: use of INT64_FORMAT here is bad for
      * translatability, but we currently haven't got translation support in
      * pgaudit anyway.
      */
-    if (!auditLogRows)
-        ereport(auditLogClient ? auditLogLevel : LOG_SERVER_ONLY,
-                (errmsg("AUDIT: %s," INT64_FORMAT "," INT64_FORMAT ",%s,%s",
-                        stackItem->auditEvent.granted ?
-                        AUDIT_TYPE_OBJECT : AUDIT_TYPE_SESSION,
-                        stackItem->auditEvent.statementId,
-                        stackItem->auditEvent.substatementId,
-                        className,
-                        auditStr.data),
-                        errhidestmt(true),
-                        errhidecontext(true)));
-    else
-        ereport(auditLogClient ? auditLogLevel : LOG_SERVER_ONLY,
-                (errmsg("AUDIT: %s," INT64_FORMAT "," INT64_FORMAT ",%s,%s," INT64_FORMAT "",
-                        stackItem->auditEvent.granted ?
-                        AUDIT_TYPE_OBJECT : AUDIT_TYPE_SESSION,
-                        stackItem->auditEvent.statementId,
-                        stackItem->auditEvent.substatementId,
-                        className,
-                        auditStr.data,
-                        stackItem->auditEvent.rows),
-                        errhidestmt(true),
-                        errhidecontext(true)));
+    ereport(auditLogClient ? auditLogLevel : LOG_SERVER_ONLY,
+            (errmsg("AUDIT: %s," INT64_FORMAT "," INT64_FORMAT ",%s,%s",
+                    stackItem->auditEvent.granted ?
+                    AUDIT_TYPE_OBJECT : AUDIT_TYPE_SESSION,
+                    stackItem->auditEvent.statementId,
+                    stackItem->auditEvent.substatementId,
+                    className,
+                    auditStr.data),
+                    errhidestmt(true),
+                    errhidecontext(true)));
 
     stackItem->auditEvent.logged = true;
 
@@ -1366,8 +1359,8 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
         MemoryContextSetParent(stackItem->contextAudit,
                                queryDesc->estate->es_query_cxt);
 
+        /* Set query context for tracking rows processed */
         if (auditLogRows)
-            /* Set query context for tracking rows processed */
             stackItem->auditEvent.queryContext = queryDesc->estate->es_query_cxt;
     }
 }
@@ -1423,6 +1416,67 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
         return false;
 
     return true;
+}
+
+/*
+ * Hook ExecutorRun to get rows processed by the current statement.
+ */
+static void
+pgaudit_ExecutorRun_hook(QueryDesc *queryDesc, ScanDirection direction, uint64 count, bool execute_once)
+{
+    AuditEventStackItem *stackItem = NULL;
+
+    /* Call the previous hook or standard function */
+    if (next_ExecutorRun_hook)
+        next_ExecutorRun_hook(queryDesc, direction, count, execute_once);
+    else
+        standard_ExecutorRun(queryDesc, direction, count, execute_once);
+
+    if (auditLogRows && !internalStatement)
+    {
+        /* Find an item from the stack by the query memory context */
+        stackItem = stack_find_context(queryDesc->estate->es_query_cxt);
+
+        /* Accumulate the number of rows processed */
+        if (stackItem != NULL)
+            stackItem->auditEvent.rows += queryDesc->estate->es_processed;
+    }
+}
+
+/*
+ * Hook ExecutorEnd to get rows processed by the current statement.
+ */
+static void
+pgaudit_ExecutorEnd_hook(QueryDesc *queryDesc)
+{
+    AuditEventStackItem *stackItem = NULL;
+    AuditEventStackItem *auditEventStackOld = NULL;
+
+    if (auditLogRows && !internalStatement)
+    {
+        /* Find an item from the stack by the query memory context */
+        stackItem = stack_find_context(queryDesc->estate->es_query_cxt);
+
+        if (stackItem != NULL && stackItem->auditEvent.rangeTabls != NULL)
+        {
+            /* Reset auditEventStack to use in log_select_dml() */
+            auditEventStackFull = auditEventStack;
+            auditEventStack = stackItem;
+
+            /* Log SELECT/DML audit entry */
+            log_select_dml(stackItem->auditEvent.auditOid,
+                           stackItem->auditEvent.rangeTabls);
+
+            /* Switch back to the previous auditEventStack */
+            auditEventStack = auditEventStackFull; 
+        }
+    }
+
+    /* Call the previous hook or standard function */
+    if (next_ExecutorEnd_hook)
+        next_ExecutorEnd_hook(queryDesc);
+    else
+        standard_ExecutorEnd(queryDesc);
 }
 
 /*
@@ -1554,65 +1608,6 @@ pgaudit_object_access_hook(ObjectAccessType access,
 
     if (next_object_access_hook)
         (*next_object_access_hook) (access, classId, objectId, subId, arg);
-}
-
-/*
- * Hook ExecutorRun to get rows processed by the current statement.
- */
-static void
-pgaudit_ExecutorRun_hook(QueryDesc *queryDesc, ScanDirection direction, uint64 count, bool execute_once)
-{
-    AuditEventStackItem *stackItem = NULL;
-
-    /* Call the previous hook or standard function */
-    if (next_ExecutorRun_hook)
-        next_ExecutorRun_hook(queryDesc, direction, count, execute_once);
-    else
-        standard_ExecutorRun(queryDesc, direction, count, execute_once);
-
-    if (auditLogRows && !internalStatement)
-    {
-        /* Find an item from the stack by the query memory context */
-        stackItem = stack_find(queryDesc->estate->es_query_cxt);
-        if (stackItem != NULL)
-            /* Accumulate the number of rows processed */
-            stackItem->auditEvent.rows += queryDesc->estate->es_processed;
-    }
-}
-
-/*
- * Hook ExecutorEnd to get rows processed by the current statement.
- */
-static void
-pgaudit_ExecutorEnd_hook(QueryDesc *queryDesc)
-{
-    AuditEventStackItem *stackItem = NULL;
-    AuditEventStackItem *auditEventStackOld = NULL;
-
-    if (auditLogRows && !internalStatement)
-    {
-        /* Find an item from the stack by the query memory context */
-        stackItem = stack_find(queryDesc->estate->es_query_cxt);
-        if (stackItem != NULL && stackItem->auditEvent.rangeTabls != NULL)
-        {
-            /* Reset auditEventStack to use in log_select_dml() */
-            auditEventStackOld = auditEventStack;
-            auditEventStack = stackItem;
-
-            /* Log SELECT/DML audit entry */
-            log_select_dml(stackItem->auditEvent.auditOid,
-                           stackItem->auditEvent.rangeTabls);
-
-            /* Switch back to the previous auditEventStack */
-            auditEventStack = auditEventStackOld; 
-        }
-    }
-
-    /* Call the previous hook or standard function */
-    if (next_ExecutorEnd_hook)
-        next_ExecutorEnd_hook(queryDesc);
-    else
-        standard_ExecutorEnd(queryDesc);
 }
 
 /*
