@@ -163,7 +163,7 @@ char *auditRole = NULL;
 /*
  * GUC variable for pgaudit.log_rows
  *
- * Administrators can choose if the rows retrieved or affected by a statement 
+ * Administrators can choose if the rows retrieved or affected by a statement
  * are included in the audit log.
  */
 bool auditLogRows = false;
@@ -302,7 +302,7 @@ stack_free(void *stackFree)
             *nextItem = (*nextItem)->next;
 
             /*
-             * If the stack is not empty or an item for cursor audit events has 
+             * If the stack is not empty or an item for cursor audit events has
              * been freed.
              */
             if (*nextItem == NULL ||
@@ -762,10 +762,10 @@ log_audit_event(AuditEventStackItem *stackItem)
     else
         appendStringInfoString(&auditStr,
                                "<previously logged>,<previously logged>");
- 
+
     /* Log rows affected */
     if (auditLogRows)
-        appendStringInfo(&auditStr, "," INT64_FORMAT, 
+        appendStringInfo(&auditStr, "," INT64_FORMAT,
                          stackItem->auditEvent.rows);
 
     /*
@@ -1450,7 +1450,7 @@ static void
 pgaudit_ExecutorEnd_hook(QueryDesc *queryDesc)
 {
     AuditEventStackItem *stackItem = NULL;
-    AuditEventStackItem *auditEventStackOld = NULL;
+    AuditEventStackItem *auditEventStackFull = NULL;
 
     if (auditLogRows && !internalStatement)
     {
@@ -1468,7 +1468,7 @@ pgaudit_ExecutorEnd_hook(QueryDesc *queryDesc)
                            stackItem->auditEvent.rangeTabls);
 
             /* Switch back to the previous auditEventStack */
-            auditEventStack = auditEventStackFull; 
+            auditEventStack = auditEventStackFull;
         }
     }
 
