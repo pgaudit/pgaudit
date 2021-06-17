@@ -1519,6 +1519,22 @@ CREATE INDEX h_idx ON h (x);
 DROP INDEX h_idx;
 DROP TABLE h;
 
+--
+-- Change configuration of user 1 so that full statements are not logged
+\connect - :current_user
+ALTER ROLE user1 RESET pgaudit.log_relation;
+ALTER ROLE user1 RESET pgaudit.log;
+ALTER ROLE user1 SET pgaudit.log_statement = OFF;
+ALTER ROLE user1 SET pgaudit.log_rows = on;
+\connect - user1
+
+--
+-- Logged but without full statement
+SELECT * FROM account;
+
+--
+-- Change back to superuser to do exhaustive tests
+\connect - :current_user
 
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise

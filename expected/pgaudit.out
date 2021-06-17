@@ -2441,6 +2441,32 @@ DROP INDEX h_idx;
 NOTICE:  AUDIT: SESSION,148,1,DDL,DROP INDEX,,,DROP INDEX h_idx;,<none>,0
 DROP TABLE h;
 NOTICE:  AUDIT: SESSION,149,1,DDL,DROP TABLE,,,DROP TABLE h;,<none>,0
+--
+-- Change configuration of user 1 so that full statements are not logged
+\connect - :current_user
+ALTER ROLE user1 RESET pgaudit.log_relation;
+NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 RESET pgaudit.log_relation;,<not logged>
+ALTER ROLE user1 RESET pgaudit.log;
+NOTICE:  AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 RESET pgaudit.log;,<not logged>
+ALTER ROLE user1 SET pgaudit.log_statement = OFF;
+NOTICE:  AUDIT: SESSION,3,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_statement = OFF;,<not logged>
+ALTER ROLE user1 SET pgaudit.log_rows = on;
+NOTICE:  AUDIT: SESSION,4,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_rows = on;,<not logged>
+\connect - user1
+--
+-- Logged but without full statement
+SELECT * FROM account;
+NOTICE:  AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,<not logged>,<not logged>,3
+ id | name  | password | description 
+----+-------+----------+-------------
+  1 | user1 | HASH4    | yada, yada3
+  1 | user2 | HASH4    | yada, yada3
+  1 | user3 | HASH4    | yada, yada3
+(3 rows)
+
+--
+-- Change back to superuser to do exhaustive tests
+\connect - :current_user
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
