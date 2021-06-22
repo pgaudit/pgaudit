@@ -1,10 +1,9 @@
-# docker build --platform linux/amd64 -t pgaudit-test .
+# docker build -t pgaudit-test .
 FROM centos:7
 
 # Setup environment
-RUN echo 'export PG_VERSION=14' >> /etc/bashrc
-RUN echo 'export PATH=$PATH:/usr/pgsql-${PG_VERSION?}/bin' >> /etc/bashrc
-RUN source /etc/bashrc
+ENV PG_VERSION=14
+ENV PATH=$PATH:/usr/pgsql-${PG_VERSION?}/bin
 
 # Install PostgreSQL
 # RUN rpm --import http://yum.postgresql.org/RPM-GPG-KEY-PGDG
