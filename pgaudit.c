@@ -1439,7 +1439,7 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         if (stackItem->auditEvent.command == CMDTAG_CREATE_TABLE_AS ||
             stackItem->auditEvent.command == CMDTAG_CREATE_MATERIALIZED_VIEW)
         {
-            stackItem->auditEvent->intoRel =
+            stackItem->auditEvent.intoRel =
                 ((CreateTableAsStmt *) parsetree)->into->rel;
         }
 
