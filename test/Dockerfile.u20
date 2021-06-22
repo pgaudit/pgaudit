@@ -1,0 +1,28 @@
+# docker build -f Dockerfile.u20 -t pgaudit-test .
+FROM ubuntu:focal
+
+# Setup environment
+ENV PG_VERSION=14
+ENV PATH="$PATH:/usr/lib/postgresql/${PG_VERSION}/bin"
+ENV PGDATA="/var/lib/postgresql/${PG_VERSION}/test"
+
+# Install packages
+RUN apt-get update
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y make gcc sudo wget gnupg tzdata locales lsb-release
+
+# Install PostgreSQL
+RUN RELEASE_CODENAME=`lsb_release -c | awk '{print $2}'` && \
+    echo 'deb http://apt.postgresql.org/pub/repos/apt/ '${RELEASE_CODENAME?}'-pgdg main 14' | \
+        tee -a /etc/apt/sources.list.d/pgdg.list
+RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+RUN apt-get update
+RUN apt-get install -y postgresql-common 2>&1
+RUN sed -i 's/^\#create\_main\_cluster.*$/create\_main\_cluster \= false/' \
+        /etc/postgresql-common/createcluster.conf
+RUN apt-get install -y postgresql-${PG_VERSION?} postgresql-server-dev-${PG_VERSION?}
+RUN apt-get install -y libssl-dev
+RUN apt-get install -y libgss-dev
+
+# Create PostgreSQL cluster
+RUN sudo -u postgres /usr/lib/postgresql/${PG_VERSION?}/bin/initdb -A trust -k ${PGDATA?}
+RUN echo "shared_preload_libraries = 'pgaudit'" >> ${PGDATA}/postgresql.conf

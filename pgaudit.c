@@ -1274,7 +1274,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
                     stackItem->next->auditEvent.intoRel != NULL)
                 {
                     /* Get the audit oid if the role exists */
-                    Oid auditOid = get_role_oid(auditRole, true);
+                    auditOid = get_role_oid(auditRole, true);
 
                     /*
                      * Log DML if the audit role is valid or session logging is
@@ -1439,8 +1439,8 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         if (stackItem->auditEvent.command == CMDTAG_CREATE_TABLE_AS ||
             stackItem->auditEvent.command == CMDTAG_CREATE_MATERIALIZED_VIEW)
         {
-            stackItem->auditEvent.intoRel =
-                ((CreateTableAsStmt *) pstmt)->into->rel;
+            stackItem->auditEvent->intoRel =
+                ((CreateTableAsStmt *) parsetree)->into->rel;
         }
 
         /*
