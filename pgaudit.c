@@ -1274,7 +1274,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
                     stackItem->next->auditEvent.intoRel != NULL)
                 {
                     /* Get the audit oid if the role exists */
-                    auditOid = get_role_oid(auditRole, true);
+                    Oid auditOid = get_role_oid(auditRole, true);
 
                     /*
                      * Log DML if the audit role is valid or session logging is
