@@ -21,7 +21,8 @@ RUN sed -i 's/^\#create\_main\_cluster.*$/create\_main\_cluster \= false/' \
         /etc/postgresql-common/createcluster.conf
 RUN apt-get install -y postgresql-${PG_VERSION?} postgresql-server-dev-${PG_VERSION?}
 RUN apt-get install -y libssl-dev
-RUN apt-get install -y libgss-dev
+RUN apt-get install -y libkrb5-dev
+# RUN dpkg -S gssapi.h
 
 # Create PostgreSQL cluster
 RUN sudo -u postgres /usr/lib/postgresql/${PG_VERSION?}/bin/initdb -A trust -k ${PGDATA?}
