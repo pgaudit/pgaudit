@@ -1,9 +1,9 @@
-# docker build -t pgaudit-test .
+# docker build -t pgaudit-test -v ..:/pgaudit .
 FROM centos:7
 
 # Setup environment
 ENV PG_VERSION=14
-ENV PATH=$PATH:/usr/pgsql-${PG_VERSION?}/bin
+ENV PATH="$PATH:/usr/pgsql-${PG_VERSION}/bin"
 
 # Install PostgreSQL
 # RUN rpm --import http://yum.postgresql.org/RPM-GPG-KEY-PGDG
@@ -14,13 +14,8 @@ RUN yum install -y postgresql${PG_VERSION?}-server
 
 # Compile & install pgaudit
 RUN yum install -y centos-release-scl-rh epel-release
-RUN yum install -y postgresql${PG_VERSION?}-devel gcc openssl-devel llvm-toolset-7-clang llvm5.0
-RUN sudo -u postgres make -C /pgaudit install USE_PGXS=1
+RUN yum install -y postgresql${PG_VERSION?}-devel gcc openssl-devel llvm-toolset-7-clang llvm5.0 sudo
 
 # Create PostgreSQL cluster
 RUN sudo -u postgres /usr/pgsql-${PG_VERSION?}/bin/initdb -A trust -k /var/lib/pgsql/${PG_VERSION?}/data
 RUN echo "shared_preload_libraries = 'pgaudit'" >> /var/lib/pgsql/${PG_VERSION?}/data/postgresql.conf
-RUN sudo -u postgres pg_ctl -D /var/lib/pgsql/${PG_VERSION?}/data start
-
-# Test pgaudit
-RUN sudo -u postgres bash -cl 'make -C /pgaudit installcheck USE_PGXS=1'
