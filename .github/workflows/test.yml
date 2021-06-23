@@ -1,0 +1,34 @@
+name: test
+
+on:
+  push:
+    branches:
+      - integration
+      - '**-ci'
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-20.04
+
+    strategy:
+      # Let all the jobs run to completion even if one fails
+      fail-fast: false
+
+      # Test matrix
+      matrix:
+        include:
+          # Ubuntu 20.04
+          - image: u20
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+        with:
+          path: pgaudit
+
+      - name: Build Test Container
+        run: docker build -f ${GITHUB_WORKSPACE?}/pgaudit/test/Dockerfile.${{matrix.image}} -t pgaudit-test ${GITHUB_WORKSPACE?}/pgaudit
+
+      - name: Run Test
+        run: docker run -it -v ${GITHUB_WORKSPACE?}/pgaudit:/pgaudit pgaudit-test /pgaudit/test/test.sh
