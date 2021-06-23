@@ -27,6 +27,9 @@ jobs:
         with:
           path: pgaudit
 
+      - name: Test
+        run: touch ${GITHUB_WORKSPACE?}/pgaudit/regression.out
+
       - name: Build Test Container
         run: docker build -f ${GITHUB_WORKSPACE?}/pgaudit/test/Dockerfile.${{matrix.image}} -t pgaudit-test ${GITHUB_WORKSPACE?}/pgaudit
 
