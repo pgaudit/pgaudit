@@ -31,4 +31,4 @@ jobs:
         run: docker build -f ${GITHUB_WORKSPACE?}/pgaudit/test/Dockerfile.${{matrix.image}} -t pgaudit-test ${GITHUB_WORKSPACE?}/pgaudit
 
       - name: Run Test
-        run: docker run -it -v ${GITHUB_WORKSPACE?}/pgaudit:/pgaudit pgaudit-test /pgaudit/test/test.sh
+        run: docker run -v ${GITHUB_WORKSPACE?}/pgaudit:/pgaudit pgaudit-test /pgaudit/test/test.sh

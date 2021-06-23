@@ -9,19 +9,19 @@ ENV PGDATA="/var/lib/postgresql/${PGVERSION}/test"
 
 # Install packages
 RUN apt-get update
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y sudo wget gnupg tzdata locales lsb-release
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y sudo wget gnupg tzdata locales lsb-release apt-utils
 
 # Install PostgreSQL
 RUN RELEASE_CODENAME=`lsb_release -c | awk '{print $2}'` && \
     echo 'deb http://apt.postgresql.org/pub/repos/apt/ '${RELEASE_CODENAME?}'-pgdg main 14' | \
         tee -a /etc/apt/sources.list.d/pgdg.list
-RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+RUN APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1 && \
+    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
 RUN apt-get update
 RUN apt-get install -y postgresql-common 2>&1
 RUN sed -i 's/^\#create\_main\_cluster.*$/create\_main\_cluster \= false/' \
         /etc/postgresql-common/createcluster.conf
 RUN apt-get install -y postgresql-${PGVERSION?} postgresql-server-dev-${PGVERSION?} make gcc libssl-dev libkrb5-dev
-# RUN dpkg -S gssapi.h
 
 # Create PostgreSQL cluster
 RUN sudo -u postgres ${PGBIN?}/initdb -A trust -k ${PGDATA?}
