@@ -19,8 +19,11 @@ jobs:
       # Test matrix
       matrix:
         include:
-          # Ubuntu 20.04
-          - image: u20
+          # Debian
+          - image: debian
+
+          # RHEL
+          - image: rhel
 
     steps:
       - name: Checkout Code

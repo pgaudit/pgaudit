@@ -1,4 +1,3 @@
-# docker build -f Dockerfile.u20 -t pgaudit-test .
 FROM ubuntu:focal
 
 # User and group id
@@ -8,8 +7,8 @@ ARG GID=1000
 # Setup environment
 ENV PGVERSION=13
 ENV PGBIN=/usr/lib/postgresql/${PGVERSION}/bin
-ENV PATH="${PATH}:${PGBIN}"
 ENV PGDATA="/var/lib/postgresql/${PGVERSION}/test"
+ENV PATH="${PATH}:${PGBIN}"
 
 # Install packages
 RUN apt-get update
