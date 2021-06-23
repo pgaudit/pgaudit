@@ -16,7 +16,7 @@ RESET pgaudit.log_client;
 DROP TABLE tmp;
 DROP TABLE tmp2;
 RESET pgaudit.log;
-RESET pgaudit.log_level;XXXXXX
+RESET pgaudit.log_level;
 --
 -- Audit log fields are:
 --     AUDIT_TYPE - SESSION or OBJECT
