@@ -28,8 +28,7 @@ jobs:
           path: pgaudit
 
       - name: Build Test Container
-        run: docker build docker build --build-arg UID=$(id -u) --build-arg GID=$(id -g) -f Dockerfile.u20 -t pgaudit-test .
- -f ${GITHUB_WORKSPACE?}/pgaudit/test/Dockerfile.${{matrix.image}} -t pgaudit-test ${GITHUB_WORKSPACE?}/pgaudit
+        run: docker build docker build --build-arg UID=$(id -u) --build-arg GID=$(id -g) -f ${GITHUB_WORKSPACE?}/pgaudit/test/Dockerfile.${{matrix.image}} -t pgaudit-test ${GITHUB_WORKSPACE?}/pgaudit
 
       - name: Test LS
         run: docker run -v ${GITHUB_WORKSPACE?}/pgaudit:/pgaudit pgaudit-test ls -lah /pgaudit
