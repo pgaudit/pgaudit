@@ -6,7 +6,7 @@ ARG GID=1000
 
 # Setup environment
 ENV PGVERSION=13
-ENV PGBIN=/usr/lib/postgresql/${PGVERSION}/bin
+ENV PGBIN=/usr/pgsql-${PGVERSION?}/bin
 ENV PGDATA="/var/lib/pgsql/${PGVERSION?}/data"
 ENV PATH="${PATH}:${PGBIN}"
 
