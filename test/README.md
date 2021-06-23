@@ -1,6 +1,6 @@
 # Testing
 
-Testing if performed via a Docker container. First build the container:
+Testing is performed using a Docker container. First build the container:
 ```
 docker build --build-arg UID=$(id -u) --build-arg GID=$(id -g) -f test/Dockerfile.debian -t pgaudit-test .
 ```
