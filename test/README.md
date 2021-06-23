@@ -1,5 +1,10 @@
-```
-docker build --build-arg UID=$(id -u) --build-arg GID=$(id -g) -f Dockerfile.u20 -t pgaudit-test .
+# Testing
 
-docker run -it -v  ~/Documents/Code/postgres/contrib/pgaudit:/pgaudit pgaudit-test /pgaudit/test/test.sh
+Testing if performed via a Docker container. First build the container:
+```
+docker build --build-arg UID=$(id -u) --build-arg GID=$(id -g) -f test/Dockerfile.debian -t pgaudit-test .
+```
+Then run the test:
+```
+docker run -it -v $(pwd):/pgaudit pgaudit-test /pgaudit/test/test.sh
 ```
