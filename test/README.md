@@ -1,6 +1,5 @@
 ```
-docker run -it -u postgres -v ~/pgaudit:/pgaudit pgaudit-test bash -cl " \
-    make -C /pgaudit install USE_PGXS=1 && \
-    pg_ctl -D /var/lib/pgsql/14/data -w start && \
-    make -C /pgaudit installcheck USE_PGXS=1"
+docker build -f Dockerfile.u20 -t pgaudit-test .
+
+docker run -it -v  ~/Documents/Code/postgres/contrib/pgaudit:/pgaudit pgaudit-test /pgaudit/test/test.sh
 ```
