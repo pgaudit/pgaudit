@@ -1,6 +1,10 @@
 # docker build -f Dockerfile.u20 -t pgaudit-test .
 FROM ubuntu:focal
 
+# User and group id
+ARG UID=1000
+ARG GID=1000
+
 # Setup environment
 ENV PGVERSION=13
 ENV PGBIN=/usr/lib/postgresql/${PGVERSION}/bin
@@ -10,6 +14,10 @@ ENV PGDATA="/var/lib/postgresql/${PGVERSION}/test"
 # Install packages
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y sudo wget gnupg tzdata locales lsb-release apt-utils
+
+# Create postgres user/group with specific IDs
+RUN groupadd -g $GID -o postgres
+RUN useradd -m -u $UID -g $GID -o -s /bin/bash postgres
 
 # Install PostgreSQL
 RUN RELEASE_CODENAME=`lsb_release -c | awk '{print $2}'` && \
