@@ -25,9 +25,6 @@ RUN RELEASE_CODENAME=`lsb_release -c | awk '{print $2}'` && \
 RUN APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1 && \
     wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
 RUN apt-get update
-RUN apt-get install -y postgresql-common 2>&1
-RUN sed -i 's/^\#create\_main\_cluster.*$/create\_main\_cluster \= false/' \
-        /etc/postgresql-common/createcluster.conf
 RUN apt-get install -y postgresql-${PGVERSION?} postgresql-server-dev-${PGVERSION?} make gcc libssl-dev libkrb5-dev
 
 # Create PostgreSQL cluster
