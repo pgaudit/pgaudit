@@ -1766,9 +1766,6 @@ NOTICE:  AUDIT: SESSION,52,1,DDL,DROP TABLE,,,DROP TABLE test.account_copy;,<non
 CREATE TABLE test.account_copy AS
 SELECT *
   FROM account;
-NOTICE:  AUDIT: SESSION,53,1,WRITE,INSERT,TABLE,test.account_copy,"CREATE TABLE test.account_copy AS
-SELECT *
-  FROM account;",<none>,0
 NOTICE:  AUDIT: OBJECT,53,1,READ,SELECT,TABLE,public.account,"CREATE TABLE test.account_copy AS
 SELECT *
   FROM account;",<none>,3
