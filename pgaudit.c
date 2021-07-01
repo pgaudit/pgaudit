@@ -301,14 +301,8 @@ stack_free(void *stackFree)
             /* Delete the item to be freed */
             *nextItem = (*nextItem)->next;
 
-            /*
-             * If the stack is not empty or an item for cursor audit events has
-             * been freed.
-             */
-            if (*nextItem == NULL ||
-                freeItem->auditEvent.commandTag == T_DeclareCursorStmt ||
-                freeItem->auditEvent.commandTag == T_FetchStmt ||
-                freeItem->auditEvent.commandTag == T_ClosePortalStmt)
+            /* If the stack is not empty */
+            if (*nextItem == NULL)
             {
                 /*
                  * Reset internal statement to false.  Normally this will be
