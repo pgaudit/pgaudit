@@ -1568,7 +1568,7 @@ NOTICE:  AUDIT: SESSION,30,1,WRITE,DELETE,TABLE,public.test2,"DELETE
   FROM test2;",<none>,5
 DELETE
   FROM test3
- WHERE id > 0; 
+ WHERE id > 0;
 NOTICE:  AUDIT: SESSION,31,1,WRITE,DELETE,TABLE,public.test3,"DELETE
   FROM test3
  WHERE id > 0;",<none>,10
