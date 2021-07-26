@@ -997,7 +997,7 @@ DELETE
 
 DELETE
   FROM test3
- WHERE id > 0; 
+ WHERE id > 0;
 
 --
 -- Drop test tables

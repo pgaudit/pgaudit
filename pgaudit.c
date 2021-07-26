@@ -1373,7 +1373,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
     if ((auditOid != InvalidOid || auditLogBitmap != 0) &&
         !IsAbortedTransactionBlockState())
     {
-        /* If auditLogRows is on, wait for rows processed to be set */ 
+        /* If auditLogRows is on, wait for rows processed to be set */
         if (auditLogRows && auditEventStack != NULL)
         {
             /* Check if the top item is SELECT/INSERT for CREATE TABLE AS */
