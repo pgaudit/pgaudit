@@ -160,6 +160,12 @@ Specifies whether session audit logging should create a separate log entry for e
 
 The default is `off`.
 
+### pgaudit.log_rows
+
+Specifies that audit logging should include the rows retrieved or affected by a statement. When enabled the rows field will be included after the parameter field.
+
+The default is `off`.
+
 ### pgaudit.log_statement
 
 Specifies whether logging will include the statement text and parameters (if enabled). Depending on requirements, an audit log might not require this and it makes the logs less verbose.
@@ -177,12 +183,6 @@ The default is `off`.
 Specifies the master role to use for object audit logging. Multiple audit roles can be defined by granting them to the master role. This allows multiple groups to be in charge of different aspects of audit logging.
 
 There is no default.
-
-### pgaudit.log_rows
-
-Specifies that audit logging should include the rows retrieved or affected by a statement. When enabled the rows field will be included after the parameter field.
-
-The default is `off`.
 
 ## Session Audit Logging
 

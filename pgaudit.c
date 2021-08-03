@@ -135,6 +135,14 @@ bool auditLogParameter = false;
 bool auditLogRelation = false;
 
 /*
+ * GUC variable for pgaudit.log_rows
+ *
+ * Administrators can choose if the rows retrieved or affected by a statement
+ * are included in the audit log.
+ */
+bool auditLogRows = false;
+
+/*
  * GUC variable for pgaudit.log_statement
  *
  * Administrators can choose to not have the full statement text logged.
@@ -159,14 +167,6 @@ bool auditLogStatementOnce = false;
  * determine if a statement should be logged.
  */
 char *auditRole = NULL;
-
-/*
- * GUC variable for pgaudit.log_rows
- *
- * Administrators can choose if the rows retrieved or affected by a statement
- * are included in the audit log.
- */
-bool auditLogRows = false;
 
 /*
  * String constants for the audit log fields.
@@ -2086,6 +2086,20 @@ _PG_init(void)
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);
 
+    /* Define pgaudit.log_rows */
+    DefineCustomBoolVariable(
+        "pgaudit.log_rows",
+
+        "Specifies whether logging will include the rows retrieved or "
+        "affected by a statement.",
+
+        NULL,
+        &auditLogRows,
+        false,
+        PGC_SUSET,
+        GUC_NOT_IN_SAMPLE,
+        NULL, NULL, NULL);
+
     /* Define pgaudit.log_statement */
     DefineCustomBoolVariable(
         "pgaudit.log_statement",
@@ -2132,20 +2146,6 @@ _PG_init(void)
         NULL,
         &auditRole,
         "",
-        PGC_SUSET,
-        GUC_NOT_IN_SAMPLE,
-        NULL, NULL, NULL);
-
-    /* Define pgaudit.log_rows */
-    DefineCustomBoolVariable(
-        "pgaudit.log_rows",
-
-        "Specifies whether logging will include the rows retrieved or "
-        "affected by a statement.",
-
-        NULL,
-        &auditLogRows,
-        false,
         PGC_SUSET,
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);
