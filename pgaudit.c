@@ -1011,7 +1011,9 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         /*
          * We don't have access to the parsetree here, so we have to generate
          * the node type, object type, and command tag by decoding
-         * rte->requiredPerms and rte->relkind.
+         * rte->requiredPerms and rte->relkind. For updates we also check 
+         * rellockmode so that only true UPDATE commands (not
+         * SELECT FOR UPDATE, etc.) are logged.
          */
         if (rte->requiredPerms & ACL_INSERT)
         {
@@ -1019,7 +1021,8 @@ log_select_dml(Oid auditOid, List *rangeTabls)
             auditEventStack->auditEvent.commandTag = T_InsertStmt;
             auditEventStack->auditEvent.command = CMDTAG_INSERT;
         }
-        else if (rte->requiredPerms & ACL_UPDATE)
+        else if (rte->requiredPerms & ACL_UPDATE &&
+                 rte->rellockmode >= RowExclusiveLock)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
             auditEventStack->auditEvent.commandTag = T_UpdateStmt;

@@ -553,11 +553,11 @@ SELECT *
   FROM account
  WHERE password = 'HASH2'
    FOR UPDATE;
-NOTICE:  AUDIT: OBJECT,4,1,WRITE,UPDATE,TABLE,public.account,"SELECT *
+NOTICE:  AUDIT: OBJECT,4,1,READ,SELECT,TABLE,public.account,"SELECT *
   FROM account
  WHERE password = 'HASH2'
    FOR UPDATE;",<not logged>
-NOTICE:  AUDIT: SESSION,4,1,WRITE,UPDATE,TABLE,public.account,"SELECT *
+NOTICE:  AUDIT: SESSION,4,1,READ,SELECT,TABLE,public.account,"SELECT *
   FROM account
  WHERE password = 'HASH2'
    FOR UPDATE;",<not logged>
@@ -1174,12 +1174,12 @@ NOTICE:  AUDIT: SESSION,66,1,WRITE,INSERT,TABLE,public.aaa,"INSERT INTO aaa VALU
 SET pgaudit.log_parameter TO OFF;
 INSERT INTO bbb VALUES (1);
 NOTICE:  AUDIT: SESSION,67,1,WRITE,INSERT,TABLE,public.bbb,INSERT INTO bbb VALUES (1);,<not logged>
-NOTICE:  AUDIT: OBJECT,67,2,WRITE,UPDATE,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
-NOTICE:  AUDIT: SESSION,67,2,WRITE,UPDATE,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
+NOTICE:  AUDIT: OBJECT,67,2,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
+NOTICE:  AUDIT: SESSION,67,2,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
 NOTICE:  AUDIT: OBJECT,67,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>
 NOTICE:  AUDIT: SESSION,67,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>
-NOTICE:  AUDIT: OBJECT,67,4,WRITE,UPDATE,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
-NOTICE:  AUDIT: SESSION,67,4,WRITE,UPDATE,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
+NOTICE:  AUDIT: OBJECT,67,4,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
+NOTICE:  AUDIT: SESSION,67,4,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
 SET pgaudit.log_parameter TO ON;
 DROP TABLE bbb;
 DROP TABLE aaa;
