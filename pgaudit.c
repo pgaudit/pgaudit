@@ -1013,7 +1013,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
          * the node type, object type, and command tag by decoding
          * rte->requiredPerms and rte->relkind. For updates we also check 
          * rellockmode so that only true UPDATE commands (not
-         * SELECT FOR UPDATE, etc.) are logged.
+         * SELECT FOR UPDATE, etc.) are logged as UPDATE.
          */
         if (rte->requiredPerms & ACL_INSERT)
         {
