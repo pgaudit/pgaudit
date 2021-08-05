@@ -2362,9 +2362,13 @@ INSERT INTO aaa VALUES (generate_series(1,100));
 NOTICE:  AUDIT: SESSION,120,1,WRITE,INSERT,TABLE,public.aaa,"INSERT INTO aaa VALUES (generate_series(1,100));",<none>,100
 SET pgaudit.log_parameter TO OFF;
 INSERT INTO bbb VALUES (1);
-NOTICE:  AUDIT: OBJECT,121,1,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>,1
-NOTICE:  AUDIT: SESSION,121,1,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>,1
-NOTICE:  AUDIT: SESSION,121,2,WRITE,INSERT,TABLE,public.bbb,INSERT INTO bbb VALUES (1);,<not logged>,1
+NOTICE:  AUDIT: OBJECT,121,1,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>,1
+NOTICE:  AUDIT: SESSION,121,1,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>,1
+NOTICE:  AUDIT: OBJECT,121,2,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>,1
+NOTICE:  AUDIT: SESSION,121,2,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>,1
+NOTICE:  AUDIT: OBJECT,121,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>,1
+NOTICE:  AUDIT: SESSION,121,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>,1
+NOTICE:  AUDIT: SESSION,121,4,WRITE,INSERT,TABLE,public.bbb,INSERT INTO bbb VALUES (1);,<not logged>,1
 SET pgaudit.log_parameter TO ON;
 DROP TABLE bbb;
 DROP TABLE aaa;
