@@ -1759,8 +1759,8 @@ pgaudit_sql_drop(PG_FUNCTION_ARGS)
     query = "SELECT pg_catalog.upper(object_type),\n"
             "       object_identity\n"
             "  FROM pg_catalog.pg_event_trigger_dropped_objects()\n"
-            " WHERE pg_catalog.lower(object_type) OPERATOR(pg_catalog.<>) 'type'\n"
-            "   AND schema_name OPERATOR(pg_catalog.<>) 'pg_toast'";
+            " WHERE pg_catalog.lower(object_type) operator(pg_catalog.<>) 'type'\n"
+            "   AND schema_name operator(pg_catalog.<>) 'pg_toast'";
 
     /* Attempt to connect */
     result = SPI_connect();
