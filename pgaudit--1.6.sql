@@ -4,7 +4,9 @@
 CREATE FUNCTION pgaudit_ddl_command_end()
 	RETURNS event_trigger
 	LANGUAGE C
-	AS 'MODULE_PATHNAME', 'pgaudit_ddl_command_end';
+	AS 'MODULE_PATHNAME', 'pgaudit_ddl_command_end'
+	SECURITY DEFINER
+	SET search_path = 'pg_catalog';
 
 CREATE EVENT TRIGGER pgaudit_ddl_command_end
 	ON ddl_command_end
@@ -13,7 +15,9 @@ CREATE EVENT TRIGGER pgaudit_ddl_command_end
 CREATE FUNCTION pgaudit_sql_drop()
 	RETURNS event_trigger
 	LANGUAGE C
-	AS 'MODULE_PATHNAME', 'pgaudit_sql_drop';
+	AS 'MODULE_PATHNAME', 'pgaudit_sql_drop'
+	SECURITY DEFINER
+	SET search_path = 'pg_catalog';
 
 CREATE EVENT TRIGGER pgaudit_sql_drop
 	ON sql_drop
