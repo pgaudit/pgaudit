@@ -1255,6 +1255,39 @@ DROP INDEX h_idx;
 NOTICE:  AUDIT: SESSION,95,1,DDL,DROP INDEX,,,DROP INDEX h_idx;,<none>
 DROP TABLE h;
 NOTICE:  AUDIT: SESSION,96,1,DDL,DROP TABLE,,,DROP TABLE h;,<none>
+--
+-- Test that pgaudit event triggers are immune to search-path-based attacks
+-- Attempt to capture unqualified references to standard functions
+CREATE FUNCTION upper(text) RETURNS text
+LANGUAGE SQL AS 'SELECT (1/0)::text';
+NOTICE:  AUDIT: SESSION,97,1,DDL,CREATE FUNCTION,,,"CREATE FUNCTION upper(text) RETURNS text
+LANGUAGE SQL AS 'SELECT (1/0)::text';",<none>
+CREATE FUNCTION lower(text) RETURNS text
+LANGUAGE SQL AS 'SELECT (1/0)::text';
+NOTICE:  AUDIT: SESSION,98,1,DDL,CREATE FUNCTION,,,"CREATE FUNCTION lower(text) RETURNS text
+LANGUAGE SQL AS 'SELECT (1/0)::text';",<none>
+CREATE FUNCTION my_ne(text, text) RETURNS bool
+LANGUAGE SQL AS 'SELECT (1/0)::bool';
+NOTICE:  AUDIT: SESSION,99,1,DDL,CREATE FUNCTION,,,"CREATE FUNCTION my_ne(text, text) RETURNS bool
+LANGUAGE SQL AS 'SELECT (1/0)::bool';",<none>
+CREATE OPERATOR <> (FUNCTION = my_ne, LEFTARG = text, RIGHTARG = text);
+NOTICE:  AUDIT: SESSION,100,1,DDL,CREATE OPERATOR,,,"CREATE OPERATOR <> (FUNCTION = my_ne, LEFTARG = text, RIGHTARG = text);",<none>
+CREATE EXTENSION IF NOT EXISTS pgaudit;
+NOTICE:  AUDIT: SESSION,101,5,DDL,CREATE EXTENSION,,,CREATE EXTENSION IF NOT EXISTS pgaudit;,<none>
+SET pgaudit.log = 'DDL';
+-- Put public schema before pg_catalog to capture unqualified references
+SET search_path = public, pg_catalog;
+-- If there was a vulnerability, these would fail with division by zero error
+CREATE TABLE wombat ();
+NOTICE:  AUDIT: SESSION,102,1,DDL,CREATE TABLE,TABLE,public.wombat,CREATE TABLE wombat ();,<none>
+DROP TABLE wombat;
+NOTICE:  AUDIT: SESSION,103,1,DDL,DROP TABLE,TABLE,public.wombat,DROP TABLE wombat;,<none>
+SET pgaudit.log = 'NONE';
+DROP EXTENSION pgaudit;
+DROP OPERATOR <> (text, text);
+DROP FUNCTION my_ne(text, text);
+DROP FUNCTION lower(text);
+DROP FUNCTION upper(text);
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
