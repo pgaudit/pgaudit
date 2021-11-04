@@ -1,5 +1,5 @@
 # pgaudit extension
 comment = 'provides auditing functionality'
-default_version = '1.2.2'
+default_version = '1.2.3'
 module_pathname = '$libdir/pgaudit'
 relocatable = true
