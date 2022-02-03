@@ -655,6 +655,12 @@ log_audit_event(AuditEventStackItem *stackItem)
     if (!stackItem->auditEvent.granted && !(auditLogBitmap & class))
         return;
 
+    /* !!! */
+    if (creating_extension &&
+        !(stackItem->auditEvent.commandTag == T_CreateExtensionStmt ||
+          stackItem->auditEvent.commandTag == T_AlterExtensionStmt))
+        return;
+
     /*
      * Use audit memory context in case something is not free'd while
      * appending strings and parameters.
@@ -695,10 +701,7 @@ log_audit_event(AuditEventStackItem *stackItem)
      * parameters if they have not already been logged for this substatement.
      */
     appendStringInfoCharMacro(&auditStr, ',');
-    if (auditLogStatement && !(stackItem->auditEvent.statementLogged && auditLogStatementOnce) &&
-        (!creating_extension ||
-            (stackItem->auditEvent.commandTag == T_CreateExtensionStmt  ||
-             stackItem->auditEvent.commandTag == T_AlterExtensionStmt)))
+    if (auditLogStatement && !(stackItem->auditEvent.statementLogged && auditLogStatementOnce))
     {
         append_valid_csv(&auditStr, stackItem->auditEvent.commandText);
 

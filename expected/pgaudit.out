@@ -2507,9 +2507,6 @@ SET pgaudit.log = 'all,-misc_set';
 SET pgaudit.log_level = 'warning';
 CREATE EXTENSION pg_prewarm;
 WARNING:  AUDIT: SESSION,3,1,DDL,CREATE EXTENSION,,,CREATE EXTENSION pg_prewarm;,<not logged>
-WARNING:  AUDIT: SESSION,3,2,DDL,CREATE FUNCTION,,,<previously logged>,<previously logged>
-WARNING:  AUDIT: SESSION,3,3,DDL,CREATE FUNCTION,,,<previously logged>,<previously logged>
-WARNING:  AUDIT: SESSION,3,4,DDL,CREATE FUNCTION,,,<previously logged>,<previously logged>
 ALTER EXTENSION pg_prewarm UPDATE TO '1.2';
 WARNING:  AUDIT: SESSION,4,1,DDL,ALTER EXTENSION,,,ALTER EXTENSION pg_prewarm UPDATE TO '1.2';,<not logged>
 NOTICE:  version "1.2" of extension "pg_prewarm" is already installed
