@@ -19,6 +19,7 @@
 #include "catalog/pg_class.h"
 #include "catalog/namespace.h"
 #include "commands/dbcommands.h"
+#include "commands/extension.h"
 #include "catalog/pg_proc.h"
 #include "commands/event_trigger.h"
 #include "executor/executor.h"
@@ -694,7 +695,10 @@ log_audit_event(AuditEventStackItem *stackItem)
      * parameters if they have not already been logged for this substatement.
      */
     appendStringInfoCharMacro(&auditStr, ',');
-    if (auditLogStatement && !(stackItem->auditEvent.statementLogged && auditLogStatementOnce))
+    if (auditLogStatement && !(stackItem->auditEvent.statementLogged && auditLogStatementOnce) &&
+        (!creating_extension ||
+            (stackItem->auditEvent.commandTag == T_CreateExtensionStmt  ||
+             stackItem->auditEvent.commandTag == T_AlterExtensionStmt)))
     {
         append_valid_csv(&auditStr, stackItem->auditEvent.commandText);
 
@@ -1533,6 +1537,16 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
          */
         if (auditLogBitmap & LOG_FUNCTION &&
             stackItem->auditEvent.commandTag == T_DoStmt &&
+            !IsAbortedTransactionBlockState())
+            log_audit_event(stackItem);
+
+        /*
+         * If this is a create/alter extension command log it before calling
+         * the next ProcessUtility hook.
+         */
+        if (auditLogBitmap & LOG_DDL &&
+            (stackItem->auditEvent.commandTag == T_CreateExtensionStmt ||
+                stackItem->auditEvent.commandTag == T_AlterExtensionStmt) &&
             !IsAbortedTransactionBlockState())
             log_audit_event(stackItem);
 
