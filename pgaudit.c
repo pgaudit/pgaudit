@@ -19,6 +19,7 @@
 #include "catalog/pg_class.h"
 #include "catalog/namespace.h"
 #include "commands/dbcommands.h"
+#include "commands/extension.h"
 #include "catalog/pg_proc.h"
 #include "commands/event_trigger.h"
 #include "executor/executor.h"
@@ -167,6 +168,14 @@ bool auditLogStatementOnce = false;
  * determine if a statement should be logged.
  */
 char *auditRole = NULL;
+
+/*
+ * GUC variable for pgaudit.skip_create_extension_details
+ *
+ * Administrators can choose to log only the CREATE EXTENSION statement itself,
+ * rather than every individual statement executed by the extension SQL script.
+ */
+bool skip_create_extension_details = false;
 
 /*
  * String constants for the audit log fields.
@@ -652,6 +661,17 @@ log_audit_event(AuditEventStackItem *stackItem)
      * If neither of these is true, return.
      */
     if (!stackItem->auditEvent.granted && !(auditLogBitmap & class))
+        return;
+
+    /*
+     * Do not log the statement if:
+     *
+     * 1. skip_create_extension_details is true and
+     * 2. creating_extension is currently true
+     *
+     * If both of these are true, return.
+     */
+    if (skip_create_extension_details && creating_extension)
         return;
 
     /*
@@ -2144,6 +2164,22 @@ _PG_init(void)
         NULL,
         &auditRole,
         "",
+        PGC_SUSET,
+        GUC_NOT_IN_SAMPLE,
+        NULL, NULL, NULL);
+
+    /* Define pgaudit.skip_create_extension_details */
+    DefineCustomBoolVariable(
+        "pgaudit.skip_create_extension_details",
+
+        "Specifies whether logging should create a separate log "
+        "entry for each statement run on behalf of CREATE EXTENSION statement. "
+        "This is a useful shortcut for exhaustive logging that may occur when "
+        "creating extensions.",
+
+        NULL,
+        &skip_create_extension_details,
+        false,
         PGC_SUSET,
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);
