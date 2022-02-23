@@ -1582,9 +1582,9 @@ DROP FUNCTION upper(text);
 SET pgaudit.log = 'all,-misc_set';
 SET pgaudit.log_level = 'warning';
 
-CREATE EXTENSION pg_prewarm;
-ALTER EXTENSION pg_prewarm UPDATE TO '1.2';
-DROP EXTENSION pg_prewarm;
+CREATE EXTENSION pg_stat_statements;
+ALTER EXTENSION pg_stat_statements UPDATE TO '1.9';
+DROP EXTENSION pg_stat_statements;
 
 SET pgaudit.log_level = 'notice';
 
