@@ -495,10 +495,10 @@ log_audit_event(AuditEventStackItem *stackItem)
     StringInfoData auditStr;
 
     /*
-     * Skip logging if an extension is currently being created or altered.
-     * PostgreSQL reports the statement text for each statement in the script
-     * as the entire script text, which can blow up the logs. The create/alter
-     * statement will still be logged.
+     * Skip logging script statements if an extension is currently being created
+     * or altered. PostgreSQL reports the statement text for each statement in
+     * the script as the entire script text, which can blow up the logs. The
+     * create/alter statement will still be logged.
      *
      * Since a superuser is responsible for determining which extensions are
      * available, and in most cases installing them, it should not be necessary
