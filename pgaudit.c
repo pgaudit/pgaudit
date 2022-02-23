@@ -494,6 +494,19 @@ log_audit_event(AuditEventStackItem *stackItem)
     MemoryContext contextOld;
     StringInfoData auditStr;
 
+    /*
+     * Skip logging if an extension is currently being created or altered.
+     * PostgreSQL reports the statement text for each statement in the script
+     * as the entire script text, which can blow up the logs. The create/alter
+     * statement will still be logged.
+     *
+     * Since a superuser is responsible for determining which extensions are
+     * available, and in most cases installing them, it should not be necessary
+     * to log each statement in the script.
+     */
+    if (creating_extension)
+        return;
+
     /* If this event has already been logged don't log it again */
     if (stackItem->auditEvent.logged)
         return;
@@ -653,12 +666,6 @@ log_audit_event(AuditEventStackItem *stackItem)
      * If neither of these is true, return.
      */
     if (!stackItem->auditEvent.granted && !(auditLogBitmap & class))
-        return;
-
-    /* !!! */
-    if (creating_extension &&
-        !(stackItem->auditEvent.commandTag == T_CreateExtensionStmt ||
-          stackItem->auditEvent.commandTag == T_AlterExtensionStmt))
         return;
 
     /*
@@ -1055,7 +1062,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         /*
          * We don't have access to the parsetree here, so we have to generate
          * the node type, object type, and command tag by decoding
-         * rte->requiredPerms and rte->relkind. For updates we also check 
+         * rte->requiredPerms and rte->relkind. For updates we also check
          * rellockmode so that only true UPDATE commands (not
          * SELECT FOR UPDATE, etc.) are logged as UPDATE.
          */
@@ -1545,7 +1552,9 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
 
         /*
          * If this is a create/alter extension command log it before calling
-         * the next ProcessUtility hook.
+         * the next ProcessUtility hook. Otherwise, any warnings will be emitted
+         * before the create/alter is logged and errors will prevent it from
+         * being logged at all.
          */
         if (auditLogBitmap & LOG_DDL &&
             (stackItem->auditEvent.commandTag == T_CreateExtensionStmt ||
