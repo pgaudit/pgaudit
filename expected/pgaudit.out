@@ -1252,7 +1252,7 @@ LANGUAGE SQL AS 'SELECT (1/0)::bool';",<none>
 CREATE OPERATOR <> (FUNCTION = my_ne, LEFTARG = text, RIGHTARG = text);
 NOTICE:  AUDIT: SESSION,100,1,DDL,CREATE OPERATOR,,,"CREATE OPERATOR <> (FUNCTION = my_ne, LEFTARG = text, RIGHTARG = text);",<none>
 CREATE EXTENSION IF NOT EXISTS pgaudit;
-NOTICE:  AUDIT: SESSION,101,5,DDL,CREATE EXTENSION,,,CREATE EXTENSION IF NOT EXISTS pgaudit;,<none>
+NOTICE:  AUDIT: SESSION,101,1,DDL,CREATE EXTENSION,,,CREATE EXTENSION IF NOT EXISTS pgaudit;,<none>
 SET pgaudit.log = 'DDL';
 -- Put public schema before pg_catalog to capture unqualified references
 SET search_path = public, pg_catalog;
@@ -1267,6 +1267,18 @@ DROP OPERATOR <> (text, text);
 DROP FUNCTION my_ne(text, text);
 DROP FUNCTION lower(text);
 DROP FUNCTION upper(text);
+-- Create/drop extension. Note that the log level here must be warning because the create extension code will reset any higher log
+-- levels like notice
+SET pgaudit.log = 'all,-misc_set';
+SET pgaudit.log_level = 'warning';
+CREATE EXTENSION pg_stat_statements;
+WARNING:  AUDIT: SESSION,104,1,DDL,CREATE EXTENSION,,,CREATE EXTENSION pg_stat_statements;,<none>
+ALTER EXTENSION pg_stat_statements UPDATE TO '1.7';
+WARNING:  AUDIT: SESSION,105,1,DDL,ALTER EXTENSION,,,ALTER EXTENSION pg_stat_statements UPDATE TO '1.7';,<none>
+NOTICE:  version "1.7" of extension "pg_stat_statements" is already installed
+DROP EXTENSION pg_stat_statements;
+WARNING:  AUDIT: SESSION,106,1,DDL,DROP EXTENSION,,,DROP EXTENSION pg_stat_statements;,<none>
+SET pgaudit.log_level = 'notice';
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
