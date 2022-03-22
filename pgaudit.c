@@ -90,6 +90,8 @@ static int auditLogBitmap = LOG_NONE;
 #define CLASS_NONE      "NONE"
 #define CLASS_ALL       "ALL"
 
+#define ROLES_NONE		"[none]"
+
 /*
  * GUC variable for pgaudit.log_catalog
  *
@@ -511,14 +513,14 @@ log_audit_event(AuditEventStackItem *stackItem)
     StringInfoData auditStr;
 
     //TC
-    unsigned int useridcheck;
-    unsigned int authenticateduseridcheck;
+    //unsigned int useridcheck;
+    //unsigned int authenticateduseridcheck;
     unsigned int roleidcheck;
-    unsigned int roleidcheck2;
-    bool isMember;
+
+    bool isMember = false;
     ListCell *lt;
     char *groupCopy;
-    char *group; //debug
+    //char *group; //debug
     List *auditRolesList;
 
 
@@ -691,31 +693,36 @@ log_audit_event(AuditEventStackItem *stackItem)
     /*
      * Check for the membership of the role in a role that is configured for logging
      */
-    useridcheck = GetUserId();
-    authenticateduseridcheck = GetAuthenticatedUserId();
-    roleidcheck=GetCurrentRoleId();
-    groupCopy = malloc(strlen(auditRolesScope)+1);
-    strcpy(groupCopy, auditRolesScope);
+    //useridcheck = GetUserId();
+    //authenticateduseridcheck = GetAuthenticatedUserId();
+    //roleidcheck=GetCurrentRoleId();
 
-    SplitIdentifierString(groupCopy, ',', &auditRolesList);
-
-
-    isMember = false;
-    foreach(lt, auditRolesList)
+    if (strcmp(auditRolesScope, ROLES_NONE )!=0 )
     {
-    	char *token = (char *) lfirst(lt);
-    	group = token;
-    	roleidcheck2 = get_role_oid(token, 1);
-    	if(roleidcheck2!=0)
+    	groupCopy = malloc(strlen(auditRolesScope)+1);
+    	strcpy(groupCopy, auditRolesScope);
+
+    	SplitIdentifierString(groupCopy, ',', &auditRolesList);
+
+
+    	foreach(lt, auditRolesList)
+    	{
+    		char *token = (char *) lfirst(lt);
+    		//group = token;
+    		roleidcheck = get_role_oid(token, 1);
+    		if(roleidcheck!=0)
     			{
-    				isMember = isMember || is_member_of_role(GetUserId(),roleidcheck2) || is_member_of_role(GetAuthenticatedUserId(),roleidcheck2);
+    			// check for the current user and the original authenticated user
+    				isMember = isMember || is_member_of_role(GetUserId(),roleidcheck) || is_member_of_role(GetAuthenticatedUserId(),roleidcheck);
     				if (isMember)
     					break;
     			}
 
-    }
+    	}
 
-    free(groupCopy );
+    	free(groupCopy );
+
+    }
 
     /*
      * Only log the statement if:
@@ -2281,7 +2288,7 @@ _PG_init(void)
 
         NULL,
         &auditRolesScope,
-        "",
+        "[none]",
         PGC_SUSET,
 		GUC_NOT_IN_SAMPLE,
 		check_pgaudit_rolesscope,
