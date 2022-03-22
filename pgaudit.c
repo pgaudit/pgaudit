@@ -494,7 +494,8 @@ append_valid_csv(StringInfoData *buffer, const char *appendStr)
  * Takes an AuditEvent, classifies it, then logs it if appropriate.
  *
  * Logging is decided based on if the statement is in one of the classes being
- * logged or if an object used has been marked for auditing.
+ * logged or if an object used has been marked for auditing or if the user or
+ * the authenticated user of that session is in a group marked for auditing.
  *
  * Objects are marked for auditing by the auditor role being granted access
  * to the object.  The kind of access (INSERT, UPDATE, etc) is also considered
@@ -512,15 +513,10 @@ log_audit_event(AuditEventStackItem *stackItem)
     MemoryContext contextOld;
     StringInfoData auditStr;
 
-    //TC
-    //unsigned int useridcheck;
-    //unsigned int authenticateduseridcheck;
     unsigned int roleidcheck;
-
     bool isMember = false;
     ListCell *lt;
     char *groupCopy;
-    //char *group; //debug
     List *auditRolesList;
 
 
