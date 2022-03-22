@@ -169,6 +169,17 @@ bool auditLogStatementOnce = false;
  */
 char *auditRole = NULL;
 
+
+/*
+ * GUC variable for auditRolesScope
+ *
+ * Administrators can choose which roles to audit. All statement classes
+ * will be logged against all object types.
+ *
+ */
+char *auditRolesScope = NULL;
+
+
 /*
  * String constants for the audit log fields.
  */
@@ -178,6 +189,8 @@ char *auditRole = NULL;
  */
 #define AUDIT_TYPE_OBJECT   "OBJECT"
 #define AUDIT_TYPE_SESSION  "SESSION"
+#define AUDIT_TYPE_ROLE	    "ROLE"
+
 
 /*
  * Object type, used for SELECT/DML statements and function calls.
@@ -256,6 +269,9 @@ typedef struct AuditEventStackItem
 } AuditEventStackItem;
 
 AuditEventStackItem *auditEventStack = NULL;
+
+
+
 
 /*
  * pgAudit runs queries of its own when using the event trigger system.
@@ -494,6 +510,18 @@ log_audit_event(AuditEventStackItem *stackItem)
     MemoryContext contextOld;
     StringInfoData auditStr;
 
+    //TC
+    unsigned int useridcheck;
+    unsigned int authenticateduseridcheck;
+    unsigned int roleidcheck;
+    unsigned int roleidcheck2;
+    bool isMember;
+    ListCell *lt;
+    char *groupCopy;
+    char *group; //debug
+    List *auditRolesList;
+
+
     /*
      * Skip logging script statements if an extension is currently being created
      * or altered. PostgreSQL reports the statement text for each statement in
@@ -512,6 +540,7 @@ log_audit_event(AuditEventStackItem *stackItem)
         return;
 
     /* Classify the statement using log stmt level and the command tag */
+
     switch (stackItem->auditEvent.logStmtLevel)
     {
         /* All mods go in WRITE class, except EXECUTE */
@@ -657,18 +686,52 @@ log_audit_event(AuditEventStackItem *stackItem)
             break;
     }
 
+
+
+    /*
+     * Check for the membership of the role in a role that is configured for logging
+     */
+    useridcheck = GetUserId();
+    authenticateduseridcheck = GetAuthenticatedUserId();
+    roleidcheck=GetCurrentRoleId();
+    groupCopy = malloc(strlen(auditRolesScope)+1);
+    strcpy(groupCopy, auditRolesScope);
+
+    SplitIdentifierString(groupCopy, ',', &auditRolesList);
+
+
+    isMember = false;
+    foreach(lt, auditRolesList)
+    {
+    	char *token = (char *) lfirst(lt);
+    	group = token;
+    	roleidcheck2 = get_role_oid(token, 1);
+    	if(roleidcheck2!=0)
+    			{
+    				isMember = isMember || is_member_of_role(GetUserId(),roleidcheck2) || is_member_of_role(GetAuthenticatedUserId(),roleidcheck2);
+    				if (isMember)
+    					break;
+    			}
+
+    }
+
+    free(groupCopy );
+
     /*
      * Only log the statement if:
      *
      * 1. The object was selected for audit logging (granted), or
      * 2. The statement belongs to a class that is being logged
+     * 3. The role is flagged to be logged
      *
-     * If neither of these is true, return.
+     * If none apply, return.
      */
-    if (!stackItem->auditEvent.granted && !(auditLogBitmap & class))
+
+    if (!stackItem->auditEvent.granted && !(auditLogBitmap & class) && !(isMember))
         return;
 
     /*
+
      * Use audit memory context in case something is not free'd while
      * appending strings and parameters.
      */
@@ -783,7 +846,7 @@ log_audit_event(AuditEventStackItem *stackItem)
     ereport(auditLogClient ? auditLogLevel : LOG_SERVER_ONLY,
             (errmsg("AUDIT: %s," INT64_FORMAT "," INT64_FORMAT ",%s,%s",
                     stackItem->auditEvent.granted ?
-                    AUDIT_TYPE_OBJECT : AUDIT_TYPE_SESSION,
+                    AUDIT_TYPE_OBJECT : (isMember ? AUDIT_TYPE_ROLE : AUDIT_TYPE_SESSION),
                     stackItem->auditEvent.statementId,
                     stackItem->auditEvent.substatementId,
                     className,
@@ -1306,7 +1369,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
         stackItem = stack_push();
 
         /* Initialize command using queryDesc->operation */
-        switch (queryDesc->operation)
+         switch (queryDesc->operation)
         {
             case CMD_SELECT:
                 stackItem->auditEvent.logStmtLevel = LOGSTMT_ALL;
@@ -1378,6 +1441,8 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
 
     /* Get the audit oid if the role exists */
     auditOid = get_role_oid(auditRole, true);
+
+    /*TO DO and if RolesScope is not null */
 
     /* Log DML if the audit role is valid or session logging is enabled */
     if ((auditOid != InvalidOid || auditLogBitmap != 0) &&
@@ -1995,6 +2060,39 @@ assign_pgaudit_log_level(const char *newVal, void *extra)
 }
 
 /*
+ * Take a pgaudit.RolesScope value such as "admin, approle", verify that each of the
+ * comma-separated tokens corresponds to a valid OID, and convert them into
+ * an array log_audit_event can check.
+ */
+static bool
+check_pgaudit_rolesscope(char **newVal, void **extra, GucSource source)
+{
+    List *groupRawList;
+    char *rawVal;
+
+    // TO DO - check length / count of groups
+
+    /* Make sure newval is a comma-separated list of tokens. */
+    rawVal = pstrdup(*newVal);
+    if (!SplitIdentifierString(rawVal, ',', &groupRawList))
+    {
+        GUC_check_errdetail("List syntax is invalid");
+        list_free(groupRawList);
+        pfree(rawVal);
+        return false;
+    }
+
+
+    // Free up resources
+    pfree(rawVal);
+    list_free(groupRawList);
+
+    return true;
+}
+
+
+
+/*
  * Define GUC variables and install hooks upon module load.
  */
 void
@@ -2162,7 +2260,7 @@ _PG_init(void)
     DefineCustomStringVariable(
         "pgaudit.role",
 
-        "Specifies the master role to use for object audit logging.  Muliple "
+        "Specifies the master role to use for object audit logging.  Multiple "
         "audit roles can be defined by granting them to the master role. This "
         "allows multiple groups to be in charge of different aspects of audit "
         "logging.",
@@ -2173,6 +2271,24 @@ _PG_init(void)
         PGC_SUSET,
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);
+
+    /* Define pgaudit.role */
+    DefineCustomStringVariable(
+        "pgaudit.RolesScope",
+
+        "Specifies the roles to audit for role audit logging.  Multiple "
+        "roles can be provided using a comma-separated list.",
+
+        NULL,
+        &auditRolesScope,
+        "",
+        PGC_SUSET,
+		GUC_NOT_IN_SAMPLE,
+		check_pgaudit_rolesscope,
+		NULL,
+		NULL);
+
+
 
     /*
      * Install our hook functions after saving the existing pointers to
