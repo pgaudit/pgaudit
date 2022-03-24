@@ -90,7 +90,7 @@ static int auditLogBitmap = LOG_NONE;
 #define CLASS_NONE      "NONE"
 #define CLASS_ALL       "ALL"
 
-#define ROLES_NONE		"[none]"
+
 
 /*
  * GUC variable for pgaudit.log_catalog
@@ -176,11 +176,15 @@ char *auditRole = NULL;
  * GUC variable for auditRolesScope
  *
  * Administrators can choose which roles to audit. All statement classes
- * will be logged against all object types.
+ * will be logged against all object types. superusers are considered members
+ * of all roles and will be logged in addition to defined roles when ROLE
+ * based auditing active.
+ * Special characters included in initial entry to denote an unacceptable
+ * role value.
  *
  */
 char *auditRolesScope = NULL;
-
+#define ROLES_NONE		"[none]"
 
 /*
  * String constants for the audit log fields.
@@ -2279,8 +2283,11 @@ _PG_init(void)
     DefineCustomStringVariable(
         "pgaudit.RolesScope",
 
-        "Specifies the roles to audit for role audit logging.  Multiple "
-        "roles can be provided using a comma-separated list.",
+        "Specifies the roles to audit for role based audit logging.  Multiple "
+        "roles can be provided using a comma-separated list. Superusers are "
+		"considered members of all roles and will be logged in addition "
+		"to any roles listed. A value of [none] (including the square brackets) "
+		"disables.",
 
         NULL,
         &auditRolesScope,

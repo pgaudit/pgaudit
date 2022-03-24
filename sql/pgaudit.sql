@@ -1624,4 +1624,20 @@ DROP USER user2;
 DROP USER user1;
 DROP ROLE auditor;
 
+DROP FUNCTION public.get_test_id CASCADE;
+DROP FUNCTION public.int_add1 CASCADE;
+DROP FUNCTION public.int_add CASCADE;
+DROP FUNCTION public.test1 CASCADE;
+DROP FUNCTION public.test CASCADE;
+DROP FUNCTION bbb_insert;
+DROP FUNCTION bbb_insert1;
+DROP SCHEMA foo2;
+DROP SCHEMA foo3;
+DROP CONVERSION public.conversion_test2;
+DROP CONVERSION public.conversion_test3;
+
+
+
+
+
 RESET client_min_messages;
