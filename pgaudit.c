@@ -2281,7 +2281,7 @@ _PG_init(void)
 
     /* Define pgaudit.role */
     DefineCustomStringVariable(
-        "pgaudit.RolesScope",
+        "pgaudit.roles_scope",
 
         "Specifies the roles to audit for role based audit logging.  Multiple "
         "roles can be provided using a comma-separated list. Superusers are "
