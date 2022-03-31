@@ -181,10 +181,16 @@ char *auditRole = NULL;
  * based auditing active.
  * Special characters included in initial entry to denote an unacceptable
  * role value.
- *
  */
 char *auditRolesScope = NULL;
 #define ROLES_NONE		"[none]"
+
+
+/*
+ * Administrators can choose if parameters passed into a statement are
+ * included in the audit log for ROLE based logging.
+ */
+bool auditLogParameterRoleBased = false;
 
 /*
  * String constants for the audit log fields.
@@ -693,9 +699,6 @@ log_audit_event(AuditEventStackItem *stackItem)
     /*
      * Check for the membership of the role in a role that is configured for logging
      */
-    //useridcheck = GetUserId();
-    //authenticateduseridcheck = GetAuthenticatedUserId();
-    //roleidcheck=GetCurrentRoleId();
 
     if (strcmp(auditRolesScope, ROLES_NONE )!=0 )
     {
@@ -708,11 +711,12 @@ log_audit_event(AuditEventStackItem *stackItem)
     	foreach(lt, auditRolesList)
     	{
     		char *token = (char *) lfirst(lt);
-    		//group = token;
+    		//Check if role exists - could possibly update auditRolesScope to remove null entries
     		roleidcheck = get_role_oid(token, 1);
     		if(roleidcheck!=0)
     			{
-    			// check for the current user and the original authenticated user
+    			// Check for the current user and the original authenticated user
+    			// AuthenticatedUserId is determined at connection start and never changes
     				isMember = isMember || is_member_of_role(GetUserId(),roleidcheck) || is_member_of_role(GetAuthenticatedUserId(),roleidcheck);
     				if (isMember)
     					break;
@@ -785,7 +789,7 @@ log_audit_event(AuditEventStackItem *stackItem)
         appendStringInfoCharMacro(&auditStr, ',');
 
         /* Handle parameter logging, if enabled. */
-        if (auditLogParameter)
+        if (auditLogParameter || (auditLogParameterRoleBased && isMember))
         {
             int paramIdx;
             int numParams;
@@ -853,7 +857,7 @@ log_audit_event(AuditEventStackItem *stackItem)
     ereport(auditLogClient ? auditLogLevel : LOG_SERVER_ONLY,
             (errmsg("AUDIT: %s," INT64_FORMAT "," INT64_FORMAT ",%s,%s",
                     stackItem->auditEvent.granted ?
-                    AUDIT_TYPE_OBJECT : (isMember ? AUDIT_TYPE_ROLE : AUDIT_TYPE_SESSION),
+                    AUDIT_TYPE_OBJECT : ((auditLogBitmap & class) ? AUDIT_TYPE_SESSION : AUDIT_TYPE_ROLE),
                     stackItem->auditEvent.statementId,
                     stackItem->auditEvent.substatementId,
                     className,
@@ -1449,10 +1453,8 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
     /* Get the audit oid if the role exists */
     auditOid = get_role_oid(auditRole, true);
 
-    /*TO DO and if RolesScope is not null */
-
-    /* Log DML if the audit role is valid or session logging is enabled */
-    if ((auditOid != InvalidOid || auditLogBitmap != 0) &&
+    /* Log DML if the audit role is valid or session logging is enabled or roles_scope is enabled */
+    if ((auditOid != InvalidOid || auditLogBitmap != 0 || strcmp(auditRolesScope, ROLES_NONE )!=0 ) &&
         !IsAbortedTransactionBlockState())
     {
         /* If auditLogRows is on, wait for rows processed to be set */
@@ -1670,11 +1672,11 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         stack_valid(stackId);
 
         /*
-         * Log the utility command if logging is on, the command has not
+         * Log the utility command if logging is on or role based logging is set, the command has not
          * already been logged by another hook, and the transaction is not
-         * aborted.
+         * aborted
          */
-        if (auditLogBitmap != 0 && !stackItem->auditEvent.logged)
+        if ((auditLogBitmap != 0 ||  strcmp(auditRolesScope, ROLES_NONE )!=0) && !stackItem->auditEvent.logged  )
             log_audit_event(stackItem);
     }
 }
@@ -2072,7 +2074,7 @@ assign_pgaudit_log_level(const char *newVal, void *extra)
  * an array log_audit_event can check.
  */
 static bool
-check_pgaudit_rolesscope(char **newVal, void **extra, GucSource source)
+check_pgaudit_roles_scope(char **newVal, void **extra, GucSource source)
 {
     List *groupRawList;
     char *rawVal;
@@ -2096,6 +2098,9 @@ check_pgaudit_rolesscope(char **newVal, void **extra, GucSource source)
 
     return true;
 }
+
+
+
 
 
 
@@ -2286,18 +2291,33 @@ _PG_init(void)
         "Specifies the roles to audit for role based audit logging.  Multiple "
         "roles can be provided using a comma-separated list. Superusers are "
 		"considered members of all roles and will be logged in addition "
-		"to any roles listed. A value of [none] (including the square brackets) "
-		"disables.",
+		"if any valid roles listed. A value of [none] (including the square "
+		"brackets) disables.",
 
         NULL,
         &auditRolesScope,
         "[none]",
         PGC_SUSET,
 		GUC_NOT_IN_SAMPLE,
-		check_pgaudit_rolesscope,
+		check_pgaudit_roles_scope,
 		NULL,
 		NULL);
 
+    /* Define pgaudit.log_parameter */
+    DefineCustomBoolVariable(
+        "pgaudit.log_parameter_for_role_based",
+
+        "Specifies that audit logging should include the parameters that were "
+        "passed with the statement for items that are just captured for role-based"
+        "logging. When parameters are present they will be included in CSV format "
+		"after the statement text.",
+
+        NULL,
+        &auditLogParameterRoleBased,
+        false,
+        PGC_SUSET,
+        GUC_NOT_IN_SAMPLE,
+        NULL, NULL, NULL);
 
 
     /*
