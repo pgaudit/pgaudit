@@ -2501,6 +2501,12 @@ DROP OPERATOR <> (text, text);
 DROP FUNCTION my_ne(text, text);
 DROP FUNCTION lower(text);
 DROP FUNCTION upper(text);
+-- Test exclude_objects for two tables
+SET pgaudit.exclude_objects = "extratable1,extratable2";
+CREATE TABLE extratable1 ();
+CREATE TABLE extratable2 ();
+DROP TABLE extratable1;
+DROP TABLE extratable2;
 -- Create/drop extension. Note that the log level here must be warning because the create extension code will reset any higher log
 -- levels like notice
 SET pgaudit.log = 'all,-misc_set';
