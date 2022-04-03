@@ -500,6 +500,73 @@ append_valid_csv(StringInfoData *buffer, const char *appendStr)
         appendStringInfoString(buffer, appendStr);
 }
 
+
+
+/*
+ *  Check for audit role_scope being set
+ *
+ */
+
+static bool
+check_scope_role_set()
+{
+	bool isSet= false;
+
+	if (strcmp(auditRolesScope, ROLES_NONE)!=0)
+	{
+		isSet = true;
+	}
+
+	return isSet;
+
+}
+
+/*
+ * Check Membership of Roles_Scope
+ */
+
+static bool
+check_scope_role_membership()
+{
+
+    unsigned int roleidcheck;
+    bool isMember = false;
+    ListCell *lt;
+    char *groupCopy;
+    List *auditRolesList;
+
+    if (check_scope_role_set())
+    {
+    	groupCopy = malloc(strlen(auditRolesScope)+1);
+    	strcpy(groupCopy, auditRolesScope);
+
+    	SplitIdentifierString(groupCopy, ',', &auditRolesList);
+
+
+    	foreach(lt, auditRolesList)
+    	{
+    		char *token = (char *) lfirst(lt);
+    		//Check if role exists - could possibly update auditRolesScope to remove null entries
+    		roleidcheck = get_role_oid(token, 1);
+    		if(roleidcheck!=0)
+				{
+    			// Check for the current user and the original authenticated user
+    			// AuthenticatedUserId is determined at connection start and never changes
+					isMember = isMember || is_member_of_role(GetUserId(),roleidcheck) || is_member_of_role(GetAuthenticatedUserId(),roleidcheck);
+					if (isMember)
+						break;
+				}
+
+    	}
+
+    	free(groupCopy );
+    }
+
+	return isMember;
+}
+
+
+
 /*
  * Takes an AuditEvent, classifies it, then logs it if appropriate.
  *
@@ -523,11 +590,8 @@ log_audit_event(AuditEventStackItem *stackItem)
     MemoryContext contextOld;
     StringInfoData auditStr;
 
-    unsigned int roleidcheck;
-    bool isMember = false;
-    ListCell *lt;
-    char *groupCopy;
-    List *auditRolesList;
+    bool isMember; // = false;
+
 
 
     /*
@@ -637,7 +701,7 @@ log_audit_event(AuditEventStackItem *stackItem)
                     break;
 
                 /*
-                 * Rename and Drop are general and therefore we have to do
+                 * Rename and Drop are general and therefore we have
                  * an additional check against the command string to see
                  * if they are role or regular DDL.
                  */
@@ -695,38 +759,7 @@ log_audit_event(AuditEventStackItem *stackItem)
     }
 
 
-
-    /*
-     * Check for the membership of the role in a role that is configured for logging
-     */
-
-    if (strcmp(auditRolesScope, ROLES_NONE )!=0 )
-    {
-    	groupCopy = malloc(strlen(auditRolesScope)+1);
-    	strcpy(groupCopy, auditRolesScope);
-
-    	SplitIdentifierString(groupCopy, ',', &auditRolesList);
-
-
-    	foreach(lt, auditRolesList)
-    	{
-    		char *token = (char *) lfirst(lt);
-    		//Check if role exists - could possibly update auditRolesScope to remove null entries
-    		roleidcheck = get_role_oid(token, 1);
-    		if(roleidcheck!=0)
-    			{
-    			// Check for the current user and the original authenticated user
-    			// AuthenticatedUserId is determined at connection start and never changes
-    				isMember = isMember || is_member_of_role(GetUserId(),roleidcheck) || is_member_of_role(GetAuthenticatedUserId(),roleidcheck);
-    				if (isMember)
-    					break;
-    			}
-
-    	}
-
-    	free(groupCopy );
-
-    }
+    isMember = check_scope_role_membership();
 
     /*
      * Only log the statement if:
@@ -1101,9 +1134,11 @@ log_select_dml(Oid auditOid, List *rangeTabls)
          * Don't log if the session user is not a member of the current
          * role.  This prevents contents of security definer functions
          * from being logged and supresses foreign key queries unless the
-         * session user is the owner of the referenced table.
+         * session user is the owner of the referenced table. However, log
+         * if the security definer is a member of a role configured for
+         * logging.
          */
-        if (!is_member_of_role(GetSessionUserId(), GetUserId()))
+        if (!is_member_of_role(GetSessionUserId(), GetUserId()) && !check_scope_role_membership())
             return;
 
         /*
@@ -1353,6 +1388,8 @@ log_function_execute(Oid objectId)
     stack_pop(stackItem->stackId);
 }
 
+
+
 /*
  * Hook functions
  */
@@ -1454,7 +1491,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
     auditOid = get_role_oid(auditRole, true);
 
     /* Log DML if the audit role is valid or session logging is enabled or roles_scope is enabled */
-    if ((auditOid != InvalidOid || auditLogBitmap != 0 || strcmp(auditRolesScope, ROLES_NONE )!=0 ) &&
+    if ((auditOid != InvalidOid || auditLogBitmap != 0 || check_scope_role_set()) &&
         !IsAbortedTransactionBlockState())
     {
         /* If auditLogRows is on, wait for rows processed to be set */
@@ -1617,9 +1654,9 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
 
         /*
          * If this is a DO block log it before calling the next ProcessUtility
-         * hook.
+         * hook. Also log in the case of pgaudit role set
          */
-        if (auditLogBitmap & LOG_FUNCTION &&
+        if ((auditLogBitmap & LOG_FUNCTION || check_scope_role_set()) &&
             stackItem->auditEvent.commandTag == T_DoStmt &&
             !IsAbortedTransactionBlockState())
             log_audit_event(stackItem);
@@ -1628,9 +1665,9 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
          * If this is a create/alter extension command log it before calling
          * the next ProcessUtility hook. Otherwise, any warnings will be emitted
          * before the create/alter is logged and errors will prevent it from
-         * being logged at all.
+         * being logged at all. Also log in the case of pgaudit role set
          */
-        if (auditLogBitmap & LOG_DDL &&
+        if ((auditLogBitmap & LOG_DDL || check_scope_role_set()) &&
             (stackItem->auditEvent.commandTag == T_CreateExtensionStmt ||
                 stackItem->auditEvent.commandTag == T_AlterExtensionStmt) &&
             !IsAbortedTransactionBlockState())
@@ -1643,7 +1680,7 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
          */
         if (stackItem->auditEvent.commandTag == T_ClosePortalStmt)
         {
-            if (auditLogBitmap & LOG_MISC && !IsAbortedTransactionBlockState())
+            if ((auditLogBitmap & LOG_MISC  || check_scope_role_set()) && !IsAbortedTransactionBlockState())
                 log_audit_event(stackItem);
 
             stackItem = NULL;
@@ -1676,7 +1713,7 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
          * already been logged by another hook, and the transaction is not
          * aborted
          */
-        if ((auditLogBitmap != 0 ||  strcmp(auditRolesScope, ROLES_NONE )!=0) && !stackItem->auditEvent.logged  )
+        if ((auditLogBitmap != 0 || check_scope_role_set()) && !stackItem->auditEvent.logged)
             log_audit_event(stackItem);
     }
 }
@@ -1692,7 +1729,7 @@ pgaudit_object_access_hook(ObjectAccessType access,
                             int subId,
                             void *arg)
 {
-    if (auditLogBitmap & LOG_FUNCTION && access == OAT_FUNCTION_EXECUTE &&
+    if ((auditLogBitmap & LOG_FUNCTION || check_scope_role_set()) && access == OAT_FUNCTION_EXECUTE &&
         auditEventStack && !IsAbortedTransactionBlockState())
         log_function_execute(objectId);
 
