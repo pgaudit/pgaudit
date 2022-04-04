@@ -1,0 +1,214 @@
+postgres=# \i /path/to/file/pgaudit_2.sql
+RESET
+RESET
+RESET
+RESET
+RESET
+RESET
+RESET
+RESET
+RESET
+RESET
+SET
+SET
+SET
+CREATE TABLE
+ id 
+----
+(0 rows)
+
+psql:/path/to/file/pgaudit_2.sql:32: NOTICE:  AUDIT: SESSION,1,1,WRITE,INSERT,,,INSERT INTO role_test values (1);,<not logged>
+INSERT 0 1
+RESET
+CREATE ROLE
+CREATE ROLE
+psql:/path/to/file/pgaudit_2.sql:41: NOTICE:  AUDIT: ROLE,2,1,MISC,SET,,,SET pgaudit.roles_scope = 'roleuser1';,<not logged>
+SET
+psql:/path/to/file/pgaudit_2.sql:43: NOTICE:  AUDIT: ROLE,3,1,READ,SELECT,,,SELECT * FROM role_test;,<not logged>
+ id 
+----
+  1
+(1 row)
+
+psql:/path/to/file/pgaudit_2.sql:47: NOTICE:  AUDIT: ROLE,4,1,ROLE,GRANT,,,GRANT SELECT ON role_test TO roleuser1;,<not logged>
+GRANT
+psql:/path/to/file/pgaudit_2.sql:48: NOTICE:  AUDIT: ROLE,5,1,ROLE,GRANT,,,GRANT SELECT ON role_test TO roleuser2;,<not logged>
+GRANT
+psql:/path/to/file/pgaudit_2.sql:49: NOTICE:  AUDIT: ROLE,6,1,MISC,SET,,,set role 'roleuser1';,<not logged>
+SET
+psql:/path/to/file/pgaudit_2.sql:51: NOTICE:  AUDIT: ROLE,7,1,READ,SELECT,,,SELECT * FROM role_test;,<not logged>
+ id 
+----
+  1
+(1 row)
+
+psql:/path/to/file/pgaudit_2.sql:53: NOTICE:  AUDIT: ROLE,8,1,MISC,SET,,,SET SESSION AUTHORIZATION 'roleuser2';,<not logged>
+SET
+psql:/path/to/file/pgaudit_2.sql:55: NOTICE:  AUDIT: ROLE,9,1,READ,SELECT,,,SELECT * FROM role_test;,<not logged>
+ id 
+----
+  1
+(1 row)
+
+You are now connected to database "postgres" as user "postgres".
+ALTER ROLE
+ALTER ROLE
+ALTER ROLE
+ALTER ROLE
+GRANT
+You are now connected to database "postgres" as user "roleuser2".
+psql:/path/to/file/pgaudit_2.sql:71: WARNING:  AUDIT: SESSION,1,1,WRITE,INSERT,,,INSERT INTO role_test values (2);,<not logged>
+INSERT 0 1
+ id 
+----
+  1
+  2
+(2 rows)
+
+You are now connected to database "postgres" as user "postgres".
+GRANT ROLE
+You are now connected to database "postgres" as user "roleuser2".
+psql:/path/to/file/pgaudit_2.sql:81: WARNING:  AUDIT: SESSION,1,1,WRITE,INSERT,,,INSERT INTO role_test values (3);,<not logged>
+INSERT 0 1
+psql:/path/to/file/pgaudit_2.sql:82: WARNING:  AUDIT: ROLE,2,1,READ,SELECT,,,SELECT * FROM role_test;,<not logged>
+ id 
+----
+  1
+  2
+  3
+(3 rows)
+
+You are now connected to database "postgres" as user "postgres".
+CREATE TABLE
+CREATE TABLE
+REVOKE ROLE
+GRANT
+GRANT
+ALTER ROLE
+ALTER ROLE
+CREATE FUNCTION
+SET
+SET
+psql:/path/to/file/pgaudit_2.sql:121: NOTICE:  AUDIT: ROLE,1,1,MISC,SET,,,SET pgaudit.roles_scope = 'roleuser1';,<not logged>
+SET
+psql:/path/to/file/pgaudit_2.sql:126: NOTICE:  AUDIT: ROLE,2,1,DDL,CREATE TRIGGER,,,"CREATE TRIGGER roletest2_insert_trg
+	AFTER INSERT ON role_test2
+	FOR EACH ROW EXECUTE PROCEDURE roletest2_insert();",<not logged>
+CREATE TRIGGER
+psql:/path/to/file/pgaudit_2.sql:138: NOTICE:  AUDIT: ROLE,3,1,WRITE,INSERT,,,"WITH CTE AS
+(
+	INSERT INTO role_test3 VALUES (1)
+				   RETURNING id
+)
+INSERT INTO role_test2
+SELECT id
+  FROM cte;",<not logged>
+psql:/path/to/file/pgaudit_2.sql:138: NOTICE:  AUDIT: ROLE,3,2,WRITE,UPDATE,,,"UPDATE role_test2
+ SET id = id + 90
+ WHERE id = new.id",<not logged>
+INSERT 0 1
+You are now connected to database "postgres" as user "roleuser2".
+psql:/path/to/file/pgaudit_2.sql:143: WARNING:  AUDIT: ROLE,1,1,WRITE,UPDATE,,,"UPDATE role_test2
+ SET id = id + 90
+ WHERE id = new.id",",,,,,,,,,,,,,2"
+INSERT 0 1
+INSERT 0 1
+psql:/path/to/file/pgaudit_2.sql:147: WARNING:  AUDIT: SESSION,2,1,READ,SELECT,,,SELECT * FROM role_test2;,<not logged>
+ id 
+----
+ 91
+ 92
+(2 rows)
+
+You are now connected to database "postgres" as user "postgres".
+CREATE ROLE
+GRANT
+GRANT
+ALTER FUNCTION
+ALTER ROLE
+ALTER ROLE
+You are now connected to database "postgres" as user "roleuser2".
+psql:/path/to/file/pgaudit_2.sql:161: WARNING:  AUDIT: SESSION,1,1,WRITE,INSERT,,,INSERT INTO role_test2 VALUES (3);,<not logged>
+INSERT 0 1
+psql:/path/to/file/pgaudit_2.sql:170: WARNING:  AUDIT: SESSION,2,1,WRITE,INSERT,,,"WITH CTE AS
+(
+	INSERT INTO role_test3 VALUES (3)
+				   RETURNING id
+)
+INSERT INTO role_test2
+SELECT id
+  FROM cte;",<not logged>
+INSERT 0 1
+You are now connected to database "postgres" as user "postgres".
+SET
+SET
+psql:/path/to/file/pgaudit_2.sql:177: NOTICE:  AUDIT: ROLE,1,1,MISC,SET,,,SET pgaudit.roles_scope = 'roleuser1';,<not logged>
+SET
+psql:/path/to/file/pgaudit_2.sql:184: NOTICE:  AUDIT: ROLE,2,1,DDL,CREATE FUNCTION,,,"CREATE FUNCTION roletest2_change(change_id int) RETURNS void AS $$
+BEGIN
+ UPDATE role_test2
+  SET id = id + 1
+  WHERE id = change_id;
+END $$ LANGUAGE plpgsql security definer;",<not logged>
+CREATE FUNCTION
+psql:/path/to/file/pgaudit_2.sql:186: NOTICE:  AUDIT: ROLE,3,1,FUNCTION,DO,,,DO $$ BEGIN PERFORM roletest2_change(91); END $$;,<not logged>
+psql:/path/to/file/pgaudit_2.sql:186: NOTICE:  AUDIT: ROLE,3,2,READ,SELECT,,,SELECT roletest2_change(91),<not logged>
+psql:/path/to/file/pgaudit_2.sql:186: NOTICE:  AUDIT: ROLE,3,3,FUNCTION,EXECUTE,FUNCTION,public.roletest2_change,SELECT roletest2_change(91),<not logged>
+psql:/path/to/file/pgaudit_2.sql:186: NOTICE:  AUDIT: ROLE,3,4,WRITE,UPDATE,,,"UPDATE role_test2
+  SET id = id + 1
+  WHERE id = change_id",<not logged>
+DO
+psql:/path/to/file/pgaudit_2.sql:189: NOTICE:  AUDIT: ROLE,4,1,ROLE,GRANT,,,"GRANT SELECT, INSERT, UPDATE ON role_test2 to roleuser2;",<not logged>
+GRANT
+psql:/path/to/file/pgaudit_2.sql:190: NOTICE:  AUDIT: ROLE,5,1,DDL,ALTER FUNCTION,,,ALTER FUNCTION roletest2_change(int) OWNER TO roleuser3;,<not logged>
+ALTER FUNCTION
+You are now connected to database "postgres" as user "roleuser2".
+psql:/path/to/file/pgaudit_2.sql:195: WARNING:  AUDIT: SESSION,1,1,READ,SELECT,,,SELECT roletest2_change(93),<not logged>
+DO
+You are now connected to database "postgres" as user "postgres".
+SET
+SET
+ALTER SYSTEM
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+psql:/path/to/file/pgaudit_2.sql:206: NOTICE:  version "1.6.2" of extension "pgaudit" is already installed
+ALTER EXTENSION
+psql:/path/to/file/pgaudit_2.sql:209: NOTICE:  AUDIT: ROLE,1,1,MISC,CLOSE CURSOR ALL,,,CLOSE ALL;,<not logged>
+CLOSE CURSOR ALL
+psql:/path/to/file/pgaudit_2.sql:212: NOTICE:  AUDIT: ROLE,2,1,ROLE,ALTER ROLE,,,"ALTER ROLE roleuser2 SET pgaudit.roles_scope = 'roleuser1, roleuser2';",<not logged>
+ALTER ROLE
+psql:/path/to/file/pgaudit_2.sql:213: NOTICE:  AUDIT: ROLE,3,1,ROLE,ALTER ROLE,,,ALTER ROLE roleuser2 RESET pgaudit.log;,<not logged>
+ALTER ROLE
+You are now connected to database "postgres" as user "roleuser2".
+psql:/path/to/file/pgaudit_2.sql:217: WARNING:  AUDIT: ROLE,1,1,READ,SELECT,,,select * from role_test;,<not logged>
+ id 
+----
+  1
+  2
+  3
+(3 rows)
+
+You are now connected to database "postgres" as user "postgres".
+psql:/path/to/file/pgaudit_2.sql:222: NOTICE:  drop cascades to trigger roletest2_insert_trg on table role_test2
+DROP FUNCTION
+DROP FUNCTION
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+DROP ROLE
+DROP ROLE
+DROP ROLE
+DROP TABLE
+DROP TABLE
+DROP TABLE
+ALTER SYSTEM
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
