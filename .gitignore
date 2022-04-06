@@ -8,3 +8,5 @@ regression.out
 *.so
 .cproject
 .project
+.settings/
+extension/
