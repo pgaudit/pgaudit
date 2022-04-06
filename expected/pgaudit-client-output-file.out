@@ -1,0 +1,930 @@
+psql (14.2)
+Type "help" for help.
+
+postgres=# \o pgaudit-client.out
+postgres=# \i pgaudit.sql
+psql:pgaudit.sql:9: NOTICE:  AUDIT: SESSION,3,1,MISC,SET,,,SET pgaudit.log_level = 'notice';,<not logged>
+psql:pgaudit.sql:11: NOTICE:  AUDIT: SESSION,4,1,DDL,CREATE TABLE,TABLE,public.tmp,"CREATE TABLE tmp (id int, data text);",<not logged>
+psql:pgaudit.sql:12: NOTICE:  AUDIT: SESSION,5,1,READ,SELECT,,,CREATE TABLE tmp2 AS (SELECT * FROM tmp);,<not logged>
+psql:pgaudit.sql:12: NOTICE:  AUDIT: SESSION,5,2,DDL,CREATE TABLE AS,TABLE,public.tmp2,CREATE TABLE tmp2 AS (SELECT * FROM tmp);,<not logged>
+You are now connected to database "postgres" as user "postgres".
+psql:pgaudit.sql:49: NOTICE:  AUDIT: SESSION,1,1,ROLE,CREATE ROLE,,,CREATE ROLE auditor;,<not logged>
+psql:pgaudit.sql:53: NOTICE:  AUDIT: SESSION,2,1,ROLE,CREATE ROLE,,,CREATE USER user1 password <REDACTED>,<not logged>
+psql:pgaudit.sql:54: NOTICE:  AUDIT: SESSION,3,1,ROLE,ALTER ROLE,,,"ALTER ROLE user1 SET pgaudit.log = 'ddl, ROLE';",<not logged>
+psql:pgaudit.sql:55: NOTICE:  AUDIT: SESSION,4,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_level = 'notice';,<not logged>
+psql:pgaudit.sql:57: NOTICE:  AUDIT: SESSION,5,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 PassWord <REDACTED>,<not logged>
+psql:pgaudit.sql:60: NOTICE:  AUDIT: SESSION,6,1,ROLE,ALTER ROLE,,,ALTER USER user1 encrypted /* random comment */PASSWORD <REDACTED>,<not logged>
+psql:pgaudit.sql:61: NOTICE:  AUDIT: SESSION,7,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_client = ON;,<not logged>
+You are now connected to database "postgres" as user "user1".
+psql:pgaudit.sql:70: NOTICE:  AUDIT: SESSION,1,1,DDL,CREATE TABLE,TABLE,public.test,"CREATE TABLE public.test
+(
+	id INT
+);",<not logged>
+psql:pgaudit.sql:75: NOTICE:  AUDIT: SESSION,2,1,DDL,DROP TABLE,TABLE,public.test,DROP TABLE test;,<not logged>
+You are now connected to database "postgres" as user "postgres".
+psql:pgaudit.sql:81: NOTICE:  AUDIT: SESSION,1,1,ROLE,CREATE ROLE,,,CREATE ROLE user2 LOGIN password <REDACTED>,<not logged>
+psql:pgaudit.sql:82: NOTICE:  AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,"ALTER ROLE user2 SET pgaudit.log = 'Read, writE';",<not logged>
+psql:pgaudit.sql:83: NOTICE:  AUDIT: SESSION,3,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.log_catalog = OFF;,<not logged>
+psql:pgaudit.sql:84: NOTICE:  AUDIT: SESSION,4,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.log_client = ON;,<not logged>
+psql:pgaudit.sql:85: NOTICE:  AUDIT: SESSION,5,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.log_level = 'warning';,<not logged>
+psql:pgaudit.sql:86: NOTICE:  AUDIT: SESSION,6,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.role = auditor;,<not logged>
+psql:pgaudit.sql:87: NOTICE:  AUDIT: SESSION,7,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.log_statement_once = ON;,<not logged>
+psql:pgaudit.sql:98: NOTICE:  AUDIT: SESSION,8,1,ROLE,GRANT,TABLE,,"GRANT SELECT, INSERT, UPDATE, DELETE
+   ON test2
+   TO user2, user1;",<not logged>
+psql:pgaudit.sql:102: NOTICE:  AUDIT: SESSION,9,1,ROLE,GRANT,TABLE,,"GRANT SELECT, UPDATE
+   ON TABLE public.test2
+   TO auditor;",<not logged>
+psql:pgaudit.sql:111: NOTICE:  AUDIT: SESSION,10,1,ROLE,GRANT,TABLE,,"GRANT SELECT, INSERT, UPDATE, DELETE
+   ON test3
+   TO user2;",<not logged>
+psql:pgaudit.sql:115: NOTICE:  AUDIT: SESSION,11,1,ROLE,GRANT,TABLE,,"GRANT INSERT
+   ON TABLE public.test3
+   TO auditor;",<not logged>
+psql:pgaudit.sql:145: NOTICE:  AUDIT: SESSION,12,1,ROLE,GRANT,TABLE,,"GRANT SELECT
+   ON vw_test3
+   TO user2;",<not logged>
+psql:pgaudit.sql:149: NOTICE:  AUDIT: SESSION,13,1,ROLE,GRANT,TABLE,,"GRANT SELECT
+   ON vw_test3
+   TO auditor;",<not logged>
+You are now connected to database "postgres" as user "user2".
+psql:pgaudit.sql:164: WARNING:  AUDIT: SESSION,1,1,READ,SELECT,,,"SELECT *
+  FROM test3, test2;",<not logged>
+psql:pgaudit.sql:164: WARNING:  AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.test2,<previously logged>,<previously logged>
+psql:pgaudit.sql:171: WARNING:  AUDIT: SESSION,2,1,READ,SELECT,,,"SELECT *
+  FROM vw_test3, test2;",<not logged>
+psql:pgaudit.sql:171: WARNING:  AUDIT: OBJECT,2,1,READ,SELECT,TABLE,public.test2,<previously logged>,<previously logged>
+psql:pgaudit.sql:171: WARNING:  AUDIT: OBJECT,2,1,READ,SELECT,VIEW,public.vw_test3,<previously logged>,<previously logged>
+psql:pgaudit.sql:184: WARNING:  AUDIT: SESSION,3,1,WRITE,INSERT,,,"WITH CTE AS
+(
+	SELECT id
+	  FROM test2
+)
+INSERT INTO test3
+SELECT id
+  FROM cte;",<not logged>
+psql:pgaudit.sql:184: WARNING:  AUDIT: OBJECT,3,1,WRITE,INSERT,TABLE,public.test3,<previously logged>,<previously logged>
+psql:pgaudit.sql:184: WARNING:  AUDIT: OBJECT,3,1,READ,SELECT,TABLE,public.test2,<previously logged>,<previously logged>
+psql:pgaudit.sql:196: WARNING:  AUDIT: SESSION,4,1,WRITE,INSERT,,,"WITH CTE AS
+(
+	INSERT INTO test3 VALUES (1)
+				   RETURNING id
+)
+INSERT INTO test2
+SELECT id
+  FROM cte;",<not logged>
+psql:pgaudit.sql:196: WARNING:  AUDIT: OBJECT,4,1,WRITE,INSERT,TABLE,public.test3,<previously logged>,<previously logged>
+psql:pgaudit.sql:198: WARNING:  AUDIT: SESSION,5,1,READ,SELECT,,,SELECT test2_change(91),<not logged>
+psql:pgaudit.sql:198: WARNING:  AUDIT: SESSION,5,2,WRITE,UPDATE,,,"UPDATE test2
+	   SET id = id + 1
+	 WHERE id = change_id",<not logged>
+psql:pgaudit.sql:198: WARNING:  AUDIT: OBJECT,5,2,WRITE,UPDATE,TABLE,public.test2,<previously logged>,<previously logged>
+psql:pgaudit.sql:213: WARNING:  AUDIT: SESSION,6,1,WRITE,INSERT,,,"WITH CTE AS
+(
+	UPDATE test2
+	   SET id = 45
+	 WHERE id = 92
+	RETURNING id
+)
+INSERT INTO test3
+SELECT id
+  FROM cte;",<not logged>
+psql:pgaudit.sql:213: WARNING:  AUDIT: OBJECT,6,1,WRITE,INSERT,TABLE,public.test3,<previously logged>,<previously logged>
+psql:pgaudit.sql:213: WARNING:  AUDIT: OBJECT,6,1,WRITE,UPDATE,TABLE,public.test2,<previously logged>,<previously logged>
+psql:pgaudit.sql:226: WARNING:  AUDIT: SESSION,7,1,WRITE,UPDATE,,,"WITH CTE AS
+(
+	INSERT INTO test2 VALUES (37)
+				   RETURNING id
+)
+UPDATE test3
+   SET id = cte.id
+  FROM cte
+ WHERE test3.id <> cte.id;",<not logged>
+psql:pgaudit.sql:226: WARNING:  AUDIT: OBJECT,7,1,WRITE,INSERT,TABLE,public.test2,<previously logged>,<previously logged>
+psql:pgaudit.sql:232: WARNING:  AUDIT: SESSION,8,1,READ,SELECT,,,"SELECT *
+  FROM test2
+ ORDER BY ID;",<not logged>
+psql:pgaudit.sql:232: WARNING:  AUDIT: OBJECT,8,1,READ,SELECT,TABLE,public.test2,<previously logged>,<previously logged>
+You are now connected to database "postgres" as user "postgres".
+psql:pgaudit.sql:237: NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.log = 'NONE';,<not logged>
+You are now connected to database "postgres" as user "user2".
+psql:pgaudit.sql:270: WARNING:  AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.test4,"SELECT name
+  FROM public.test4;",<not logged>
+psql:pgaudit.sql:281: WARNING:  AUDIT: OBJECT,2,1,WRITE,INSERT,TABLE,public.test4,"INSERT INTO public.test4 (name)
+				  VALUES ('test');",<not logged>
+psql:pgaudit.sql:292: WARNING:  AUDIT: OBJECT,3,1,WRITE,UPDATE,TABLE,public.test4,"UPDATE public.test4
+   SET id = 1;",<not logged>
+psql:pgaudit.sql:298: WARNING:  AUDIT: OBJECT,4,1,WRITE,UPDATE,TABLE,public.test4,update public.test4 set name = 'foo' where name = 'bar';,<not logged>
+You are now connected to database "postgres" as user "postgres".
+psql:pgaudit.sql:313: NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,"ALTER ROLE user1 SET pgaudit.log = 'DDL, READ';",<not logged>
+You are now connected to database "postgres" as user "user1".
+psql:pgaudit.sql:324: NOTICE:  AUDIT: SESSION,1,1,DDL,CREATE TABLE,TABLE,public.account,"CREATE TABLE public.account
+(
+	id INT,
+	name TEXT,
+	password TEXT,
+	description TEXT
+);",<not logged>
+psql:pgaudit.sql:329: NOTICE:  AUDIT: SESSION,2,1,READ,SELECT,,,"SELECT *
+  FROM account;",<not logged>
+You are now connected to database "postgres" as user "postgres".
+psql:pgaudit.sql:339: NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log = 'none';,<not logged>
+psql:pgaudit.sql:340: NOTICE:  AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.role = 'auditor';,<not logged>
+You are now connected to database "postgres" as user "user1".
+psql:pgaudit.sql:360: NOTICE:  AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,"SELECT password
+  FROM account;",<not logged>
+psql:pgaudit.sql:371: NOTICE:  AUDIT: OBJECT,2,1,WRITE,UPDATE,TABLE,public.account,"UPDATE account
+   SET password = 'HASH2';",<not logged>
+You are now connected to database "postgres" as user "postgres".
+psql:pgaudit.sql:376: NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_relation = on;,<not logged>
+psql:pgaudit.sql:377: NOTICE:  AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,"ALTER ROLE user1 SET pgaudit.log = 'read, WRITE';",<not logged>
+You are now connected to database "postgres" as user "user1".
+psql:pgaudit.sql:403: NOTICE:  AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,"SELECT account.password,
+	   account_role_map.role_id
+  FROM account
+	   INNER JOIN account_role_map
+			on account.id = account_role_map.account_id;",<not logged>
+psql:pgaudit.sql:403: NOTICE:  AUDIT: SESSION,1,1,READ,SELECT,TABLE,public.account,"SELECT account.password,
+	   account_role_map.role_id
+  FROM account
+	   INNER JOIN account_role_map
+			on account.id = account_role_map.account_id;",<not logged>
+psql:pgaudit.sql:403: NOTICE:  AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account_role_map,"SELECT account.password,
+	   account_role_map.role_id
+  FROM account
+	   INNER JOIN account_role_map
+			on account.id = account_role_map.account_id;",<not logged>
+psql:pgaudit.sql:403: NOTICE:  AUDIT: SESSION,1,1,READ,SELECT,TABLE,public.account_role_map,"SELECT account.password,
+	   account_role_map.role_id
+  FROM account
+	   INNER JOIN account_role_map
+			on account.id = account_role_map.account_id;",<not logged>
+psql:pgaudit.sql:410: NOTICE:  AUDIT: OBJECT,2,1,READ,SELECT,TABLE,public.account,"SELECT password
+  FROM account;",<not logged>
+psql:pgaudit.sql:410: NOTICE:  AUDIT: SESSION,2,1,READ,SELECT,TABLE,public.account,"SELECT password
+  FROM account;",<not logged>
+psql:pgaudit.sql:416: NOTICE:  AUDIT: SESSION,3,1,WRITE,UPDATE,TABLE,public.account,"UPDATE account
+   SET description = 'yada, yada';",<not logged>
+psql:pgaudit.sql:425: NOTICE:  AUDIT: OBJECT,4,1,READ,SELECT,TABLE,public.account,"SELECT *
+  FROM account
+ WHERE password = 'HASH2'
+   FOR UPDATE;",<not logged>
+psql:pgaudit.sql:425: NOTICE:  AUDIT: SESSION,4,1,READ,SELECT,TABLE,public.account,"SELECT *
+  FROM account
+ WHERE password = 'HASH2'
+   FOR UPDATE;",<not logged>
+psql:pgaudit.sql:433: NOTICE:  AUDIT: OBJECT,5,1,WRITE,UPDATE,TABLE,public.account,"UPDATE account
+   SET description = 'yada, yada'
+ where password = 'HASH2';",<not logged>
+psql:pgaudit.sql:433: NOTICE:  AUDIT: SESSION,5,1,WRITE,UPDATE,TABLE,public.account,"UPDATE account
+   SET description = 'yada, yada'
+ where password = 'HASH2';",<not logged>
+psql:pgaudit.sql:440: NOTICE:  AUDIT: OBJECT,6,1,WRITE,UPDATE,TABLE,public.account,"UPDATE account
+   SET password = 'HASH2';",<not logged>
+psql:pgaudit.sql:440: NOTICE:  AUDIT: SESSION,6,1,WRITE,UPDATE,TABLE,public.account,"UPDATE account
+   SET password = 'HASH2';",<not logged>
+You are now connected to database "postgres" as user "postgres".
+psql:pgaudit.sql:445: NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 RESET pgaudit.log_relation;,<not logged>
+psql:pgaudit.sql:446: NOTICE:  AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 RESET pgaudit.log;,<not logged>
+psql:pgaudit.sql:447: NOTICE:  AUDIT: SESSION,3,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_statement = OFF;,<not logged>
+You are now connected to database "postgres" as user "user1".
+psql:pgaudit.sql:452: NOTICE:  AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,<not logged>,<not logged>
+You are now connected to database "postgres" as user "postgres".
+psql:pgaudit.sql:457: NOTICE:  AUDIT: SESSION,1,1,MISC,SET,,,SET pgaudit.log = 'ALL';,<not logged>
+psql:pgaudit.sql:458: NOTICE:  AUDIT: SESSION,2,1,MISC,SET,,,SET pgaudit.log_level = 'notice';,<not logged>
+psql:pgaudit.sql:459: NOTICE:  AUDIT: SESSION,3,1,MISC,SET,,,SET pgaudit.log_client = ON;,<not logged>
+psql:pgaudit.sql:460: NOTICE:  AUDIT: SESSION,4,1,MISC,SET,,,SET pgaudit.log_relation = ON;,<not logged>
+psql:pgaudit.sql:461: NOTICE:  AUDIT: SESSION,5,1,MISC,SET,,,SET pgaudit.log_parameter = ON;,<none>
+psql:pgaudit.sql:468: NOTICE:  AUDIT: SESSION,6,1,FUNCTION,DO,,,"DO $$
+BEGIN
+	raise notice 'test';
+END $$;",<none>
+psql:pgaudit.sql:468: NOTICE:  test
+psql:pgaudit.sql:472: NOTICE:  AUDIT: SESSION,7,1,DDL,CREATE SCHEMA,SCHEMA,test,CREATE SCHEMA test;,<none>
+psql:pgaudit.sql:476: NOTICE:  AUDIT: SESSION,8,1,READ,SELECT,TABLE,public.account,COPY account TO stdout;,<none>
+psql:pgaudit.sql:482: NOTICE:  AUDIT: SESSION,9,1,READ,SELECT,TABLE,public.account,"CREATE TABLE test.account_copy AS
+SELECT *
+  FROM account;",<none>
+psql:pgaudit.sql:482: NOTICE:  AUDIT: SESSION,9,2,DDL,CREATE TABLE AS,TABLE,test.account_copy,"CREATE TABLE test.account_copy AS
+SELECT *
+  FROM account;",<none>
+psql:pgaudit.sql:486: NOTICE:  AUDIT: SESSION,10,1,WRITE,INSERT,TABLE,test.account_copy,COPY test.account_copy from stdin;,<none>
+psql:pgaudit.sql:495: NOTICE:  AUDIT: SESSION,11,1,READ,PREPARE,,,"PREPARE pgclassstmt (oid) AS
+SELECT *
+  FROM account
+ WHERE id = $1;",<none>
+psql:pgaudit.sql:497: NOTICE:  AUDIT: SESSION,12,1,READ,SELECT,TABLE,public.account,"PREPARE pgclassstmt (oid) AS
+SELECT *
+  FROM account
+ WHERE id = $1;",1
+psql:pgaudit.sql:497: NOTICE:  AUDIT: SESSION,12,2,MISC,EXECUTE,,,EXECUTE pgclassstmt (1);,<none>
+psql:pgaudit.sql:498: NOTICE:  AUDIT: SESSION,13,1,MISC,DEALLOCATE,,,DEALLOCATE pgclassstmt;,<none>
+psql:pgaudit.sql:502: NOTICE:  AUDIT: SESSION,14,1,MISC,BEGIN,,,BEGIN;,<none>
+psql:pgaudit.sql:511: NOTICE:  AUDIT: SESSION,15,1,READ,SELECT,TABLE,pg_catalog.pg_class,"DECLARE ctest SCROLL CURSOR FOR
+SELECT count(*)
+  FROM
+(
+	SELECT relname
+	  FROM pg_class
+	 LIMIT 1
+ ) subquery;",<none>
+psql:pgaudit.sql:511: NOTICE:  AUDIT: SESSION,15,2,READ,DECLARE CURSOR,,,"DECLARE ctest SCROLL CURSOR FOR
+SELECT count(*)
+  FROM
+(
+	SELECT relname
+	  FROM pg_class
+	 LIMIT 1
+ ) subquery;",<none>
+psql:pgaudit.sql:513: NOTICE:  AUDIT: SESSION,16,1,MISC,FETCH,,,FETCH NEXT FROM ctest;,<none>
+psql:pgaudit.sql:514: NOTICE:  AUDIT: SESSION,17,1,MISC,CLOSE CURSOR,,,CLOSE ctest;,<none>
+psql:pgaudit.sql:515: NOTICE:  AUDIT: SESSION,18,1,MISC,COMMIT,,,COMMIT;,<none>
+psql:pgaudit.sql:519: NOTICE:  AUDIT: SESSION,19,1,MISC,SET,,,SET pgaudit.log_catalog = OFF;,<none>
+psql:pgaudit.sql:534: NOTICE:  AUDIT: SESSION,20,1,DDL,CREATE TABLE,TABLE,test.test_insert,"CREATE TABLE test.test_insert
+(
+	id INT
+);",<none>
+psql:pgaudit.sql:538: NOTICE:  AUDIT: SESSION,21,1,WRITE,PREPARE,,,"PREPARE pgclassstmt (oid) AS
+INSERT INTO test.test_insert (id)
+					  VALUES ($1);",<none>
+psql:pgaudit.sql:539: NOTICE:  AUDIT: SESSION,22,1,WRITE,INSERT,TABLE,test.test_insert,"PREPARE pgclassstmt (oid) AS
+INSERT INTO test.test_insert (id)
+					  VALUES ($1);",1
+psql:pgaudit.sql:539: NOTICE:  AUDIT: SESSION,22,2,MISC,EXECUTE,,,EXECUTE pgclassstmt (1);,<none>
+psql:pgaudit.sql:549: NOTICE:  AUDIT: SESSION,23,1,DDL,CREATE TABLE,TABLE,public.test,"CREATE TABLE public.test
+(
+	id INT,
+	name TEXT,
+	description TEXT,
+	CONSTRAINT test_pkey PRIMARY KEY (id)
+);",<none>
+psql:pgaudit.sql:549: NOTICE:  AUDIT: SESSION,23,1,DDL,CREATE INDEX,INDEX,public.test_pkey,"CREATE TABLE public.test
+(
+	id INT,
+	name TEXT,
+	description TEXT,
+	CONSTRAINT test_pkey PRIMARY KEY (id)
+);",<none>
+psql:pgaudit.sql:553: NOTICE:  AUDIT: SESSION,24,1,MISC,ANALYZE,,,ANALYZE test;,<none>
+psql:pgaudit.sql:560: NOTICE:  AUDIT: SESSION,25,1,ROLE,GRANT,TABLE,,"GRANT SELECT
+  ON TABLE public.test
+  TO PUBLIC;",<none>
+psql:pgaudit.sql:563: NOTICE:  AUDIT: SESSION,26,1,READ,SELECT,TABLE,public.test,"SELECT *
+  FROM test;",<none>
+psql:pgaudit.sql:567: NOTICE:  AUDIT: SESSION,27,1,READ,SELECT,TABLE,public.test,"SELECT
+  FROM test;",<none>
+psql:pgaudit.sql:570: NOTICE:  AUDIT: SESSION,28,1,READ,SELECT,,,"SELECT 1,
+	   substring('Thomas' from 2 for 3);",<none>
+psql:pgaudit.sql:578: NOTICE:  AUDIT: SESSION,29,1,FUNCTION,DO,,,"DO $$
+DECLARE
+	test INT;
+BEGIN
+	SELECT 1
+	  INTO test;
+END $$;",<none>
+psql:pgaudit.sql:578: NOTICE:  AUDIT: SESSION,29,2,READ,SELECT,,,SELECT 1,<none>
+psql:pgaudit.sql:580: NOTICE:  AUDIT: SESSION,30,1,READ,SELECT,,,explain select 1;,<none>
+psql:pgaudit.sql:580: NOTICE:  AUDIT: SESSION,30,2,MISC,EXPLAIN,,,explain select 1;,<none>
+psql:pgaudit.sql:585: NOTICE:  AUDIT: SESSION,31,1,WRITE,INSERT,TABLE,public.test,"INSERT INTO TEST (id)
+		  VALUES (1);",<none>
+psql:pgaudit.sql:587: NOTICE:  AUDIT: SESSION,32,1,WRITE,INSERT,TABLE,public.test,"INSERT INTO TEST (id)
+		  VALUES (2);",<none>
+psql:pgaudit.sql:589: NOTICE:  AUDIT: SESSION,33,1,WRITE,INSERT,TABLE,public.test,"INSERT INTO TEST (id)
+		  VALUES (3);",<none>
+psql:pgaudit.sql:602: NOTICE:  AUDIT: SESSION,34,1,FUNCTION,DO,,,"DO $$
+DECLARE
+	result RECORD;
+BEGIN
+	FOR result IN
+		SELECT id
+		  FROM test
+	LOOP
+		INSERT INTO test (id)
+			 VALUES (result.id + 100);
+	END LOOP;
+END $$;",<none>
+psql:pgaudit.sql:602: NOTICE:  AUDIT: SESSION,34,2,READ,SELECT,TABLE,public.test,"SELECT id
+		  FROM test",<none>
+psql:pgaudit.sql:602: NOTICE:  AUDIT: SESSION,34,3,WRITE,INSERT,TABLE,public.test,"INSERT INTO test (id)
+			 VALUES (result.id + 100)",",,1"
+psql:pgaudit.sql:602: NOTICE:  AUDIT: SESSION,34,4,WRITE,INSERT,TABLE,public.test,"INSERT INTO test (id)
+			 VALUES (result.id + 100)",",,2"
+psql:pgaudit.sql:602: NOTICE:  AUDIT: SESSION,34,5,WRITE,INSERT,TABLE,public.test,"INSERT INTO test (id)
+			 VALUES (result.id + 100)",",,3"
+psql:pgaudit.sql:612: NOTICE:  AUDIT: SESSION,35,1,FUNCTION,DO,,,"DO $$
+DECLARE
+	table_name TEXT = 'do_table';
+BEGIN
+	EXECUTE 'CREATE TABLE ' || table_name || ' (""weird name"" INT)';
+	EXECUTE 'DROP table ' || table_name;
+END $$;",<none>
+psql:pgaudit.sql:612: NOTICE:  AUDIT: SESSION,35,2,DDL,CREATE TABLE,TABLE,public.do_table,"CREATE TABLE do_table (""weird name"" INT)",<none>
+psql:pgaudit.sql:612: NOTICE:  AUDIT: SESSION,35,3,DDL,DROP TABLE,TABLE,public.do_table,DROP table do_table,<none>
+psql:pgaudit.sql:622: NOTICE:  AUDIT: SESSION,36,1,FUNCTION,DO,,,"DO $$
+BEGIN
+	CREATE TABLE bogus.test_block
+	(
+		id INT
+	);
+END $$;",<none>
+psql:pgaudit.sql:622: ERROR:  schema "bogus" does not exist at character 14
+psql:pgaudit.sql:627: NOTICE:  AUDIT: SESSION,37,1,DDL,ALTER TABLE,TABLE COLUMN,public.test.description,"ALTER TABLE public.test
+	DROP COLUMN description ;",<none>
+psql:pgaudit.sql:627: NOTICE:  AUDIT: SESSION,37,1,DDL,ALTER TABLE,TABLE,public.test,"ALTER TABLE public.test
+	DROP COLUMN description ;",<none>
+psql:pgaudit.sql:630: NOTICE:  AUDIT: SESSION,38,1,DDL,ALTER TABLE,TABLE,public.test2,"ALTER TABLE public.test
+	RENAME TO test2;",<none>
+psql:pgaudit.sql:633: NOTICE:  AUDIT: SESSION,39,1,DDL,ALTER TABLE,TABLE,test.test2,"ALTER TABLE public.test2
+	SET SCHEMA test;",<none>
+psql:pgaudit.sql:636: NOTICE:  AUDIT: SESSION,40,1,DDL,ALTER TABLE,TABLE,test.test2,"ALTER TABLE test.test2
+	ADD COLUMN description TEXT;",<none>
+psql:pgaudit.sql:639: NOTICE:  AUDIT: SESSION,41,1,DDL,ALTER TABLE,TABLE COLUMN,test.test2.description,"ALTER TABLE test.test2
+	DROP COLUMN description;",<none>
+psql:pgaudit.sql:639: NOTICE:  AUDIT: SESSION,41,1,DDL,ALTER TABLE,TABLE,test.test2,"ALTER TABLE test.test2
+	DROP COLUMN description;",<none>
+psql:pgaudit.sql:641: NOTICE:  AUDIT: SESSION,42,1,DDL,DROP TABLE,TABLE,test.test2,DROP TABLE test.test2;,<none>
+psql:pgaudit.sql:641: NOTICE:  AUDIT: SESSION,42,1,DDL,DROP TABLE,TABLE CONSTRAINT,test_pkey on test.test2,DROP TABLE test.test2;,<none>
+psql:pgaudit.sql:641: NOTICE:  AUDIT: SESSION,42,1,DDL,DROP TABLE,INDEX,test.test_pkey,DROP TABLE test.test2;,<none>
+psql:pgaudit.sql:647: NOTICE:  AUDIT: SESSION,43,1,DDL,CREATE SCHEMA,SCHEMA,foo,"CREATE SCHEMA foo
+	CREATE TABLE foo.bar (id int)
+	CREATE TABLE foo.baz (id int);",<none>
+psql:pgaudit.sql:647: NOTICE:  AUDIT: SESSION,43,1,DDL,CREATE TABLE,TABLE,foo.bar,"CREATE SCHEMA foo
+	CREATE TABLE foo.bar (id int)
+	CREATE TABLE foo.baz (id int);",<none>
+psql:pgaudit.sql:647: NOTICE:  AUDIT: SESSION,43,1,DDL,CREATE TABLE,TABLE,foo.baz,"CREATE SCHEMA foo
+	CREATE TABLE foo.bar (id int)
+	CREATE TABLE foo.baz (id int);",<none>
+psql:pgaudit.sql:659: NOTICE:  AUDIT: SESSION,44,1,DDL,CREATE FUNCTION,FUNCTION,"public.int_add(integer,integer)","CREATE FUNCTION public.int_add
+(
+	a INT,
+	b INT
+)
+	RETURNS INT LANGUAGE plpgsql AS $$
+BEGIN
+	return a + b;
+END $$;",<none>
+psql:pgaudit.sql:661: NOTICE:  AUDIT: SESSION,45,1,READ,SELECT,,,"SELECT int_add(1, 1);",<none>
+psql:pgaudit.sql:661: NOTICE:  AUDIT: SESSION,45,2,FUNCTION,EXECUTE,FUNCTION,public.int_add,"SELECT int_add(1, 1);",<none>
+psql:pgaudit.sql:663: NOTICE:  AUDIT: SESSION,46,1,DDL,CREATE AGGREGATE,AGGREGATE,public.sum_test(integer),"CREATE AGGREGATE public.sum_test(INT) (SFUNC=public.int_add, STYPE=INT, INITCOND='0');",<none>
+psql:pgaudit.sql:664: NOTICE:  AUDIT: SESSION,47,1,DDL,ALTER AGGREGATE,AGGREGATE,public.sum_test2(integer),ALTER AGGREGATE public.sum_test(integer) RENAME TO sum_test2;,<none>
+psql:pgaudit.sql:668: NOTICE:  AUDIT: SESSION,48,1,DDL,CREATE CONVERSION,CONVERSION,public.conversion_test,CREATE CONVERSION public.conversion_test FOR 'latin1' TO 'utf8' FROM pg_catalog.iso8859_1_to_utf8;,<none>
+psql:pgaudit.sql:669: NOTICE:  AUDIT: SESSION,49,1,DDL,ALTER CONVERSION,CONVERSION,public.conversion_test2,ALTER CONVERSION public.conversion_test RENAME TO conversion_test2;,<none>
+psql:pgaudit.sql:673: NOTICE:  AUDIT: SESSION,50,1,DDL,CREATE DATABASE,,,CREATE DATABASE contrib_regression_pgaudit;,<none>
+psql:pgaudit.sql:674: NOTICE:  AUDIT: SESSION,51,1,DDL,ALTER DATABASE,,,ALTER DATABASE contrib_regression_pgaudit RENAME TO contrib_regression_pgaudit2;,<none>
+psql:pgaudit.sql:675: NOTICE:  AUDIT: SESSION,52,1,DDL,DROP DATABASE,,,DROP DATABASE contrib_regression_pgaudit2;,<none>
+psql:pgaudit.sql:681: NOTICE:  AUDIT: SESSION,53,1,ROLE,CREATE ROLE,,,CREATE ROLE alice;,<none>
+psql:pgaudit.sql:686: NOTICE:  AUDIT: SESSION,54,1,ROLE,GRANT,TABLE,,"CREATE SCHEMA foo2
+	GRANT SELECT
+	   ON public.t
+	   TO alice;",<none>
+psql:pgaudit.sql:689: NOTICE:  AUDIT: SESSION,55,1,ROLE,DROP ROLE,,,drop role alice;,<none>
+psql:pgaudit.sql:711: NOTICE:  AUDIT: SESSION,56,1,MISC,SET,,,SET pgaudit.log = 'ALL';,<none>
+psql:pgaudit.sql:716: NOTICE:  AUDIT: SESSION,57,1,DDL,CREATE TABLE,TABLE,public.hoge,"CREATE TABLE hoge
+(
+	id int
+);",<none>
+psql:pgaudit.sql:728: NOTICE:  AUDIT: SESSION,58,1,DDL,CREATE FUNCTION,FUNCTION,public.test(),"CREATE FUNCTION test()
+	RETURNS INT AS $$
+DECLARE
+	cur1 cursor for select * from hoge;
+	tmp int;
+BEGIN
+	OPEN cur1;
+	FETCH cur1 into tmp;
+	RETURN tmp;
+END $$
+LANGUAGE plpgsql ;",<none>
+psql:pgaudit.sql:730: NOTICE:  AUDIT: SESSION,59,1,READ,SELECT,,,SELECT test();,<none>
+psql:pgaudit.sql:730: NOTICE:  AUDIT: SESSION,59,2,FUNCTION,EXECUTE,FUNCTION,public.test,SELECT test();,<none>
+psql:pgaudit.sql:730: NOTICE:  AUDIT: SESSION,59,3,READ,SELECT,TABLE,public.hoge,select * from hoge,<none>
+psql:pgaudit.sql:747: NOTICE:  AUDIT: SESSION,60,1,WRITE,INSERT,TABLE,public.bar,"insert into bar (col)
+		 values (1);",<none>
+psql:pgaudit.sql:748: NOTICE:  AUDIT: OBJECT,61,1,WRITE,DELETE,TABLE,public.bar,delete from bar;,<none>
+psql:pgaudit.sql:748: NOTICE:  AUDIT: SESSION,61,1,WRITE,DELETE,TABLE,public.bar,delete from bar;,<none>
+psql:pgaudit.sql:751: NOTICE:  AUDIT: SESSION,62,1,WRITE,INSERT,TABLE,public.bar,"insert into bar (col)
+		 values (1);",<none>
+psql:pgaudit.sql:753: NOTICE:  AUDIT: OBJECT,63,1,WRITE,DELETE,TABLE,public.bar,"delete from bar
+ where col = 1;",<none>
+psql:pgaudit.sql:753: NOTICE:  AUDIT: SESSION,63,1,WRITE,DELETE,TABLE,public.bar,"delete from bar
+ where col = 1;",<none>
+psql:pgaudit.sql:760: NOTICE:  AUDIT: SESSION,64,1,ROLE,GRANT ROLE,,,GRANT user1 TO user2;,<none>
+psql:pgaudit.sql:761: NOTICE:  AUDIT: SESSION,65,1,ROLE,REVOKE ROLE,,,REVOKE user1 FROM user2;,<none>
+psql:pgaudit.sql:798: NOTICE:  AUDIT: SESSION,66,1,WRITE,INSERT,TABLE,public.aaa,"INSERT INTO aaa VALUES (generate_series(1,100));",<none>
+psql:pgaudit.sql:801: NOTICE:  AUDIT: SESSION,67,1,WRITE,INSERT,TABLE,public.bbb,INSERT INTO bbb VALUES (1);,<not logged>
+psql:pgaudit.sql:801: NOTICE:  AUDIT: OBJECT,67,2,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
+psql:pgaudit.sql:801: NOTICE:  AUDIT: SESSION,67,2,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
+psql:pgaudit.sql:801: NOTICE:  AUDIT: OBJECT,67,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>
+psql:pgaudit.sql:801: NOTICE:  AUDIT: SESSION,67,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>
+psql:pgaudit.sql:801: NOTICE:  AUDIT: OBJECT,67,4,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
+psql:pgaudit.sql:801: NOTICE:  AUDIT: SESSION,67,4,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
+psql:pgaudit.sql:811: NOTICE:  AUDIT: SESSION,68,1,READ,SELECT,TABLE,public.tmp,CREATE TABLE tmp2 AS (SELECT * FROM tmp);,<none>
+psql:pgaudit.sql:818: NOTICE:  AUDIT: SESSION,69,1,MISC,SET,,,SET pgaudit.log = 'MISC';,<none>
+psql:pgaudit.sql:819: NOTICE:  AUDIT: SESSION,70,1,MISC,SET,,,SET pgaudit.log_level = 'notice';,<none>
+psql:pgaudit.sql:820: NOTICE:  AUDIT: SESSION,71,1,MISC,SET,,,SET pgaudit.log_client = ON;,<none>
+psql:pgaudit.sql:821: NOTICE:  AUDIT: SESSION,72,1,MISC,SET,,,SET pgaudit.log_relation = ON;,<none>
+psql:pgaudit.sql:822: NOTICE:  AUDIT: SESSION,73,1,MISC,SET,,,SET pgaudit.log_parameter = ON;,<none>
+psql:pgaudit.sql:826: NOTICE:  AUDIT: SESSION,74,1,MISC,SET,,,SET ROLE alice;,<none>
+psql:pgaudit.sql:828: NOTICE:  AUDIT: SESSION,75,1,MISC,SET,,,"SET search_path TO test, public;",<none>
+psql:pgaudit.sql:832: NOTICE:  AUDIT: SESSION,76,1,MISC,VACUUM,,,VACUUM t;,<none>
+psql:pgaudit.sql:833: NOTICE:  AUDIT: SESSION,77,1,MISC,RESET,,,RESET ROLE;,<none>
+psql:pgaudit.sql:837: NOTICE:  AUDIT: SESSION,78,1,MISC,SET,,,SET pgaudit.log = 'MISC_SET';,<none>
+psql:pgaudit.sql:839: NOTICE:  AUDIT: SESSION,79,1,MISC,SET,,,SET ROLE alice;,<none>
+psql:pgaudit.sql:840: NOTICE:  AUDIT: SESSION,80,1,MISC,SET,,,SET search_path TO public;,<none>
+psql:pgaudit.sql:845: NOTICE:  AUDIT: SESSION,81,1,MISC,RESET,,,RESET ROLE;,<none>
+psql:pgaudit.sql:849: NOTICE:  AUDIT: SESSION,82,1,MISC,SET,,,"SET pgaudit.log = 'ALL, -MISC, MISC_SET';",<none>
+psql:pgaudit.sql:851: NOTICE:  AUDIT: SESSION,83,1,MISC,SET,,,SET search_path TO public;,<none>
+psql:pgaudit.sql:853: NOTICE:  AUDIT: SESSION,84,1,WRITE,INSERT,TABLE,public.t,"INSERT INTO t VALUES (3, 'all, -misc, misc_set');",<none>
+psql:pgaudit.sql:857: NOTICE:  AUDIT: SESSION,85,1,MISC,RESET,,,RESET ROLE;,<none>
+psql:pgaudit.sql:858: NOTICE:  AUDIT: SESSION,86,1,DDL,DROP TABLE,,,DROP TABLE public.t;,<none>
+psql:pgaudit.sql:859: NOTICE:  AUDIT: SESSION,87,1,ROLE,DROP ROLE,,,DROP ROLE alice;,<none>
+psql:pgaudit.sql:863: NOTICE:  AUDIT: SESSION,88,1,DDL,CREATE TABLE,,,"CREATE TABLE h(x int ,y int) PARTITION BY HASH(x);",<none>
+psql:pgaudit.sql:864: NOTICE:  AUDIT: SESSION,89,1,DDL,CREATE TABLE,,,"CREATE TABLE h_0 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 0);",<none>
+psql:pgaudit.sql:865: NOTICE:  AUDIT: SESSION,90,1,DDL,CREATE TABLE,,,"CREATE TABLE h_1 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 1);",<none>
+psql:pgaudit.sql:866: NOTICE:  AUDIT: SESSION,91,1,WRITE,INSERT,TABLE,public.h,"INSERT INTO h VALUES(1,1);",<none>
+psql:pgaudit.sql:867: NOTICE:  AUDIT: SESSION,92,1,READ,SELECT,TABLE,public.h,SELECT * FROM h;,<none>
+psql:pgaudit.sql:868: NOTICE:  AUDIT: SESSION,93,1,READ,SELECT,TABLE,public.h_0,SELECT * FROM h_0;,<none>
+psql:pgaudit.sql:869: NOTICE:  AUDIT: SESSION,94,1,DDL,CREATE INDEX,,,CREATE INDEX h_idx ON h (x);,<none>
+psql:pgaudit.sql:870: NOTICE:  AUDIT: SESSION,95,1,DDL,DROP INDEX,,,DROP INDEX h_idx;,<none>
+psql:pgaudit.sql:871: NOTICE:  AUDIT: SESSION,96,1,DDL,DROP TABLE,,,DROP TABLE h;,<none>
+You are now connected to database "postgres" as user "postgres".
+psql:pgaudit.sql:877: NOTICE:  AUDIT: SESSION,1,1,MISC,SET,,,SET pgaudit.log = 'all';,<not logged>
+psql:pgaudit.sql:878: NOTICE:  AUDIT: SESSION,2,1,MISC,SET,,,SET pgaudit.log_client = on;,<not logged>
+psql:pgaudit.sql:879: NOTICE:  AUDIT: SESSION,3,1,MISC,SET,,,SET pgaudit.log_relation = on;,<not logged>
+psql:pgaudit.sql:880: NOTICE:  AUDIT: SESSION,4,1,MISC,SET,,,SET pgaudit.log_statement_once = off;,<not logged>
+psql:pgaudit.sql:881: NOTICE:  AUDIT: SESSION,5,1,MISC,SET,,,SET pgaudit.log_parameter = on;,<none>
+psql:pgaudit.sql:882: NOTICE:  AUDIT: SESSION,6,1,MISC,SET,,,SET pgaudit.log_rows = on;,<none>,0
+psql:pgaudit.sql:890: NOTICE:  AUDIT: SESSION,7,1,DDL,CREATE TABLE,,,"CREATE TABLE test2
+(
+	id int,
+	name text
+);",<none>,0
+psql:pgaudit.sql:896: NOTICE:  AUDIT: SESSION,8,1,DDL,CREATE TABLE,,,"CREATE TABLE test3
+(
+	id int,
+	name text
+);",<none>,0
+psql:pgaudit.sql:905: NOTICE:  AUDIT: SESSION,9,1,DDL,CREATE FUNCTION,,,"CREATE FUNCTION test2_insert() RETURNS TRIGGER AS $$
+BEGIN
+	UPDATE test2
+	   SET id = id + 90
+	 WHERE id = new.id;
+
+	RETURN new;
+END $$ LANGUAGE plpgsql security definer;",<none>,0
+psql:pgaudit.sql:909: NOTICE:  AUDIT: SESSION,10,1,DDL,CREATE TRIGGER,,,"CREATE TRIGGER test2_insert_trg
+	AFTER INSERT ON test2
+	FOR EACH ROW EXECUTE PROCEDURE test2_insert();",<none>,0
+psql:pgaudit.sql:916: NOTICE:  AUDIT: SESSION,11,1,DDL,CREATE FUNCTION,,,"CREATE FUNCTION test2_change(change_id int) RETURNS void AS $$
+BEGIN
+	UPDATE test2
+	   SET id = id + 1
+	 WHERE id = change_id;
+END $$ LANGUAGE plpgsql security definer;",<none>,0
+psql:pgaudit.sql:920: NOTICE:  AUDIT: SESSION,12,1,DDL,CREATE VIEW,,,"CREATE VIEW vw_test3 AS
+SELECT *
+  FROM test3;",<none>,0
+psql:pgaudit.sql:925: NOTICE:  AUDIT: SESSION,13,1,WRITE,UPDATE,TABLE,public.test2,"UPDATE test2
+	   SET id = id + 90
+	 WHERE id = new.id",",,,,,,,,,,,,,1",1
+psql:pgaudit.sql:925: NOTICE:  AUDIT: SESSION,13,2,WRITE,INSERT,TABLE,public.test2,"INSERT INTO test2 (id, name)
+		  VALUES (1, 'a');",<none>,1
+psql:pgaudit.sql:927: NOTICE:  AUDIT: SESSION,14,1,WRITE,UPDATE,TABLE,public.test2,"UPDATE test2
+	   SET id = id + 90
+	 WHERE id = new.id",",,,,,,,,,,,,,2",1
+psql:pgaudit.sql:927: NOTICE:  AUDIT: SESSION,14,2,WRITE,INSERT,TABLE,public.test2,"INSERT INTO test2 (id, name)
+		  VALUES (2, 'b');",<none>,1
+psql:pgaudit.sql:929: NOTICE:  AUDIT: SESSION,15,1,WRITE,UPDATE,TABLE,public.test2,"UPDATE test2
+	   SET id = id + 90
+	 WHERE id = new.id",",,,,,,,,,,,,,3",1
+psql:pgaudit.sql:929: NOTICE:  AUDIT: SESSION,15,2,WRITE,INSERT,TABLE,public.test2,"INSERT INTO test2 (id, name)
+		  VALUES (3, 'c');",<none>,1
+psql:pgaudit.sql:932: NOTICE:  AUDIT: SESSION,16,1,WRITE,INSERT,TABLE,public.test3,"INSERT INTO test3 (id, name)
+		  VALUES (1, 'a');",<none>,1
+psql:pgaudit.sql:934: NOTICE:  AUDIT: SESSION,17,1,WRITE,INSERT,TABLE,public.test3,"INSERT INTO test3 (id, name)
+		  VALUES (2, 'b');",<none>,1
+psql:pgaudit.sql:936: NOTICE:  AUDIT: SESSION,18,1,WRITE,INSERT,TABLE,public.test3,"INSERT INTO test3 (id, name)
+		  VALUES (3, 'c');",<none>,1
+psql:pgaudit.sql:939: NOTICE:  AUDIT: SESSION,19,1,READ,SELECT,TABLE,public.test3,"SELECT *
+  FROM test3, test2;",<none>,9
+psql:pgaudit.sql:939: NOTICE:  AUDIT: SESSION,19,1,READ,SELECT,TABLE,public.test2,"SELECT *
+  FROM test3, test2;",<none>,9
+psql:pgaudit.sql:942: NOTICE:  AUDIT: SESSION,20,1,READ,SELECT,TABLE,public.test2,"SELECT *
+  FROM vw_test3, test2;",<none>,9
+psql:pgaudit.sql:942: NOTICE:  AUDIT: SESSION,20,1,READ,SELECT,VIEW,public.vw_test3,"SELECT *
+  FROM vw_test3, test2;",<none>,9
+psql:pgaudit.sql:942: NOTICE:  AUDIT: SESSION,20,1,MISC,???,VIEW,public.vw_test3,"SELECT *
+  FROM vw_test3, test2;",<none>,9
+psql:pgaudit.sql:942: NOTICE:  AUDIT: SESSION,20,1,READ,SELECT,TABLE,public.test3,"SELECT *
+  FROM vw_test3, test2;",<none>,9
+psql:pgaudit.sql:946: NOTICE:  AUDIT: SESSION,21,1,READ,SELECT,TABLE,public.test2,"SELECT *
+  FROM test2
+ ORDER BY ID;",<none>,3
+psql:pgaudit.sql:949: NOTICE:  AUDIT: SESSION,22,1,WRITE,UPDATE,TABLE,public.test2,"UPDATE test2
+   SET name = 'd';",<none>,3
+psql:pgaudit.sql:953: NOTICE:  AUDIT: SESSION,23,1,WRITE,UPDATE,TABLE,public.test3,"UPDATE test3
+   SET name = 'd'
+ WHERE id > 0;",<none>,3
+psql:pgaudit.sql:961: NOTICE:  AUDIT: SESSION,24,1,READ,SELECT,TABLE,pg_catalog.pg_class,"SELECT 1
+  FROM
+(
+	SELECT relname
+	  FROM pg_class
+	  LIMIT 3
+) SUBQUERY;",<none>,3
+psql:pgaudit.sql:970: NOTICE:  AUDIT: SESSION,25,1,WRITE,INSERT,TABLE,public.test3,"WITH CTE AS
+(
+	SELECT id
+	  FROM test2
+)
+INSERT INTO test3
+SELECT id
+  FROM cte;",<none>,3
+psql:pgaudit.sql:970: NOTICE:  AUDIT: SESSION,25,1,READ,SELECT,TABLE,public.test2,"WITH CTE AS
+(
+	SELECT id
+	  FROM test2
+)
+INSERT INTO test3
+SELECT id
+  FROM cte;",<none>,3
+psql:pgaudit.sql:979: NOTICE:  AUDIT: SESSION,26,1,WRITE,UPDATE,TABLE,public.test2,"UPDATE test2
+	   SET id = id + 90
+	 WHERE id = new.id",",,,,,,,,,,,,,1",1
+psql:pgaudit.sql:979: NOTICE:  AUDIT: SESSION,26,2,WRITE,INSERT,TABLE,public.test2,"WITH CTE AS
+(
+	INSERT INTO test3 VALUES (1)
+				   RETURNING id
+)
+INSERT INTO test2
+SELECT id
+  FROM cte;",<none>,1
+psql:pgaudit.sql:979: NOTICE:  AUDIT: SESSION,26,2,WRITE,INSERT,TABLE,public.test3,"WITH CTE AS
+(
+	INSERT INTO test3 VALUES (1)
+				   RETURNING id
+)
+INSERT INTO test2
+SELECT id
+  FROM cte;",<none>,1
+psql:pgaudit.sql:981: NOTICE:  AUDIT: SESSION,27,1,FUNCTION,DO,,,DO $$ BEGIN PERFORM test2_change(91); END $$;,<none>,0
+psql:pgaudit.sql:981: NOTICE:  AUDIT: SESSION,27,2,FUNCTION,EXECUTE,FUNCTION,public.test2_change,SELECT test2_change(91),<none>,0
+psql:pgaudit.sql:981: NOTICE:  AUDIT: SESSION,27,3,WRITE,UPDATE,TABLE,public.test2,"UPDATE test2
+	   SET id = id + 1
+	 WHERE id = change_id","91,",2
+psql:pgaudit.sql:981: NOTICE:  AUDIT: SESSION,27,4,READ,SELECT,,,SELECT test2_change(91),<none>,1
+psql:pgaudit.sql:992: NOTICE:  AUDIT: SESSION,28,1,WRITE,INSERT,TABLE,public.test3,"WITH CTE AS
+(
+	UPDATE test2
+	   SET id = 45
+	 WHERE id = 92
+	RETURNING id
+)
+INSERT INTO test3
+SELECT id
+  FROM cte;",<none>,3
+psql:pgaudit.sql:992: NOTICE:  AUDIT: SESSION,28,1,WRITE,UPDATE,TABLE,public.test2,"WITH CTE AS
+(
+	UPDATE test2
+	   SET id = 45
+	 WHERE id = 92
+	RETURNING id
+)
+INSERT INTO test3
+SELECT id
+  FROM cte;",<none>,3
+psql:pgaudit.sql:1002: NOTICE:  AUDIT: SESSION,29,1,WRITE,UPDATE,TABLE,public.test2,"UPDATE test2
+	   SET id = id + 90
+	 WHERE id = new.id",",,,,,,,,,,,,,37",1
+psql:pgaudit.sql:1002: NOTICE:  AUDIT: SESSION,29,2,WRITE,UPDATE,TABLE,public.test3,"WITH CTE AS
+(
+	INSERT INTO test2 VALUES (37)
+				   RETURNING id
+)
+UPDATE test3
+   SET id = cte.id
+  FROM cte
+ WHERE test3.id <> cte.id;",<none>,10
+psql:pgaudit.sql:1002: NOTICE:  AUDIT: SESSION,29,2,WRITE,INSERT,TABLE,public.test2,"WITH CTE AS
+(
+	INSERT INTO test2 VALUES (37)
+				   RETURNING id
+)
+UPDATE test3
+   SET id = cte.id
+  FROM cte
+ WHERE test3.id <> cte.id;",<none>,10
+psql:pgaudit.sql:1005: NOTICE:  AUDIT: SESSION,30,1,WRITE,DELETE,TABLE,public.test2,"DELETE
+  FROM test2;",<none>,5
+psql:pgaudit.sql:1009: NOTICE:  AUDIT: SESSION,31,1,WRITE,DELETE,TABLE,public.test3,"DELETE
+  FROM test3
+ WHERE id > 0;",<none>,10
+psql:pgaudit.sql:1013: NOTICE:  AUDIT: SESSION,32,1,DDL,DROP TABLE,,,DROP TABLE test2;,<none>,0
+psql:pgaudit.sql:1014: NOTICE:  AUDIT: SESSION,33,1,DDL,DROP VIEW,,,DROP VIEW vw_test3;,<none>,0
+psql:pgaudit.sql:1015: NOTICE:  AUDIT: SESSION,34,1,DDL,DROP TABLE,,,DROP TABLE test3;,<none>,0
+psql:pgaudit.sql:1016: NOTICE:  AUDIT: SESSION,35,1,DDL,DROP FUNCTION,,,DROP FUNCTION test2_insert();,<none>,0
+psql:pgaudit.sql:1017: NOTICE:  AUDIT: SESSION,36,1,DDL,DROP FUNCTION,,,DROP FUNCTION test2_change(int);,<none>,0
+psql:pgaudit.sql:1027: NOTICE:  AUDIT: OBJECT,37,1,READ,SELECT,TABLE,public.account,"SELECT *
+  FROM account;",<none>,1
+psql:pgaudit.sql:1046: NOTICE:  AUDIT: OBJECT,38,1,READ,SELECT,TABLE,public.account,"SELECT password
+  FROM account;",<none>,3
+psql:pgaudit.sql:1057: NOTICE:  AUDIT: OBJECT,39,1,WRITE,UPDATE,TABLE,public.account,"UPDATE account
+   SET password = 'HASH4';",<none>,3
+psql:pgaudit.sql:1073: NOTICE:  AUDIT: OBJECT,40,1,READ,SELECT,TABLE,public.account,"SELECT account.password,
+	   account_role_map.role_id
+  FROM account
+	   INNER JOIN account_role_map
+			on account.id = account_role_map.account_id;",<none>,0
+psql:pgaudit.sql:1073: NOTICE:  AUDIT: SESSION,40,1,READ,SELECT,TABLE,public.account,"SELECT account.password,
+	   account_role_map.role_id
+  FROM account
+	   INNER JOIN account_role_map
+			on account.id = account_role_map.account_id;",<none>,0
+psql:pgaudit.sql:1073: NOTICE:  AUDIT: OBJECT,40,1,READ,SELECT,TABLE,public.account_role_map,"SELECT account.password,
+	   account_role_map.role_id
+  FROM account
+	   INNER JOIN account_role_map
+			on account.id = account_role_map.account_id;",<none>,0
+psql:pgaudit.sql:1073: NOTICE:  AUDIT: SESSION,40,1,READ,SELECT,TABLE,public.account_role_map,"SELECT account.password,
+	   account_role_map.role_id
+  FROM account
+	   INNER JOIN account_role_map
+			on account.id = account_role_map.account_id;",<none>,0
+psql:pgaudit.sql:1080: NOTICE:  AUDIT: OBJECT,41,1,READ,SELECT,TABLE,public.account,"SELECT password
+  FROM account;",<none>,3
+psql:pgaudit.sql:1080: NOTICE:  AUDIT: SESSION,41,1,READ,SELECT,TABLE,public.account,"SELECT password
+  FROM account;",<none>,3
+psql:pgaudit.sql:1086: NOTICE:  AUDIT: SESSION,42,1,WRITE,UPDATE,TABLE,public.account,"UPDATE account
+   SET description = 'yada, yada2';",<none>,3
+psql:pgaudit.sql:1094: NOTICE:  AUDIT: OBJECT,43,1,WRITE,UPDATE,TABLE,public.account,"UPDATE account
+   SET description = 'yada, yada3'
+ where password = 'HASH4';",<none>,3
+psql:pgaudit.sql:1094: NOTICE:  AUDIT: SESSION,43,1,WRITE,UPDATE,TABLE,public.account,"UPDATE account
+   SET description = 'yada, yada3'
+ where password = 'HASH4';",<none>,3
+psql:pgaudit.sql:1101: NOTICE:  AUDIT: OBJECT,44,1,WRITE,UPDATE,TABLE,public.account,"UPDATE account
+   SET password = 'HASH4';",<none>,3
+psql:pgaudit.sql:1101: NOTICE:  AUDIT: SESSION,44,1,WRITE,UPDATE,TABLE,public.account,"UPDATE account
+   SET password = 'HASH4';",<none>,3
+psql:pgaudit.sql:1105: NOTICE:  AUDIT: SESSION,45,1,MISC,SET,,,SET pgaudit.log = 'all';,<none>,0
+psql:pgaudit.sql:1106: NOTICE:  AUDIT: SESSION,46,1,MISC,SET,,,SET pgaudit.log_client = on;,<none>,0
+psql:pgaudit.sql:1107: NOTICE:  AUDIT: SESSION,47,1,MISC,SET,,,SET pgaudit.log_relation = on;,<none>,0
+psql:pgaudit.sql:1108: NOTICE:  AUDIT: SESSION,48,1,MISC,SET,,,SET pgaudit.log_parameter = on;,<none>,0
+psql:pgaudit.sql:1109: NOTICE:  AUDIT: SESSION,49,1,MISC,SET,,,SET pgaudit.log_rows = on;,<none>,0
+psql:pgaudit.sql:1116: NOTICE:  AUDIT: SESSION,50,1,FUNCTION,DO,,,"DO $$
+BEGIN
+	raise notice 'test';
+END $$;",<none>,0
+psql:pgaudit.sql:1116: NOTICE:  test
+psql:pgaudit.sql:1120: NOTICE:  AUDIT: SESSION,51,1,READ,COPY,,,COPY account TO stdout;,<none>,0
+psql:pgaudit.sql:1124: NOTICE:  AUDIT: SESSION,52,1,DDL,DROP TABLE,,,DROP TABLE test.account_copy;,<none>,0
+psql:pgaudit.sql:1130: NOTICE:  AUDIT: OBJECT,53,1,READ,SELECT,TABLE,public.account,"CREATE TABLE test.account_copy AS
+SELECT *
+  FROM account;",<none>,3
+psql:pgaudit.sql:1130: NOTICE:  AUDIT: SESSION,53,1,READ,SELECT,TABLE,public.account,"CREATE TABLE test.account_copy AS
+SELECT *
+  FROM account;",<none>,3
+psql:pgaudit.sql:1130: NOTICE:  AUDIT: SESSION,53,2,DDL,CREATE TABLE AS,,,"CREATE TABLE test.account_copy AS
+SELECT *
+  FROM account;",<none>,0
+psql:pgaudit.sql:1136: NOTICE:  AUDIT: SESSION,54,1,WRITE,COPY,,,COPY test.account_copy from stdin;,<none>,0
+psql:pgaudit.sql:1143: NOTICE:  AUDIT: SESSION,55,1,READ,PREPARE,,,"PREPARE pgclassstmt1 (oid) AS
+SELECT 1
+  FROM account
+ WHERE id = $1;",<none>,0
+psql:pgaudit.sql:1148: NOTICE:  AUDIT: SESSION,56,1,READ,PREPARE,,,"PREPARE pgclassstmt2 (oid) AS
+SELECT 2
+  FROM account
+ WHERE id = $1;",<none>,0
+psql:pgaudit.sql:1150: NOTICE:  AUDIT: SESSION,57,1,READ,SELECT,TABLE,public.account,"PREPARE pgclassstmt2 (oid) AS
+SELECT 2
+  FROM account
+ WHERE id = $1;",1,3
+psql:pgaudit.sql:1150: NOTICE:  AUDIT: SESSION,57,2,MISC,EXECUTE,,,EXECUTE pgclassstmt2 (1);,<none>,0
+psql:pgaudit.sql:1151: NOTICE:  AUDIT: SESSION,58,1,READ,SELECT,TABLE,public.account,"PREPARE pgclassstmt1 (oid) AS
+SELECT 1
+  FROM account
+ WHERE id = $1;",1,3
+psql:pgaudit.sql:1151: NOTICE:  AUDIT: SESSION,58,2,MISC,EXECUTE,,,EXECUTE pgclassstmt1 (1);,<none>,0
+psql:pgaudit.sql:1153: NOTICE:  AUDIT: SESSION,59,1,MISC,DEALLOCATE,,,DEALLOCATE pgclassstmt2;,<none>,0
+psql:pgaudit.sql:1154: NOTICE:  AUDIT: SESSION,60,1,MISC,DEALLOCATE,,,DEALLOCATE pgclassstmt1;,<none>,0
+psql:pgaudit.sql:1158: NOTICE:  AUDIT: SESSION,61,1,MISC,BEGIN,,,BEGIN;,<none>,0
+psql:pgaudit.sql:1167: NOTICE:  AUDIT: SESSION,62,1,READ,DECLARE CURSOR,,,"DECLARE ctest1 SCROLL CURSOR FOR
+SELECT 1
+  FROM
+(
+	SELECT relname
+	  FROM pg_class
+	 LIMIT 3
+ ) subquery;",<none>,0
+psql:pgaudit.sql:1176: NOTICE:  AUDIT: SESSION,63,1,READ,DECLARE CURSOR,,,"DECLARE ctest2 SCROLL CURSOR FOR
+SELECT 2
+  FROM
+(
+	SELECT relname
+	  FROM pg_class
+	 LIMIT 3
+ ) subquery;",<none>,0
+psql:pgaudit.sql:1178: NOTICE:  AUDIT: SESSION,64,1,MISC,FETCH,,,FETCH NEXT FROM ctest1;,<none>,0
+psql:pgaudit.sql:1179: NOTICE:  AUDIT: SESSION,65,1,MISC,FETCH,,,FETCH NEXT FROM ctest2;,<none>,0
+psql:pgaudit.sql:1180: NOTICE:  AUDIT: SESSION,66,1,MISC,FETCH,,,FETCH NEXT FROM ctest1;,<none>,0
+psql:pgaudit.sql:1181: NOTICE:  AUDIT: SESSION,67,1,MISC,FETCH,,,FETCH NEXT FROM ctest2;,<none>,0
+psql:pgaudit.sql:1182: NOTICE:  AUDIT: SESSION,68,1,MISC,FETCH,,,FETCH NEXT FROM ctest1;,<none>,0
+psql:pgaudit.sql:1183: NOTICE:  AUDIT: SESSION,69,1,MISC,FETCH,,,FETCH NEXT FROM ctest2;,<none>,0
+psql:pgaudit.sql:1185: NOTICE:  AUDIT: SESSION,70,1,MISC,CLOSE CURSOR,,,CLOSE ctest2;,<none>,0
+psql:pgaudit.sql:1186: NOTICE:  AUDIT: SESSION,71,1,MISC,CLOSE CURSOR,,,CLOSE ctest1;,<none>,0
+psql:pgaudit.sql:1187: NOTICE:  AUDIT: SESSION,72,1,MISC,COMMIT,,,COMMIT;,<none>,0
+psql:pgaudit.sql:1191: NOTICE:  AUDIT: SESSION,73,1,MISC,SET,,,SET pgaudit.log_catalog = off;,<none>,0
+psql:pgaudit.sql:1203: NOTICE:  AUDIT: SESSION,74,1,DDL,DROP TABLE,,,DROP TABLE test.test_insert;,<none>,0
+psql:pgaudit.sql:1210: NOTICE:  AUDIT: SESSION,75,1,DDL,CREATE TABLE,,,"CREATE TABLE test.test_insert
+(
+	id INT
+);",<none>,0
+psql:pgaudit.sql:1214: NOTICE:  AUDIT: SESSION,76,1,WRITE,PREPARE,,,"PREPARE pgclassstmt (oid) AS
+INSERT INTO test.test_insert (id)
+					  VALUES ($1);",<none>,0
+psql:pgaudit.sql:1215: NOTICE:  AUDIT: SESSION,77,1,WRITE,INSERT,TABLE,test.test_insert,"PREPARE pgclassstmt (oid) AS
+INSERT INTO test.test_insert (id)
+					  VALUES ($1);",1,1
+psql:pgaudit.sql:1215: NOTICE:  AUDIT: SESSION,77,2,MISC,EXECUTE,,,EXECUTE pgclassstmt (1);,<none>,0
+psql:pgaudit.sql:1225: NOTICE:  AUDIT: SESSION,78,1,DDL,CREATE TABLE,,,"CREATE TABLE public.test
+(
+	id INT,
+	name TEXT,
+	description TEXT,
+	CONSTRAINT test_pkey PRIMARY KEY (id)
+);",<none>,0
+psql:pgaudit.sql:1229: NOTICE:  AUDIT: SESSION,79,1,MISC,ANALYZE,,,ANALYZE test;,<none>,0
+psql:pgaudit.sql:1236: NOTICE:  AUDIT: SESSION,80,1,ROLE,GRANT,,,"GRANT SELECT
+  ON TABLE public.test
+  TO PUBLIC;",<none>,0
+psql:pgaudit.sql:1239: NOTICE:  AUDIT: SESSION,81,1,READ,SELECT,TABLE,public.test,"SELECT *
+  FROM test;",<none>,0
+psql:pgaudit.sql:1243: NOTICE:  AUDIT: SESSION,82,1,READ,SELECT,TABLE,public.test,"SELECT
+  FROM test;",<none>,0
+psql:pgaudit.sql:1246: NOTICE:  AUDIT: SESSION,83,1,READ,SELECT,,,"SELECT 1,
+	   substring('Thomas' from 2 for 3);",<none>,1
+psql:pgaudit.sql:1254: NOTICE:  AUDIT: SESSION,84,1,FUNCTION,DO,,,"DO $$
+DECLARE
+	test INT;
+BEGIN
+	SELECT 1
+	  INTO test;
+END $$;",<none>,0
+psql:pgaudit.sql:1254: NOTICE:  AUDIT: SESSION,84,2,READ,SELECT,,,SELECT 1,<none>,1
+psql:pgaudit.sql:1256: NOTICE:  AUDIT: SESSION,85,1,READ,SELECT,,,explain select 1;,<none>,0
+psql:pgaudit.sql:1256: NOTICE:  AUDIT: SESSION,85,2,MISC,EXPLAIN,,,explain select 1;,<none>,0
+psql:pgaudit.sql:1261: NOTICE:  AUDIT: SESSION,86,1,WRITE,INSERT,TABLE,public.test,"INSERT INTO TEST (id)
+		  VALUES (1);",<none>,1
+psql:pgaudit.sql:1263: NOTICE:  AUDIT: SESSION,87,1,WRITE,INSERT,TABLE,public.test,"INSERT INTO TEST (id)
+		  VALUES (2);",<none>,1
+psql:pgaudit.sql:1265: NOTICE:  AUDIT: SESSION,88,1,WRITE,INSERT,TABLE,public.test,"INSERT INTO TEST (id)
+		  VALUES (3);",<none>,1
+psql:pgaudit.sql:1278: NOTICE:  AUDIT: SESSION,89,1,FUNCTION,DO,,,"DO $$
+DECLARE
+	result RECORD;
+BEGIN
+	FOR result IN
+		SELECT id
+		  FROM test
+	LOOP
+		INSERT INTO test (id)
+			 VALUES (result.id + 100);
+	END LOOP;
+END $$;",<none>,0
+psql:pgaudit.sql:1278: NOTICE:  AUDIT: SESSION,89,2,WRITE,INSERT,TABLE,public.test,"INSERT INTO test (id)
+			 VALUES (result.id + 100)",",,1",1
+psql:pgaudit.sql:1278: NOTICE:  AUDIT: SESSION,89,3,WRITE,INSERT,TABLE,public.test,"INSERT INTO test (id)
+			 VALUES (result.id + 100)",",,2",1
+psql:pgaudit.sql:1278: NOTICE:  AUDIT: SESSION,89,4,WRITE,INSERT,TABLE,public.test,"INSERT INTO test (id)
+			 VALUES (result.id + 100)",",,3",1
+psql:pgaudit.sql:1278: NOTICE:  AUDIT: SESSION,89,5,READ,SELECT,TABLE,public.test,"SELECT id
+		  FROM test",<none>,3
+psql:pgaudit.sql:1288: NOTICE:  AUDIT: SESSION,90,1,FUNCTION,DO,,,"DO $$
+DECLARE
+	table_name TEXT = 'do_table';
+BEGIN
+	EXECUTE 'CREATE TABLE ' || table_name || ' (""weird name"" INT)';
+	EXECUTE 'DROP table ' || table_name;
+END $$;",<none>,0
+psql:pgaudit.sql:1288: NOTICE:  AUDIT: SESSION,90,2,DDL,CREATE TABLE,,,"CREATE TABLE do_table (""weird name"" INT)",<none>,0
+psql:pgaudit.sql:1288: NOTICE:  AUDIT: SESSION,90,3,DDL,DROP TABLE,,,DROP table do_table,<none>,0
+psql:pgaudit.sql:1298: NOTICE:  AUDIT: SESSION,91,1,FUNCTION,DO,,,"DO $$
+BEGIN
+	CREATE TABLE bogus.test_block
+	(
+		id INT
+	);
+END $$;",<none>,0
+psql:pgaudit.sql:1298: ERROR:  schema "bogus" does not exist at character 14
+psql:pgaudit.sql:1303: NOTICE:  AUDIT: SESSION,92,1,DDL,ALTER TABLE,,,"ALTER TABLE public.test
+	DROP COLUMN description ;",<none>,0
+psql:pgaudit.sql:1306: NOTICE:  AUDIT: SESSION,93,1,DDL,ALTER TABLE,,,"ALTER TABLE public.test
+	RENAME TO test2;",<none>,0
+psql:pgaudit.sql:1309: NOTICE:  AUDIT: SESSION,94,1,DDL,ALTER TABLE,,,"ALTER TABLE public.test2
+	SET SCHEMA test;",<none>,0
+psql:pgaudit.sql:1312: NOTICE:  AUDIT: SESSION,95,1,DDL,ALTER TABLE,,,"ALTER TABLE test.test2
+	ADD COLUMN description TEXT;",<none>,0
+psql:pgaudit.sql:1315: NOTICE:  AUDIT: SESSION,96,1,DDL,ALTER TABLE,,,"ALTER TABLE test.test2
+	DROP COLUMN description;",<none>,0
+psql:pgaudit.sql:1317: NOTICE:  AUDIT: SESSION,97,1,DDL,DROP TABLE,,,DROP TABLE test.test2;,<none>,0
+psql:pgaudit.sql:1323: NOTICE:  AUDIT: SESSION,98,1,DDL,CREATE SCHEMA,,,"CREATE SCHEMA foo1
+	CREATE TABLE foo1.bar1 (id int)
+	CREATE TABLE foo1.baz1 (id int);",<none>,0
+psql:pgaudit.sql:1325: NOTICE:  AUDIT: SESSION,99,1,DDL,DROP TABLE,,,DROP TABLE foo1.bar1;,<none>,0
+psql:pgaudit.sql:1326: NOTICE:  AUDIT: SESSION,100,1,DDL,DROP TABLE,,,DROP TABLE foo1.baz1;,<none>,0
+psql:pgaudit.sql:1327: NOTICE:  AUDIT: SESSION,101,1,DDL,DROP SCHEMA,,,DROP SCHEMA foo1;,<none>,0
+psql:pgaudit.sql:1339: NOTICE:  AUDIT: SESSION,102,1,DDL,CREATE FUNCTION,,,"CREATE FUNCTION public.int_add1
+(
+	a INT,
+	b INT
+)
+	RETURNS INT LANGUAGE plpgsql AS $$
+BEGIN
+	return a + b;
+END $$;",<none>,0
+psql:pgaudit.sql:1341: NOTICE:  AUDIT: SESSION,103,1,FUNCTION,EXECUTE,FUNCTION,public.int_add1,"SELECT int_add1(1, 1);",<none>,0
+psql:pgaudit.sql:1341: NOTICE:  AUDIT: SESSION,103,2,READ,SELECT,,,"SELECT int_add1(1, 1);",<none>,1
+psql:pgaudit.sql:1343: NOTICE:  AUDIT: SESSION,104,1,DDL,CREATE AGGREGATE,,,"CREATE AGGREGATE public.sum_test(INT) (SFUNC=public.int_add1, STYPE=INT, INITCOND='0');",<none>,0
+psql:pgaudit.sql:1344: NOTICE:  AUDIT: SESSION,105,1,DDL,ALTER AGGREGATE,,,ALTER AGGREGATE public.sum_test(integer) RENAME TO sum_test3;,<none>,0
+psql:pgaudit.sql:1348: NOTICE:  AUDIT: SESSION,106,1,DDL,CREATE CONVERSION,,,CREATE CONVERSION public.conversion_test FOR 'latin1' TO 'utf8' FROM pg_catalog.iso8859_1_to_utf8;,<none>,0
+psql:pgaudit.sql:1349: NOTICE:  AUDIT: SESSION,107,1,DDL,ALTER CONVERSION,,,ALTER CONVERSION public.conversion_test RENAME TO conversion_test3;,<none>,0
+psql:pgaudit.sql:1353: NOTICE:  AUDIT: SESSION,108,1,DDL,CREATE DATABASE,,,CREATE DATABASE contrib_regression_pgaudit;,<none>,0
+psql:pgaudit.sql:1354: NOTICE:  AUDIT: SESSION,109,1,DDL,ALTER DATABASE,,,ALTER DATABASE contrib_regression_pgaudit RENAME TO contrib_regression_pgaudit2;,<none>,0
+psql:pgaudit.sql:1355: NOTICE:  AUDIT: SESSION,110,1,DDL,DROP DATABASE,,,DROP DATABASE contrib_regression_pgaudit2;,<none>,0
+psql:pgaudit.sql:1361: NOTICE:  AUDIT: SESSION,111,1,ROLE,CREATE ROLE,,,CREATE ROLE alice;,<none>,0
+psql:pgaudit.sql:1369: NOTICE:  AUDIT: SESSION,112,1,ROLE,DROP ROLE,,,drop role alice;,<none>,0
+psql:pgaudit.sql:1391: NOTICE:  AUDIT: SESSION,113,1,MISC,SET,,,SET pgaudit.log = 'all';,<none>,0
+psql:pgaudit.sql:1403: NOTICE:  AUDIT: SESSION,114,1,DDL,CREATE FUNCTION,,,"CREATE FUNCTION test1()
+	RETURNS INT AS $$
+DECLARE
+	cur1 cursor for select * from hoge;
+	tmp int;
+BEGIN
+	OPEN cur1;
+	FETCH cur1 into tmp;
+	RETURN tmp;
+END $$
+LANGUAGE plpgsql ;",<none>,0
+psql:pgaudit.sql:1405: NOTICE:  AUDIT: SESSION,115,1,FUNCTION,EXECUTE,FUNCTION,public.test1,SELECT test1();,<none>,0
+psql:pgaudit.sql:1405: NOTICE:  AUDIT: SESSION,115,2,READ,SELECT,,,SELECT test1();,<none>,1
+psql:pgaudit.sql:1422: NOTICE:  AUDIT: SESSION,116,1,WRITE,INSERT,TABLE,public.bar,"insert into bar (col)
+		 values (1);",<none>,1
+psql:pgaudit.sql:1423: NOTICE:  AUDIT: OBJECT,117,1,WRITE,DELETE,TABLE,public.bar,delete from bar;,<none>,1
+psql:pgaudit.sql:1423: NOTICE:  AUDIT: SESSION,117,1,WRITE,DELETE,TABLE,public.bar,delete from bar;,<none>,1
+psql:pgaudit.sql:1426: NOTICE:  AUDIT: SESSION,118,1,WRITE,INSERT,TABLE,public.bar,"insert into bar (col)
+		 values (1);",<none>,1
+psql:pgaudit.sql:1428: NOTICE:  AUDIT: OBJECT,119,1,WRITE,DELETE,TABLE,public.bar,"delete from bar
+ where col = 1;",<none>,1
+psql:pgaudit.sql:1428: NOTICE:  AUDIT: SESSION,119,1,WRITE,DELETE,TABLE,public.bar,"delete from bar
+ where col = 1;",<none>,1
+psql:pgaudit.sql:1467: NOTICE:  AUDIT: SESSION,120,1,WRITE,INSERT,TABLE,public.aaa,"INSERT INTO aaa VALUES (generate_series(1,100));",<none>,100
+psql:pgaudit.sql:1470: NOTICE:  AUDIT: OBJECT,121,1,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>,1
+psql:pgaudit.sql:1470: NOTICE:  AUDIT: SESSION,121,1,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>,1
+psql:pgaudit.sql:1470: NOTICE:  AUDIT: OBJECT,121,2,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>,1
+psql:pgaudit.sql:1470: NOTICE:  AUDIT: SESSION,121,2,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>,1
+psql:pgaudit.sql:1470: NOTICE:  AUDIT: OBJECT,121,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>,1
+psql:pgaudit.sql:1470: NOTICE:  AUDIT: SESSION,121,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>,1
+psql:pgaudit.sql:1470: NOTICE:  AUDIT: SESSION,121,4,WRITE,INSERT,TABLE,public.bbb,INSERT INTO bbb VALUES (1);,<not logged>,1
+psql:pgaudit.sql:1478: NOTICE:  AUDIT: SESSION,122,1,MISC,SET,,,SET pgaudit.log = 'misc';,<none>,0
+psql:pgaudit.sql:1479: NOTICE:  AUDIT: SESSION,123,1,MISC,SET,,,SET pgaudit.log_client = on;,<none>,0
+psql:pgaudit.sql:1480: NOTICE:  AUDIT: SESSION,124,1,MISC,SET,,,SET pgaudit.log_relation = on;,<none>,0
+psql:pgaudit.sql:1481: NOTICE:  AUDIT: SESSION,125,1,MISC,SET,,,SET pgaudit.log_parameter = on;,<none>,0
+psql:pgaudit.sql:1485: NOTICE:  AUDIT: SESSION,126,1,MISC,SET,,,SET ROLE alice;,<none>,0
+psql:pgaudit.sql:1487: NOTICE:  AUDIT: SESSION,127,1,MISC,SET,,,"SET search_path TO test, public;",<none>,0
+psql:pgaudit.sql:1491: NOTICE:  AUDIT: SESSION,128,1,MISC,VACUUM,,,VACUUM t;,<none>,0
+psql:pgaudit.sql:1492: NOTICE:  AUDIT: SESSION,129,1,MISC,RESET,,,RESET ROLE;,<none>,0
+psql:pgaudit.sql:1496: NOTICE:  AUDIT: SESSION,130,1,MISC,SET,,,SET pgaudit.log = 'MISC_SET';,<none>,0
+psql:pgaudit.sql:1498: NOTICE:  AUDIT: SESSION,131,1,MISC,SET,,,SET ROLE alice;,<none>,0
+psql:pgaudit.sql:1499: NOTICE:  AUDIT: SESSION,132,1,MISC,SET,,,SET search_path TO public;,<none>,0
+psql:pgaudit.sql:1504: NOTICE:  AUDIT: SESSION,133,1,MISC,RESET,,,RESET ROLE;,<none>,0
+psql:pgaudit.sql:1508: NOTICE:  AUDIT: SESSION,134,1,MISC,SET,,,"SET pgaudit.log = 'ALL, -MISC, MISC_SET';",<none>,0
+psql:pgaudit.sql:1509: NOTICE:  AUDIT: SESSION,135,1,MISC,SET,,,SET search_path TO public;,<none>,0
+psql:pgaudit.sql:1511: NOTICE:  AUDIT: SESSION,136,1,WRITE,INSERT,TABLE,public.t,"INSERT INTO t VALUES (3, 'all, -misc, misc_set');",<none>,1
+psql:pgaudit.sql:1515: NOTICE:  AUDIT: SESSION,137,1,MISC,RESET,,,RESET ROLE;,<none>,0
+psql:pgaudit.sql:1516: NOTICE:  AUDIT: SESSION,138,1,DDL,DROP TABLE,,,DROP TABLE public.t;,<none>,0
+psql:pgaudit.sql:1517: NOTICE:  AUDIT: SESSION,139,1,ROLE,DROP ROLE,,,DROP ROLE alice;,<none>,0
+psql:pgaudit.sql:1521: NOTICE:  AUDIT: SESSION,140,1,DDL,CREATE TABLE,,,"CREATE TABLE h(x int ,y int) PARTITION BY HASH(x);",<none>,0
+psql:pgaudit.sql:1522: NOTICE:  AUDIT: SESSION,141,1,DDL,CREATE TABLE,,,"CREATE TABLE h_0 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 0);",<none>,0
+psql:pgaudit.sql:1523: NOTICE:  AUDIT: SESSION,142,1,DDL,CREATE TABLE,,,"CREATE TABLE h_1 partition OF h FOR VALUES WITH ( MODULUS 2, REMAINDER 1);",<none>,0
+psql:pgaudit.sql:1524: NOTICE:  AUDIT: SESSION,143,1,WRITE,INSERT,TABLE,public.h,"INSERT INTO h VALUES(1,1);",<none>,1
+psql:pgaudit.sql:1525: NOTICE:  AUDIT: SESSION,144,1,READ,SELECT,TABLE,public.h,SELECT * FROM h;,<none>,1
+psql:pgaudit.sql:1526: NOTICE:  AUDIT: SESSION,145,1,READ,SELECT,TABLE,public.h_0,SELECT * FROM h_0;,<none>,1
+psql:pgaudit.sql:1527: NOTICE:  AUDIT: SESSION,146,1,DDL,CREATE INDEX,,,CREATE INDEX h_idx ON h (x);,<none>,0
+psql:pgaudit.sql:1528: NOTICE:  AUDIT: SESSION,147,1,DDL,DROP INDEX,,,DROP INDEX h_idx;,<none>,0
+psql:pgaudit.sql:1529: NOTICE:  AUDIT: SESSION,148,1,DDL,DROP TABLE,,,DROP TABLE h;,<none>,0
+You are now connected to database "postgres" as user "postgres".
+psql:pgaudit.sql:1534: NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 RESET pgaudit.log_relation;,<not logged>
+psql:pgaudit.sql:1535: NOTICE:  AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 RESET pgaudit.log;,<not logged>
+psql:pgaudit.sql:1536: NOTICE:  AUDIT: SESSION,3,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_statement = OFF;,<not logged>
+psql:pgaudit.sql:1537: NOTICE:  AUDIT: SESSION,4,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_rows = on;,<not logged>
+You are now connected to database "postgres" as user "user1".
+psql:pgaudit.sql:1542: NOTICE:  AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,<not logged>,<not logged>,3
+You are now connected to database "postgres" as user "postgres".
+psql:pgaudit.sql:1569: NOTICE:  AUDIT: SESSION,1,1,DDL,CREATE TABLE,TABLE,public.wombat,CREATE TABLE wombat ();,<not logged>
+psql:pgaudit.sql:1570: NOTICE:  AUDIT: SESSION,2,1,DDL,DROP TABLE,TABLE,public.wombat,DROP TABLE wombat;,<not logged>
+psql:pgaudit.sql:1585: WARNING:  AUDIT: SESSION,3,1,DDL,CREATE EXTENSION,,,CREATE EXTENSION pg_stat_statements;,<not logged>
+psql:pgaudit.sql:1585: ERROR:  could not open extension control file "/home/tigger/eclipse-workspace/postgres/share/extension/pg_stat_statements.control": No such file or directory
+psql:pgaudit.sql:1586: WARNING:  AUDIT: SESSION,4,1,DDL,ALTER EXTENSION,,,ALTER EXTENSION pg_stat_statements UPDATE TO '1.9';,<not logged>
+psql:pgaudit.sql:1586: ERROR:  extension "pg_stat_statements" does not exist
+psql:pgaudit.sql:1587: ERROR:  extension "pg_stat_statements" does not exist
+postgres=#
