@@ -50,11 +50,13 @@ To limit the number of relations audit logged for `SELECT` and `DML` statements,
 
 pgAudit was developed to support PostgreSQL 9.5 or greater.
 
-In order to support new functionality introduced in each PostgreSQL release, pgAudit maintains a separate branch for each PostgreSQL major version (currently PostgreSQL 9.5 - 14) which will be maintained in a manner similar to the PostgreSQL project.
+In order to support new functionality introduced in each PostgreSQL release, pgAudit maintains a separate branch for each PostgreSQL major version (currently PostgreSQL 9.5 - 15) which will be maintained in a manner similar to the PostgreSQL project.
 
 Aside from bug fixes, no further development is planned for stable branches. New development, if any, will be strictly for next unreleased major version of PostgreSQL.
 
 pgAudit versions relate to PostgreSQL major versions as follows:
+
+- **pgAudit v1.7.X** is intended to support PostgreSQL 15.
 
 - **pgAudit v1.6.X** is intended to support PostgreSQL 14.
 
