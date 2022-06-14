@@ -2321,7 +2321,7 @@ _PG_init(void)
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);
 
-    /* Define pgaudit.role */
+    /* Define pgaudit.roles_scope */
     DefineCustomStringVariable(
         "pgaudit.roles_scope",
 
@@ -2334,7 +2334,7 @@ _PG_init(void)
         NULL,
         &auditRolesScope,
         "[none]",
-        PGC_SUSET,
+		PGC_POSTMASTER, // prevent superuser changing within that session - requires a reboot
 		GUC_NOT_IN_SAMPLE,
 		check_pgaudit_roles_scope,
 		NULL,
