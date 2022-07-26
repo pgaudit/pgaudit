@@ -1517,7 +1517,8 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
 
                 do
                 {
-                    if (nextItem->auditEvent.commandTag != T_SelectStmt &&
+                    if (!superuser() &&
+                        nextItem->auditEvent.commandTag != T_SelectStmt &&
                         nextItem->auditEvent.commandTag != T_VariableShowStmt &&
                         nextItem->auditEvent.commandTag != T_ExplainStmt)
                     {
