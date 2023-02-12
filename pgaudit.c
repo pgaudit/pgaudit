@@ -5,7 +5,7 @@
  * object level logging, and fully-qualified object names for all DML and DDL
  * statements where possible (See README.md for details).
  *
- * Copyright (c) 2014-2022, PostgreSQL Global Development Group
+ * Copyright (c) 2014-2023, PostgreSQL Global Development Group
  *------------------------------------------------------------------------------
  */
 #include "postgres.h"
@@ -2204,7 +2204,7 @@ _PG_init(void)
     DefineCustomStringVariable(
         "pgaudit.role",
 
-        "Specifies the master role to use for object audit logging.  Muliple "
+        "Specifies the master role to use for object audit logging.  Multiple "
         "audit roles can be defined by granting them to the master role. This "
         "allows multiple groups to be in charge of different aspects of audit "
         "logging.",

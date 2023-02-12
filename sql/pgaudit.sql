@@ -3,6 +3,9 @@
 -- Create pgaudit extension
 CREATE EXTENSION IF NOT EXISTS pgaudit;
 
+-- Grant all on public schema to public
+GRANT ALL ON SCHEMA public TO public;
+
 -- Make sure events don't get logged twice when session logging
 SET pgaudit.log = 'all';
 SET pgaudit.log_client = ON;
@@ -1591,7 +1594,7 @@ SET pgaudit.log = 'all,-misc_set';
 SET pgaudit.log_level = 'warning';
 
 CREATE EXTENSION pg_stat_statements;
-ALTER EXTENSION pg_stat_statements UPDATE TO '1.9';
+ALTER EXTENSION pg_stat_statements UPDATE TO '1.10';
 DROP EXTENSION pg_stat_statements;
 
 SET pgaudit.log_level = 'notice';
