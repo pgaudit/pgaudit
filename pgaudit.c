@@ -28,6 +28,7 @@
 #include "libpq/auth.h"
 #include "nodes/nodes.h"
 #include "nodes/params.h"
+#include "parser/parse_relation.h"
 #include "tcop/utility.h"
 #include "tcop/deparse_utility.h"
 #include "utils/acl.h"
@@ -238,6 +239,7 @@ typedef struct
     MemoryContext queryContext; /* Context for query tracking rows */
     Oid auditOid;               /* Role running query tracking rows  */
     List *rangeTabls;           /* Tables in query tracking rows */
+    List *permInfos;            /* Permission info rows for each table involved in the query */
 } AuditEvent;
 
 /*
@@ -1001,9 +1003,10 @@ audit_on_any_attribute(Oid relOid,
  * Create AuditEvents for SELECT/DML operations via executor permissions checks.
  */
 static void
-log_select_dml(Oid auditOid, List *rangeTabls)
+log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
 {
     ListCell *lr;
+    RTEPermissionInfo *perminfo;
     bool first = true;
     bool found = false;
 
@@ -1059,6 +1062,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
             first = false;
         }
 
+        perminfo = getRTEPermissionInfo(permInfos, rte);
         /*
          * We don't have access to the parsetree here, so we have to generate
          * the node type, object type, and command tag by decoding
@@ -1066,26 +1070,26 @@ log_select_dml(Oid auditOid, List *rangeTabls)
          * rellockmode so that only true UPDATE commands (not
          * SELECT FOR UPDATE, etc.) are logged as UPDATE.
          */
-        if (rte->requiredPerms & ACL_INSERT)
+        if (perminfo->requiredPerms & ACL_INSERT)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
             auditEventStack->auditEvent.commandTag = T_InsertStmt;
             auditEventStack->auditEvent.command = CMDTAG_INSERT;
         }
-        else if (rte->requiredPerms & ACL_UPDATE &&
+        else if (perminfo->requiredPerms & ACL_UPDATE &&
                  rte->rellockmode >= RowExclusiveLock)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
             auditEventStack->auditEvent.commandTag = T_UpdateStmt;
             auditEventStack->auditEvent.command = CMDTAG_UPDATE;
         }
-        else if (rte->requiredPerms & ACL_DELETE)
+        else if (perminfo->requiredPerms & ACL_DELETE)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
             auditEventStack->auditEvent.commandTag = T_DeleteStmt;
             auditEventStack->auditEvent.command = CMDTAG_DELETE;
         }
-        else if (rte->requiredPerms & ACL_SELECT)
+        else if (perminfo->requiredPerms & ACL_SELECT)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_ALL;
             auditEventStack->auditEvent.commandTag = T_SelectStmt;
@@ -1150,7 +1154,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         {
             AclMode auditPerms =
                 (ACL_SELECT | ACL_UPDATE | ACL_INSERT | ACL_DELETE) &
-                rte->requiredPerms;
+                perminfo->requiredPerms;
 
             /*
              * If any of the required permissions for the relation are granted
@@ -1171,7 +1175,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                 if (auditPerms & ACL_SELECT)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
-                                               rte->selectedCols,
+                                               perminfo->selectedCols,
                                                ACL_SELECT);
 
                 /*
@@ -1181,7 +1185,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                     auditPerms & ACL_INSERT)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
-                                               rte->insertedCols,
+                                               perminfo->insertedCols,
                                                auditPerms);
 
                 /*
@@ -1191,7 +1195,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                     auditPerms & ACL_UPDATE)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
-                                               rte->updatedCols,
+                                               perminfo->updatedCols,
                                                auditPerms);
             }
         }
@@ -1372,7 +1376,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
  * Hook ExecutorCheckPerms to do session and object auditing for DML.
  */
 static bool
-pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
+pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, List *permInfos, bool abort)
 {
     Oid auditOid;
 
@@ -1397,7 +1401,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
                  * The SELECT event for CREATE TABLE AS will be logged
                  * in pgaudit_ExecutorEnd_hook() later to get rows.
                  */
-                log_select_dml(auditOid, rangeTabls);
+                log_select_dml(auditOid, rangeTabls, permInfos);
             }
             else
             {
@@ -1407,15 +1411,16 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
                  */
                 auditEventStack->auditEvent.auditOid = auditOid;
                 auditEventStack->auditEvent.rangeTabls = rangeTabls;
+                auditEventStack->auditEvent.permInfos = permInfos;
             }
         }
         else
-            log_select_dml(auditOid, rangeTabls);
+            log_select_dml(auditOid, rangeTabls, permInfos);
     }
 
     /* Call the next hook function */
     if (next_ExecutorCheckPerms_hook &&
-        !(*next_ExecutorCheckPerms_hook) (rangeTabls, abort))
+        !(*next_ExecutorCheckPerms_hook) (rangeTabls, permInfos, abort))
         return false;
 
     return true;
@@ -1468,7 +1473,8 @@ pgaudit_ExecutorEnd_hook(QueryDesc *queryDesc)
 
             /* Log SELECT/DML audit entry */
             log_select_dml(stackItem->auditEvent.auditOid,
-                           stackItem->auditEvent.rangeTabls);
+                           stackItem->auditEvent.rangeTabls,
+                           stackItem->auditEvent.permInfos);
 
             /* Switch back to the previous auditEventStack */
             auditEventStack = auditEventStackFull;
