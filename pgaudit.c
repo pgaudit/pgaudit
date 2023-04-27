@@ -953,7 +953,7 @@ audit_on_any_attribute(Oid relOid,
                        AclMode mode)
 {
     bool result = false;
-    AttrNumber col;
+    AttrNumber index = -1;
     Bitmapset *tmpSet;
 
     /* If bms is empty then check for any column match */
@@ -982,9 +982,9 @@ audit_on_any_attribute(Oid relOid,
     tmpSet = bms_copy(attributeSet);
 
     /* Check each column */
-    while ((col = bms_first_member(tmpSet)) >= 0)
+    while ((index = bms_next_member(tmpSet, index)) >= 0)
     {
-        col += FirstLowInvalidHeapAttributeNumber;
+        const AttrNumber col = index + FirstLowInvalidHeapAttributeNumber;
 
         if (col != InvalidAttrNumber &&
             audit_on_attribute(relOid, col, auditOid, mode))
