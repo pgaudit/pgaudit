@@ -1591,6 +1591,17 @@ DROP EXTENSION pg_stat_statements;
 
 SET pgaudit.log_level = 'notice';
 
+-- Check that password redaction works with CREATE/ALTER USER MAPPING
+CREATE EXTENSION postgres_fdw;
+CREATE SERVER fdw_server FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host 'foo', dbname 'foodb', port '5432');
+
+CREATE USER MAPPING FOR user1 SERVER fdw_server OPTIONS (user 'user1', password 'secret');
+ALTER USER MAPPING FOR user1 SERVER fdw_server OPTIONS (SET /* comment */ password 'secret2');
+
+DROP USER MAPPING FOR user1 SERVER fdw_server;
+DROP SERVER fdw_server;
+DROP EXTENSION postgres_fdw;
+
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
