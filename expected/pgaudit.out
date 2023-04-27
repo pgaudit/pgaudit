@@ -2515,6 +2515,21 @@ NOTICE:  version "1.10" of extension "pg_stat_statements" is already installed
 DROP EXTENSION pg_stat_statements;
 WARNING:  AUDIT: SESSION,5,1,DDL,DROP EXTENSION,,,DROP EXTENSION pg_stat_statements;,<not logged>
 SET pgaudit.log_level = 'notice';
+-- Check that password redaction works with CREATE/ALTER USER MAPPING
+CREATE EXTENSION postgres_fdw;
+NOTICE:  AUDIT: SESSION,6,1,DDL,CREATE EXTENSION,,,CREATE EXTENSION postgres_fdw;,<not logged>
+CREATE SERVER fdw_server FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host 'foo', dbname 'foodb', port '5432');
+NOTICE:  AUDIT: SESSION,7,1,DDL,CREATE SERVER,,,"CREATE SERVER fdw_server FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host 'foo', dbname 'foodb', port '5432');",<not logged>
+CREATE USER MAPPING FOR user1 SERVER fdw_server OPTIONS (user 'user1', password 'secret');
+NOTICE:  AUDIT: SESSION,8,1,ROLE,CREATE USER MAPPING,,,"CREATE USER MAPPING FOR user1 SERVER fdw_server OPTIONS (user 'user1', password <REDACTED>",<not logged>
+ALTER USER MAPPING FOR user1 SERVER fdw_server OPTIONS (SET /* comment */ password 'secret2');
+NOTICE:  AUDIT: SESSION,9,1,ROLE,ALTER USER MAPPING,,,ALTER USER MAPPING FOR user1 SERVER fdw_server OPTIONS (SET /* comment */ password <REDACTED>,<not logged>
+DROP USER MAPPING FOR user1 SERVER fdw_server;
+NOTICE:  AUDIT: SESSION,10,1,DDL,DROP USER MAPPING,,,DROP USER MAPPING FOR user1 SERVER fdw_server;,<not logged>
+DROP SERVER fdw_server;
+NOTICE:  AUDIT: SESSION,11,1,DDL,DROP SERVER,,,DROP SERVER fdw_server;,<not logged>
+DROP EXTENSION postgres_fdw;
+NOTICE:  AUDIT: SESSION,12,1,DDL,DROP EXTENSION,,,DROP EXTENSION postgres_fdw;,<not logged>
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
