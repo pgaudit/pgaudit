@@ -141,7 +141,7 @@ bool auditLogRelation = false;
  * Adminsistrators can choose to prevent the logging of large variable-length
  * attributes.  If set to 0 (the default), all objects are logged.  If set
  * greater than 0, variable length objects larger (before character output)
- * whose size is  greater than the specified number of bytes will be replaced
+ * whose size is greater than the specified number of bytes will be replaced
  * by a placeholder.
 */
 int auditMaxObjectSize = 0;
@@ -771,7 +771,6 @@ log_audit_event(AuditEventStackItem *stackItem)
                     char *paramStr = OidOutputFunctionCall(typeOutput, prm->value);
 
                     append_valid_csv(&paramStrResult, paramStr);
-
                     pfree(paramStr);
                 }
             }
@@ -2139,16 +2138,17 @@ _PG_init(void)
         "pgaudit.max_object_size",
 
         "Specifies, in bytes, a maximum length of variable-length object to "
-        "log.  If 0 (the default), objects are not checked for size.  If set, if "
-        "the size of the object is longer than the setting, the value in the audit "
-        "log is replaced with a placeholder. Note hat for character types, the "
-        "length is in bytes in the field's encoding, not characters.",
+        "log.  If 0 (the default), objects are not checked for size.  If set, "
+        "when the size of the object is longer than the setting, the value in "
+        "the audit log is replaced with a placeholder. Note that for character "
+        "types, the length is in bytes for the field's encoding, not "
+        "characters.",
 
         NULL,
         &auditMaxObjectSize,
         0,
         0,
-        (1<<30)-1,
+        (1 << 30) - 1,
         PGC_SUSET,
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);
