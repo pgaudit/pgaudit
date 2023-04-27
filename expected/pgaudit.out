@@ -196,7 +196,6 @@ SELECT *
 WARNING:  AUDIT: SESSION,2,1,READ,SELECT,,,"SELECT *
   FROM vw_test3, test2;",<not logged>
 WARNING:  AUDIT: OBJECT,2,1,READ,SELECT,TABLE,public.test2,<previously logged>,<previously logged>
-WARNING:  AUDIT: OBJECT,2,1,READ,SELECT,VIEW,public.vw_test3,<previously logged>,<previously logged>
  id | id 
 ----+----
 (0 rows)
@@ -602,10 +601,10 @@ NOTICE:  AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 RESET pgaudit.log
 ALTER ROLE user1 SET pgaudit.log_statement = OFF;
 NOTICE:  AUDIT: SESSION,3,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_statement = OFF;,<not logged>
 \connect - user1
+WARNING:  permission denied to set parameter "pgaudit.log_level"
 --
 -- Logged but without full statement
 SELECT * FROM account;
-NOTICE:  AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,<not logged>,<not logged>
  id | name  | password | description 
 ----+-------+----------+-------------
   1 | user1 | HASH2    | yada, yada
@@ -1407,10 +1406,6 @@ NOTICE:  AUDIT: SESSION,19,1,READ,SELECT,TABLE,public.test2,"SELECT *
 SELECT *
   FROM vw_test3, test2;
 NOTICE:  AUDIT: SESSION,20,1,READ,SELECT,TABLE,public.test2,"SELECT *
-  FROM vw_test3, test2;",<none>,9
-NOTICE:  AUDIT: SESSION,20,1,READ,SELECT,VIEW,public.vw_test3,"SELECT *
-  FROM vw_test3, test2;",<none>,9
-NOTICE:  AUDIT: SESSION,20,1,MISC,???,VIEW,public.vw_test3,"SELECT *
   FROM vw_test3, test2;",<none>,9
 NOTICE:  AUDIT: SESSION,20,1,READ,SELECT,TABLE,public.test3,"SELECT *
   FROM vw_test3, test2;",<none>,9
@@ -2464,10 +2459,10 @@ NOTICE:  AUDIT: SESSION,3,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_s
 ALTER ROLE user1 SET pgaudit.log_rows = on;
 NOTICE:  AUDIT: SESSION,4,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_rows = on;,<not logged>
 \connect - user1
+WARNING:  permission denied to set parameter "pgaudit.log_level"
 --
 -- Logged but without full statement
 SELECT * FROM account;
-NOTICE:  AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,<not logged>,<not logged>,3
  id | name  | password | description 
 ----+-------+----------+-------------
   1 | user1 | HASH4    | yada, yada3

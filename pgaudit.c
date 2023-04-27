@@ -1006,7 +1006,6 @@ static void
 log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
 {
     ListCell *lr;
-    RTEPermissionInfo *perminfo;
     bool first = true;
     bool found = false;
 
@@ -1019,6 +1018,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
         Oid relOid;
         Oid relNamespaceOid;
         RangeTblEntry *rte = lfirst(lr);
+        const RTEPermissionInfo *perminfo;
 
         /* We only care about tables, and can ignore subqueries etc. */
         if (rte->rtekind != RTE_RELATION)
@@ -1062,7 +1062,11 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
             first = false;
         }
 
+        if (rte->perminfoindex == 0)
+            continue;
+
         perminfo = getRTEPermissionInfo(permInfos, rte);
+
         /*
          * We don't have access to the parsetree here, so we have to generate
          * the node type, object type, and command tag by decoding
@@ -1939,7 +1943,7 @@ assign_pgaudit_log(const char *newVal, void *extra)
 {
     if (extra)
         auditLogBitmap = *(int *) extra;
-}
+    }
 
 /*
  * Take a pgaudit.log_level value such as "debug" and check that is is valid.
