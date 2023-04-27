@@ -1870,8 +1870,6 @@ check_pgaudit_log(char **newVal, void **extra, GucSource source)
      * Check that we recognise each token, and add it to the bitmap we're
      * building up in a newly-allocated int *f.
      */
-    guc_free(flags);
-
     if (!(flags = (int *)guc_malloc(FATAL, sizeof(int))))
         return false;
 
@@ -1956,8 +1954,6 @@ check_pgaudit_log_level(char **newVal, void **extra, GucSource source)
     int *logLevel;
 
     /* Allocate memory to store the log level */
-    guc_free(logLevel);
-
     if (!(logLevel = (int *)guc_malloc(FATAL, sizeof(int))))
         return false;
 
