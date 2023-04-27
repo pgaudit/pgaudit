@@ -5,7 +5,7 @@
  * object level logging, and fully-qualified object names for all DML and DDL
  * statements where possible (See README.md for details).
  *
- * Copyright (c) 2014-2022, PostgreSQL Global Development Group
+ * Copyright (c) 2014-2023, PostgreSQL Global Development Group
  *------------------------------------------------------------------------------
  */
 #include "postgres.h"
@@ -550,13 +550,15 @@ log_audit_event(AuditEventStackItem *stackItem)
             /* Identify role statements */
             switch (stackItem->auditEvent.commandTag)
             {
-                /* In the case of create and alter role redact all text in the
+                /* In the case of create and alter role or user mapping redact all text in the
                  * command after the password token for security.  This doesn't
                  * cover all possible cases where passwords can be leaked but
                  * should take care of the most common usage.
                  */
                 case T_CreateRoleStmt:
                 case T_AlterRoleStmt:
+				case T_CreateUserMappingStmt:
+				case T_AlterUserMappingStmt:
 
                     if (stackItem->auditEvent.commandText != NULL)
                     {
