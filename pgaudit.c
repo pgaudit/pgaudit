@@ -1866,7 +1866,9 @@ check_pgaudit_log(char **newVal, void **extra, GucSource source)
      * Check that we recognise each token, and add it to the bitmap we're
      * building up in a newly-allocated int *f.
      */
-    if (!(flags = (int *) malloc(sizeof(int))))
+    guc_free(flags);
+
+    if (!(flags = (int *)guc_malloc(FATAL, sizeof(int))))
         return false;
 
     *flags = 0;
@@ -1905,7 +1907,7 @@ check_pgaudit_log(char **newVal, void **extra, GucSource source)
             class = LOG_WRITE;
         else
         {
-            free(flags);
+            guc_free(flags);
             pfree(rawVal);
             list_free(flagRawList);
             return false;
@@ -1950,7 +1952,9 @@ check_pgaudit_log_level(char **newVal, void **extra, GucSource source)
     int *logLevel;
 
     /* Allocate memory to store the log level */
-    if (!(logLevel = (int *) malloc(sizeof(int))))
+    guc_free(logLevel);
+
+    if (!(logLevel = (int *)guc_malloc(FATAL, sizeof(int))))
         return false;
 
     /* Find the log level enum */
@@ -1978,7 +1982,7 @@ check_pgaudit_log_level(char **newVal, void **extra, GucSource source)
     /* Error if the log level enum is not found */
     else
     {
-        free(logLevel);
+        guc_free(logLevel);
         return false;
     }
 
