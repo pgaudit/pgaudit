@@ -140,11 +140,11 @@ bool auditLogRelation = false;
  *
  * Adminsistrators can choose to prevent the logging of large variable-length
  * attributes.  If set to 0 (the default), all objects are logged.  If set
- * greater than 0, variable length objects larger (before character output)
- * whose size is greater than the specified number of bytes will be replaced
+ * greater than 0, variable length objects (before character output) whose
+ * size is greater than the specified number of bytes will be replaced
  * by a placeholder.
 */
-int auditMaxObjectSize = 0;
+int auditLogParameterMaxSize = 0;
 
 /*
  * GUC variable for pgaudit.log_rows
@@ -762,9 +762,9 @@ log_audit_event(AuditEventStackItem *stackItem)
                  */
                 getTypeOutputInfo(prm->ptype, &typeOutput, &typeIsVarLena);
 
-                if (auditMaxObjectSize &&
+                if (auditLogParameterMaxSize &&
                     typeIsVarLena &&
-                    VARSIZE_ANY_EXHDR(prm->value) > auditMaxObjectSize)
+                    VARSIZE_ANY_EXHDR(prm->value) > auditLogParameterMaxSize)
                     append_valid_csv(&paramStrResult, "<long field suppressed>");
                 else
                 {
@@ -2133,9 +2133,9 @@ _PG_init(void)
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);
 
-    /* Define pgaudit.max_object_size */
+    /* Define pgaudit.log_parameter_max_size */
     DefineCustomIntVariable(
-        "pgaudit.max_object_size",
+        "pgaudit.log_parameter_max_size",
 
         "Specifies, in bytes, a maximum length of variable-length object to "
         "log.  If 0 (the default), objects are not checked for size.  If set, "
@@ -2145,7 +2145,7 @@ _PG_init(void)
         "characters.",
 
         NULL,
-        &auditMaxObjectSize,
+        &auditLogParameterMaxSize,
         0,
         0,
         (1 << 30) - 1,

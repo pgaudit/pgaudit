@@ -160,6 +160,12 @@ Specifies that audit logging should include the parameters that were passed with
 
 The default is `off`.
 
+### pgaudit.log_parameter_max_size
+
+Specifies that parameter values longer than this setting (in bytes) should not be logged, but replaced with `<long field suppressed>`. This is set in bytes, not characters, so does not account for multibyte characters in a text field's encoding. This parameter has no effect if `log_parameter` is `off`. If this setting is 0 (the default), all parameters are logged regardless of length
+
+The default is 0.
+
 ### pgaudit.log_relation
 
 Specifies whether session audit logging should create a separate log entry for each relation (`TABLE`, `VIEW`, etc.) referenced in a `SELECT` or `DML` statement. This is a useful shortcut for exhaustive logging without using object audit logging.

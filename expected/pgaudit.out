@@ -382,6 +382,34 @@ WARNING:  AUDIT: OBJECT,3,1,WRITE,UPDATE,TABLE,public.test4,"UPDATE public.test4
 update public.test4 set name = 'foo' where name = 'bar';
 WARNING:  AUDIT: OBJECT,4,1,WRITE,UPDATE,TABLE,public.test4,update public.test4 set name = 'foo' where name = 'bar';,<not logged>
 --
+-- Confirm that "long" parameter values will not be logged if pgaudit.log_parameter_max_size
+-- is set.
+\connect - :current_user
+ALTER ROLE user2 SET pgaudit.log_parameter_max_size = 50;
+NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.log_parameter_max_size = 50;,<not logged>
+ALTER ROLE user2 SET pgaudit.log_parameter = 'on';
+NOTICE:  AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.log_parameter = 'on';,<not logged>
+\connect - user2
+PREPARE testinsert(int, text) AS
+    INSERT INTO test4 VALUES($1, $2);
+EXECUTE testinsert(1, '*******************************************************');
+WARNING:  AUDIT: OBJECT,1,1,WRITE,INSERT,TABLE,public.test4,"PREPARE testinsert(int, text) AS
+    INSERT INTO test4 VALUES($1, $2);","1,<long field suppressed>"
+DEALLOCATE testinsert;
+\connect - :current_user
+ALTER ROLE user2 RESET pgaudit.log_parameter_max_size;
+NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 RESET pgaudit.log_parameter_max_size;,<not logged>
+\connect - user2
+PREPARE testinsert(int, text) AS
+    INSERT INTO test4 VALUES($1, $2);
+EXECUTE testinsert(2, '*******************************************************');
+WARNING:  AUDIT: OBJECT,1,1,WRITE,INSERT,TABLE,public.test4,"PREPARE testinsert(int, text) AS
+    INSERT INTO test4 VALUES($1, $2);","2,*******************************************************"
+DEALLOCATE testinsert;
+\connect - :current_user
+ALTER ROLE user2 RESET pgaudit.log_parameter;
+NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 RESET pgaudit.log_parameter;,<not logged>
+--
 -- Change permissions of user 1 so that session logging will be done
 \connect - :current_user
 --
@@ -2538,6 +2566,7 @@ ALTER ROLE :current_user RESET pgaudit.log_catalog;
 ALTER ROLE :current_user RESET pgaudit.log_client;
 ALTER ROLE :current_user RESET pgaudit.log_level;
 ALTER ROLE :current_user RESET pgaudit.log_parameter;
+ALTER ROLE :current_user RESET pgaudit.log_parameter_max_size;
 ALTER ROLE :current_user RESET pgaudit.log_relation;
 ALTER ROLE :current_user RESET pgaudit.log_statement;
 ALTER ROLE :current_user RESET pgaudit.log_statement_once;
@@ -2546,6 +2575,7 @@ RESET pgaudit.log;
 RESET pgaudit.log_catalog;
 RESET pgaudit.log_level;
 RESET pgaudit.log_parameter;
+RESET pgaudit.log_parameter_max_size;
 RESET pgaudit.log_relation;
 RESET pgaudit.log_statement;
 RESET pgaudit.log_statement_once;
