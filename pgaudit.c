@@ -136,6 +136,17 @@ bool auditLogParameter = false;
 bool auditLogRelation = false;
 
 /*
+ * GUC variable for pgaudit.log_parameter_max_size
+ *
+ * Administrators can choose to prevent the logging of large variable-length
+ * parameters.  If set to 0 (the default), all parameters are logged.  If set
+ * greater than 0, variable length parameters (before character output) whose
+ * size is greater than the specified number of bytes will be replaced
+ * by a placeholder.
+*/
+int auditLogParameterMaxSize = 0;
+
+/*
  * GUC variable for pgaudit.log_rows
  *
  * Administrators can choose if the rows retrieved or affected by a statement
@@ -736,7 +747,6 @@ log_audit_event(AuditEventStackItem *stackItem)
                 ParamExternData *prm = &paramList->params[paramIdx];
                 Oid typeOutput;
                 bool typeIsVarLena;
-                char *paramStr;
 
                 /* Add a comma for each param */
                 if (paramIdx != 0)
@@ -746,12 +756,27 @@ log_audit_event(AuditEventStackItem *stackItem)
                 if (prm->isnull || !OidIsValid(prm->ptype))
                     continue;
 
-                /* Output the string */
+                /*
+                 * Append the param, suppressing long params if the appropriate
+                 * GUC is set.
+                 */
                 getTypeOutputInfo(prm->ptype, &typeOutput, &typeIsVarLena);
-                paramStr = OidOutputFunctionCall(typeOutput, prm->value);
 
-                append_valid_csv(&paramStrResult, paramStr);
-                pfree(paramStr);
+                if (auditLogParameterMaxSize > 0 &&
+                    typeIsVarLena &&
+                    VARSIZE_ANY_EXHDR(prm->value) > auditLogParameterMaxSize)
+                {
+                    append_valid_csv(&paramStrResult,
+                                     "<long param suppressed>");
+                }
+                else
+                {
+                    char *paramStr = OidOutputFunctionCall(typeOutput,
+                                                           prm->value);
+
+                    append_valid_csv(&paramStrResult, paramStr);
+                    pfree(paramStr);
+                }
             }
 
             if (numParams == 0)
@@ -2092,6 +2117,26 @@ _PG_init(void)
         NULL,
         &auditLogParameter,
         false,
+        PGC_SUSET,
+        GUC_NOT_IN_SAMPLE,
+        NULL, NULL, NULL);
+
+    /* Define pgaudit.log_parameter_max_size */
+    DefineCustomIntVariable(
+        "pgaudit.log_parameter_max_size",
+
+        "Specifies, in bytes, the maximum length of variable-length parameters "
+        "to log.  If 0 (the default), parameters are not checked for size.  If "
+        "set, when the size of the parameter is longer than the setting, the "
+        "value in the audit log is replaced with a placeholder. Note that for "
+        "character types, the length is in bytes for the parameter's encoding, "
+        "not characters.",
+
+        NULL,
+        &auditLogParameterMaxSize,
+        0,
+        0,
+        (1 << 30) - 1,
         PGC_SUSET,
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);
