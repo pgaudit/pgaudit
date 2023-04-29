@@ -136,11 +136,11 @@ bool auditLogParameter = false;
 bool auditLogRelation = false;
 
 /*
- * GUC variable for pgaudit.max_object_size
+ * GUC variable for pgaudit.log_parameter_max_size
  *
- * Adminsistrators can choose to prevent the logging of large variable-length
- * attributes.  If set to 0 (the default), all objects are logged.  If set
- * greater than 0, variable length objects (before character output) whose
+ * Administrators can choose to prevent the logging of large variable-length
+ * parameters.  If set to 0 (the default), all parameters are logged.  If set
+ * greater than 0, variable length parameters (before character output) whose
  * size is greater than the specified number of bytes will be replaced
  * by a placeholder.
 */
@@ -757,18 +757,22 @@ log_audit_event(AuditEventStackItem *stackItem)
                     continue;
 
                 /*
-                 * Output the string, suppressing long strings if the appropriate
+                 * Append the param, suppressing long params if the appropriate
                  * GUC is set.
                  */
                 getTypeOutputInfo(prm->ptype, &typeOutput, &typeIsVarLena);
 
-                if (auditLogParameterMaxSize &&
+                if (auditLogParameterMaxSize > 0 &&
                     typeIsVarLena &&
                     VARSIZE_ANY_EXHDR(prm->value) > auditLogParameterMaxSize)
-                    append_valid_csv(&paramStrResult, "<long field suppressed>");
+                {
+                    append_valid_csv(&paramStrResult,
+                                     "<long param suppressed>");
+                }
                 else
                 {
-                    char *paramStr = OidOutputFunctionCall(typeOutput, prm->value);
+                    char *paramStr = OidOutputFunctionCall(typeOutput,
+                                                           prm->value);
 
                     append_valid_csv(&paramStrResult, paramStr);
                     pfree(paramStr);
@@ -2117,6 +2121,26 @@ _PG_init(void)
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);
 
+    /* Define pgaudit.log_parameter_max_size */
+    DefineCustomIntVariable(
+        "pgaudit.log_parameter_max_size",
+
+        "Specifies, in bytes, the maximum length of variable-length parameters "
+        "to log.  If 0 (the default), parameters are not checked for size.  If "
+        "set, when the size of the parameter is longer than the setting, the "
+        "value in the audit log is replaced with a placeholder. Note that for "
+        "character types, the length is in bytes for the parameter's encoding, "
+        "not characters.",
+
+        NULL,
+        &auditLogParameterMaxSize,
+        0,
+        0,
+        (1 << 30) - 1,
+        PGC_SUSET,
+        GUC_NOT_IN_SAMPLE,
+        NULL, NULL, NULL);
+
     /* Define pgaudit.log_relation */
     DefineCustomBoolVariable(
         "pgaudit.log_relation",
@@ -2129,26 +2153,6 @@ _PG_init(void)
         NULL,
         &auditLogRelation,
         false,
-        PGC_SUSET,
-        GUC_NOT_IN_SAMPLE,
-        NULL, NULL, NULL);
-
-    /* Define pgaudit.log_parameter_max_size */
-    DefineCustomIntVariable(
-        "pgaudit.log_parameter_max_size",
-
-        "Specifies, in bytes, a maximum length of variable-length object to "
-        "log.  If 0 (the default), objects are not checked for size.  If set, "
-        "when the size of the object is longer than the setting, the value in "
-        "the audit log is replaced with a placeholder. Note that for character "
-        "types, the length is in bytes for the field's encoding, not "
-        "characters.",
-
-        NULL,
-        &auditLogParameterMaxSize,
-        0,
-        0,
-        (1 << 30) - 1,
         PGC_SUSET,
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);

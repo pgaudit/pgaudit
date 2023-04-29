@@ -394,7 +394,7 @@ PREPARE testinsert(int, text) AS
     INSERT INTO test4 VALUES($1, $2);
 EXECUTE testinsert(1, '*******************************************************');
 WARNING:  AUDIT: OBJECT,1,1,WRITE,INSERT,TABLE,public.test4,"PREPARE testinsert(int, text) AS
-    INSERT INTO test4 VALUES($1, $2);","1,<long field suppressed>"
+    INSERT INTO test4 VALUES($1, $2);","1,<long param suppressed>"
 DEALLOCATE testinsert;
 \connect - :current_user
 ALTER ROLE user2 RESET pgaudit.log_parameter_max_size;
