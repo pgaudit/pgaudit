@@ -301,6 +301,35 @@ UPDATE public.test4
 update public.test4 set name = 'foo' where name = 'bar';
 
 --
+-- Confirm that "long" parameter values will not be logged if pgaudit.log_parameter_max_size
+-- is set.
+\connect - :current_user
+ALTER ROLE user2 SET pgaudit.log_parameter_max_size = 50;
+ALTER ROLE user2 SET pgaudit.log_parameter = 'on';
+
+\connect - user2
+PREPARE testinsert(int, text) AS
+    INSERT INTO test4 VALUES($1, $2);
+
+EXECUTE testinsert(1, '*******************************************************');
+
+DEALLOCATE testinsert;
+
+\connect - :current_user
+ALTER ROLE user2 RESET pgaudit.log_parameter_max_size;
+
+\connect - user2
+PREPARE testinsert(int, text) AS
+    INSERT INTO test4 VALUES($1, $2);
+
+EXECUTE testinsert(2, '*******************************************************');
+
+DEALLOCATE testinsert;
+
+\connect - :current_user
+ALTER ROLE user2 RESET pgaudit.log_parameter;
+
+--
 -- Change permissions of user 1 so that session logging will be done
 \connect - :current_user
 
@@ -1611,6 +1640,7 @@ ALTER ROLE :current_user RESET pgaudit.log_catalog;
 ALTER ROLE :current_user RESET pgaudit.log_client;
 ALTER ROLE :current_user RESET pgaudit.log_level;
 ALTER ROLE :current_user RESET pgaudit.log_parameter;
+ALTER ROLE :current_user RESET pgaudit.log_parameter_max_size;
 ALTER ROLE :current_user RESET pgaudit.log_relation;
 ALTER ROLE :current_user RESET pgaudit.log_statement;
 ALTER ROLE :current_user RESET pgaudit.log_statement_once;
@@ -1620,6 +1650,7 @@ RESET pgaudit.log;
 RESET pgaudit.log_catalog;
 RESET pgaudit.log_level;
 RESET pgaudit.log_parameter;
+RESET pgaudit.log_parameter_max_size;
 RESET pgaudit.log_relation;
 RESET pgaudit.log_statement;
 RESET pgaudit.log_statement_once;
