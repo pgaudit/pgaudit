@@ -1968,7 +1968,7 @@ assign_pgaudit_log(const char *newVal, void *extra)
 {
     if (extra)
         auditLogBitmap = *(int *) extra;
-    }
+}
 
 /*
  * Take a pgaudit.log_level value such as "debug" and check that is is valid.

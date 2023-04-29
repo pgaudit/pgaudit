@@ -399,6 +399,7 @@ DEALLOCATE testinsert;
 ALTER ROLE user2 RESET pgaudit.log_parameter_max_size;
 NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 RESET pgaudit.log_parameter_max_size;,<not logged>
 \connect - user2
+WARNING:  permission denied to set parameter "pgaudit.log"
 PREPARE testinsert(int, text) AS
     INSERT INTO test4 VALUES($1, $2);
 EXECUTE testinsert(2, '*******************************************************');
