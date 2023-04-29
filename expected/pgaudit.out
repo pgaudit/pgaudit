@@ -399,7 +399,6 @@ DEALLOCATE testinsert;
 ALTER ROLE user2 RESET pgaudit.log_parameter_max_size;
 NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 RESET pgaudit.log_parameter_max_size;,<not logged>
 \connect - user2
-WARNING:  permission denied to set parameter "pgaudit.log"
 PREPARE testinsert(int, text) AS
     INSERT INTO test4 VALUES($1, $2);
 EXECUTE testinsert(2, '*******************************************************');
@@ -630,10 +629,10 @@ NOTICE:  AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 RESET pgaudit.log
 ALTER ROLE user1 SET pgaudit.log_statement = OFF;
 NOTICE:  AUDIT: SESSION,3,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_statement = OFF;,<not logged>
 \connect - user1
-WARNING:  permission denied to set parameter "pgaudit.log_level"
 --
 -- Logged but without full statement
 SELECT * FROM account;
+NOTICE:  AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,<not logged>,<not logged>
  id | name  | password | description 
 ----+-------+----------+-------------
   1 | user1 | HASH2    | yada, yada
@@ -2488,10 +2487,10 @@ NOTICE:  AUDIT: SESSION,3,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_s
 ALTER ROLE user1 SET pgaudit.log_rows = on;
 NOTICE:  AUDIT: SESSION,4,1,ROLE,ALTER ROLE,,,ALTER ROLE user1 SET pgaudit.log_rows = on;,<not logged>
 \connect - user1
-WARNING:  permission denied to set parameter "pgaudit.log_level"
 --
 -- Logged but without full statement
 SELECT * FROM account;
+NOTICE:  AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,<not logged>,<not logged>,3
  id | name  | password | description 
 ----+-------+----------+-------------
   1 | user1 | HASH4    | yada, yada3
