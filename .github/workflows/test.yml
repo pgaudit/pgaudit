@@ -23,7 +23,7 @@ jobs:
           - image: debian
 
           # RHEL
-        #   - image: rhel
+          - image: rhel
 
     steps:
       - name: Checkout Code
