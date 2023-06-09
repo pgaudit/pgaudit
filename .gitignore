@@ -6,3 +6,7 @@ regression.out
 *.bc
 *.o
 *.so
+.cproject
+.project
+.settings/
+extension/

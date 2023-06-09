@@ -90,6 +90,8 @@ static int auditLogBitmap = LOG_NONE;
 #define CLASS_NONE      "NONE"
 #define CLASS_ALL       "ALL"
 
+
+
 /*
  * GUC variable for pgaudit.log_catalog
  *
@@ -180,6 +182,27 @@ bool auditLogStatementOnce = false;
  */
 char *auditRole = NULL;
 
+
+/*
+ * GUC variable for auditRolesScope
+ *
+ * Administrators can choose which roles to audit. All statement classes
+ * will be logged against all object types. superusers are considered members
+ * of all roles and will be logged in addition to defined roles when ROLE
+ * based auditing active.
+ * Special characters included in initial entry to denote an unacceptable
+ * role value.
+ */
+char *auditRolesScope = NULL;
+#define ROLES_NONE		"[none]"
+
+
+/*
+ * Administrators can choose if parameters passed into a statement are
+ * included in the audit log for ROLE based logging.
+ */
+bool auditLogParameterRoleBased = false;
+
 /*
  * String constants for the audit log fields.
  */
@@ -189,6 +212,8 @@ char *auditRole = NULL;
  */
 #define AUDIT_TYPE_OBJECT   "OBJECT"
 #define AUDIT_TYPE_SESSION  "SESSION"
+#define AUDIT_TYPE_ROLE	    "ROLE"
+
 
 /*
  * Object type, used for SELECT/DML statements and function calls.
@@ -267,6 +292,9 @@ typedef struct AuditEventStackItem
 } AuditEventStackItem;
 
 AuditEventStackItem *auditEventStack = NULL;
+
+
+
 
 /*
  * pgAudit runs queries of its own when using the event trigger system.
@@ -483,11 +511,79 @@ append_valid_csv(StringInfoData *buffer, const char *appendStr)
         appendStringInfoString(buffer, appendStr);
 }
 
+
+
+/*
+ *  Check for audit role_scope being set
+ *
+ */
+
+static bool
+check_scope_role_set()
+{
+	bool isSet= false;
+
+	if (strcmp(auditRolesScope, ROLES_NONE)!=0)
+	{
+		isSet = true;
+	}
+
+	return isSet;
+
+}
+
+/*
+ * Check Membership of Roles_Scope
+ */
+
+static bool
+check_scope_role_membership()
+{
+
+    unsigned int roleidcheck;
+    bool isMember = false;
+    ListCell *lt;
+    char *groupCopy;
+    List *auditRolesList;
+
+    if (check_scope_role_set())
+    {
+    	groupCopy = malloc(strlen(auditRolesScope)+1);
+    	strcpy(groupCopy, auditRolesScope);
+
+    	SplitIdentifierString(groupCopy, ',', &auditRolesList);
+
+
+    	foreach(lt, auditRolesList)
+    	{
+    		char *token = (char *) lfirst(lt);
+    		//Check if role exists - could possibly update auditRolesScope to remove null entries
+    		roleidcheck = get_role_oid(token, 1);
+    		if(roleidcheck!=0)
+				{
+    			// Check for the current user and the original authenticated user
+    			// AuthenticatedUserId is determined at connection start and never changes
+					isMember = isMember || is_member_of_role(GetUserId(),roleidcheck) || is_member_of_role(GetAuthenticatedUserId(),roleidcheck);
+					if (isMember)
+						break;
+				}
+
+    	}
+
+    	free(groupCopy );
+    }
+
+	return isMember;
+}
+
+
+
 /*
  * Takes an AuditEvent, classifies it, then logs it if appropriate.
  *
  * Logging is decided based on if the statement is in one of the classes being
- * logged or if an object used has been marked for auditing.
+ * logged or if an object used has been marked for auditing or if the user or
+ * the authenticated user of that session is in a group marked for auditing.
  *
  * Objects are marked for auditing by the auditor role being granted access
  * to the object.  The kind of access (INSERT, UPDATE, etc) is also considered
@@ -504,6 +600,10 @@ log_audit_event(AuditEventStackItem *stackItem)
     const char *className = CLASS_MISC;
     MemoryContext contextOld;
     StringInfoData auditStr;
+
+    bool isMember; // = false;
+
+
 
     /*
      * Skip logging script statements if an extension is currently being created
@@ -523,6 +623,7 @@ log_audit_event(AuditEventStackItem *stackItem)
         return;
 
     /* Classify the statement using log stmt level and the command tag */
+
     switch (stackItem->auditEvent.logStmtLevel)
     {
         /* All mods go in WRITE class, except EXECUTE */
@@ -613,7 +714,7 @@ log_audit_event(AuditEventStackItem *stackItem)
                     break;
 
                 /*
-                 * Rename and Drop are general and therefore we have to do
+                 * Rename and Drop are general and therefore we have
                  * an additional check against the command string to see
                  * if they are role or regular DDL.
                  */
@@ -670,18 +771,24 @@ log_audit_event(AuditEventStackItem *stackItem)
             break;
     }
 
+
+    isMember = check_scope_role_membership();
+
     /*
      * Only log the statement if:
      *
      * 1. The object was selected for audit logging (granted), or
      * 2. The statement belongs to a class that is being logged
+     * 3. The role is flagged to be logged
      *
-     * If neither of these is true, return.
+     * If none apply, return.
      */
-    if (!stackItem->auditEvent.granted && !(auditLogBitmap & class))
+
+    if (!stackItem->auditEvent.granted && !(auditLogBitmap & class) && !(isMember))
         return;
 
     /*
+
      * Use audit memory context in case something is not free'd while
      * appending strings and parameters.
      */
@@ -728,7 +835,7 @@ log_audit_event(AuditEventStackItem *stackItem)
         appendStringInfoCharMacro(&auditStr, ',');
 
         /* Handle parameter logging, if enabled. */
-        if (auditLogParameter)
+        if (auditLogParameter || (auditLogParameterRoleBased && isMember))
         {
             int paramIdx;
             int numParams;
@@ -810,7 +917,7 @@ log_audit_event(AuditEventStackItem *stackItem)
     ereport(auditLogClient ? auditLogLevel : LOG_SERVER_ONLY,
             (errmsg("AUDIT: %s," INT64_FORMAT "," INT64_FORMAT ",%s,%s",
                     stackItem->auditEvent.granted ?
-                    AUDIT_TYPE_OBJECT : AUDIT_TYPE_SESSION,
+                    AUDIT_TYPE_OBJECT : ((auditLogBitmap & class) ? AUDIT_TYPE_SESSION : AUDIT_TYPE_ROLE),
                     stackItem->auditEvent.statementId,
                     stackItem->auditEvent.substatementId,
                     className,
@@ -1054,9 +1161,11 @@ log_select_dml(Oid auditOid, List *rangeTabls)
          * Don't log if the session user is not a member of the current
          * role.  This prevents contents of security definer functions
          * from being logged and supresses foreign key queries unless the
-         * session user is the owner of the referenced table.
+         * session user is the owner of the referenced table. However, log
+         * if the security definer is a member of a role configured for
+         * logging.
          */
-        if (!is_member_of_role(GetSessionUserId(), GetUserId()))
+        if (!is_member_of_role(GetSessionUserId(), GetUserId()) && !check_scope_role_membership())
             return;
 
         /*
@@ -1306,6 +1415,8 @@ log_function_execute(Oid objectId)
     stack_pop(stackItem->stackId);
 }
 
+
+
 /*
  * Hook functions
  */
@@ -1333,7 +1444,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
         stackItem = stack_push();
 
         /* Initialize command using queryDesc->operation */
-        switch (queryDesc->operation)
+         switch (queryDesc->operation)
         {
             case CMD_SELECT:
                 stackItem->auditEvent.logStmtLevel = LOGSTMT_ALL;
@@ -1406,8 +1517,8 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
     /* Get the audit oid if the role exists */
     auditOid = get_role_oid(auditRole, true);
 
-    /* Log DML if the audit role is valid or session logging is enabled */
-    if ((auditOid != InvalidOid || auditLogBitmap != 0) &&
+    /* Log DML if the audit role is valid or session logging is enabled or roles_scope is enabled */
+    if ((auditOid != InvalidOid || auditLogBitmap != 0 || check_scope_role_set()) &&
         !IsAbortedTransactionBlockState())
     {
         /* If auditLogRows is on, wait for rows processed to be set */
@@ -1570,9 +1681,9 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
 
         /*
          * If this is a DO block log it before calling the next ProcessUtility
-         * hook.
+         * hook. Also log in the case of pgaudit role set
          */
-        if (auditLogBitmap & LOG_FUNCTION &&
+        if ((auditLogBitmap & LOG_FUNCTION || check_scope_role_set()) &&
             stackItem->auditEvent.commandTag == T_DoStmt &&
             !IsAbortedTransactionBlockState())
             log_audit_event(stackItem);
@@ -1581,9 +1692,9 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
          * If this is a create/alter extension command log it before calling
          * the next ProcessUtility hook. Otherwise, any warnings will be emitted
          * before the create/alter is logged and errors will prevent it from
-         * being logged at all.
+         * being logged at all. Also log in the case of pgaudit role set
          */
-        if (auditLogBitmap & LOG_DDL &&
+        if ((auditLogBitmap & LOG_DDL || check_scope_role_set()) &&
             (stackItem->auditEvent.commandTag == T_CreateExtensionStmt ||
                 stackItem->auditEvent.commandTag == T_AlterExtensionStmt) &&
             !IsAbortedTransactionBlockState())
@@ -1596,7 +1707,7 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
          */
         if (stackItem->auditEvent.commandTag == T_ClosePortalStmt)
         {
-            if (auditLogBitmap & LOG_MISC && !IsAbortedTransactionBlockState())
+            if ((auditLogBitmap & LOG_MISC  || check_scope_role_set()) && !IsAbortedTransactionBlockState())
                 log_audit_event(stackItem);
 
             stackItem = NULL;
@@ -1625,11 +1736,11 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         stack_valid(stackId);
 
         /*
-         * Log the utility command if logging is on, the command has not
+         * Log the utility command if logging is on or role based logging is set, the command has not
          * already been logged by another hook, and the transaction is not
-         * aborted.
+         * aborted
          */
-        if (auditLogBitmap != 0 && !stackItem->auditEvent.logged)
+        if ((auditLogBitmap != 0 || check_scope_role_set()) && !stackItem->auditEvent.logged)
             log_audit_event(stackItem);
     }
 }
@@ -1645,7 +1756,7 @@ pgaudit_object_access_hook(ObjectAccessType access,
                             int subId,
                             void *arg)
 {
-    if (auditLogBitmap & LOG_FUNCTION && access == OAT_FUNCTION_EXECUTE &&
+    if ((auditLogBitmap & LOG_FUNCTION || check_scope_role_set()) && access == OAT_FUNCTION_EXECUTE &&
         auditEventStack && !IsAbortedTransactionBlockState())
         log_function_execute(objectId);
 
@@ -2022,6 +2133,42 @@ assign_pgaudit_log_level(const char *newVal, void *extra)
 }
 
 /*
+ * Take a pgaudit.RolesScope value such as "admin, approle", verify that each of the
+ * comma-separated tokens corresponds to a valid OID, and convert them into
+ * an array log_audit_event can check.
+ */
+static bool
+check_pgaudit_roles_scope(char **newVal, void **extra, GucSource source)
+{
+    List *groupRawList;
+    char *rawVal;
+
+    // TO DO - check length / count of groups
+
+    /* Make sure newval is a comma-separated list of tokens. */
+    rawVal = pstrdup(*newVal);
+    if (!SplitIdentifierString(rawVal, ',', &groupRawList))
+    {
+        GUC_check_errdetail("List syntax is invalid");
+        list_free(groupRawList);
+        pfree(rawVal);
+        return false;
+    }
+
+
+    // Free up resources
+    pfree(rawVal);
+    list_free(groupRawList);
+
+    return true;
+}
+
+
+
+
+
+
+/*
  * Define GUC variables and install hooks upon module load.
  */
 void
@@ -2220,6 +2367,42 @@ _PG_init(void)
         PGC_SUSET,
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);
+
+    /* Define pgaudit.roles_scope */
+    DefineCustomStringVariable(
+        "pgaudit.roles_scope",
+
+        "Specifies the roles to audit for role based audit logging.  Multiple "
+        "roles can be provided using a comma-separated list. Superusers are "
+		"considered members of all roles and will be logged in addition "
+		"if any valid roles listed. A value of [none] (including the square "
+		"brackets) disables.",
+
+        NULL,
+        &auditRolesScope,
+        "[none]",
+		PGC_POSTMASTER, // prevent superuser changing within that session - requires a reboot
+		GUC_NOT_IN_SAMPLE,
+		check_pgaudit_roles_scope,
+		NULL,
+		NULL);
+
+    /* Define pgaudit.log_parameter */
+    DefineCustomBoolVariable(
+        "pgaudit.log_parameter_for_role_based",
+
+        "Specifies that audit logging should include the parameters that were "
+        "passed with the statement for items that are just captured for role-based"
+        "logging. When parameters are present they will be included in CSV format "
+		"after the statement text.",
+
+        NULL,
+        &auditLogParameterRoleBased,
+        false,
+        PGC_SUSET,
+        GUC_NOT_IN_SAMPLE,
+        NULL, NULL, NULL);
+
 
     /*
      * Install our hook functions after saving the existing pointers to
