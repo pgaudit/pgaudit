@@ -1036,23 +1036,22 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
     ListCell *lr;
     bool first = true;
     bool found = false;
-    Index permInfoIdx = 0;
 
     /* Do not log if this is an internal statement */
     if (internalStatement)
         return;
 
-    foreach(lr, permInfos)
+    foreach(lr, rangeTabls)
     {
         Oid relOid;
         Oid relNamespaceOid;
-        const RTEPermissionInfo *perminfo = lfirst(lr);
+        RangeTblEntry *rte = lfirst(lr);
+        const RTEPermissionInfo *perminfo;
 
-        /*
-         * Keep track of the perminfo index so we can use it to look up the
-         * range table entry when needed.
-         */
-        permInfoIdx++;
+        /* We only care about tables/views and can ignore subqueries, etc. */
+        if (!(rte->rtekind == RTE_RELATION ||
+             (rte->rtekind == RTE_SUBQUERY && OidIsValid(rte->relid))))
+            continue;
 
         found = true;
 
@@ -1069,7 +1068,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
          * If we are not logging all-catalog queries (auditLogCatalog is
          * false) then filter out any system relations here.
          */
-        relOid = perminfo->relid;
+        relOid = rte->relid;
         relNamespaceOid = get_rel_namespace(relOid);
 
         if (!auditLogCatalog && IsCatalogNamespace(relNamespaceOid))
@@ -1092,10 +1091,15 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
             first = false;
         }
 
+        if (rte->perminfoindex == 0)
+            continue;
+
+        perminfo = getRTEPermissionInfo(permInfos, rte);
+
         /*
          * We don't have access to the parsetree here, so we have to generate
          * the node type, object type, and command tag by decoding
-         * perminfo->requiredPerms and relkind. For updates we also check
+         * rte->requiredPerms and rte->relkind. For updates we also check
          * rellockmode so that only true UPDATE commands (not
          * SELECT FOR UPDATE, etc.) are logged as UPDATE.
          */
@@ -1105,42 +1109,12 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
             auditEventStack->auditEvent.commandTag = T_InsertStmt;
             auditEventStack->auditEvent.command = CMDTAG_INSERT;
         }
-        else if (perminfo->requiredPerms & ACL_UPDATE)
+        else if (perminfo->requiredPerms & ACL_UPDATE &&
+                 rte->rellockmode >= RowExclusiveLock)
         {
-            /*
-             * rellockmode is not available in perminfo so we need to look up
-             * the corresponding range table entry.
-             */
-            ListCell *lrs;
-            bool geRowExclusiveLock = false;
-
-            foreach(lrs, rangeTabls)
-            {
-                const RangeTblEntry *rte = lfirst(lrs);
-
-                if (rte->perminfoindex == permInfoIdx && rte->relid == perminfo->relid)
-                {
-                    geRowExclusiveLock = rte->rellockmode >= RowExclusiveLock;
-                    break;
-                }
-            }
-
-            /*
-             * If rellockmode >= RowExclusiveLock then this is an update,
-             * else a select.
-             */
-            if (geRowExclusiveLock)
-            {
-                auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
-                auditEventStack->auditEvent.commandTag = T_UpdateStmt;
-                auditEventStack->auditEvent.command = CMDTAG_UPDATE;
-            }
-            else
-            {
-                auditEventStack->auditEvent.logStmtLevel = LOGSTMT_ALL;
-                auditEventStack->auditEvent.commandTag = T_SelectStmt;
-                auditEventStack->auditEvent.command = CMDTAG_SELECT;
-            }
+            auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
+            auditEventStack->auditEvent.commandTag = T_UpdateStmt;
+            auditEventStack->auditEvent.command = CMDTAG_UPDATE;
         }
         else if (perminfo->requiredPerms & ACL_DELETE)
         {
@@ -1162,7 +1136,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
         }
 
         /* Use the relation type to assign object type */
-        switch (get_rel_relkind(relOid))
+        switch (get_rel_relkind(rte->relid))
         {
             case RELKIND_RELATION:
             case RELKIND_PARTITIONED_TABLE:
