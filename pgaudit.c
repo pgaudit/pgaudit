@@ -250,7 +250,8 @@ typedef struct
     MemoryContext queryContext; /* Context for query tracking rows */
     Oid auditOid;               /* Role running query tracking rows  */
     List *rangeTabls;           /* Tables in query tracking rows */
-    List *permInfos;            /* Permission info rows for each table involved in the query */
+    List *permInfos;            /* Permission info rows for each table involved
+                                   in the query */
 } AuditEvent;
 
 /*
@@ -1047,7 +1048,10 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
         Oid relNamespaceOid;
         const RTEPermissionInfo *perminfo = lfirst(lr);
 
-        // Keep track of the perminfo index so we can use it to look up the range table entry when needed
+        /*
+         * Keep track of the perminfo index so we can use it to look up the
+         * range table entry when needed.
+         */
         permInfoIdx++;
 
         found = true;
@@ -1123,7 +1127,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
 
             /*
              * If rellockmode >= RowExclusiveLock then this is an update,
-             * otherwise a select.
+             * else a select.
              */
             if (geRowExclusiveLock)
             {
