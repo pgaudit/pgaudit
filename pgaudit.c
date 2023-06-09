@@ -1035,21 +1035,20 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
     ListCell *lr;
     bool first = true;
     bool found = false;
+    Index permInfoIdx = 0;
 
     /* Do not log if this is an internal statement */
     if (internalStatement)
         return;
 
-    foreach(lr, rangeTabls)
+    foreach(lr, permInfos)
     {
         Oid relOid;
         Oid relNamespaceOid;
-        RangeTblEntry *rte = lfirst(lr);
-        const RTEPermissionInfo *perminfo;
+        const RTEPermissionInfo *perminfo = lfirst(lr);
 
-        /* We only care about tables, and can ignore subqueries etc. */
-        if (rte->rtekind != RTE_RELATION)
-            continue;
+        // Keep track of the perminfo index so we can use it to look up the range table entry when needed
+        permInfoIdx++;
 
         found = true;
 
@@ -1066,7 +1065,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
          * If we are not logging all-catalog queries (auditLogCatalog is
          * false) then filter out any system relations here.
          */
-        relOid = rte->relid;
+        relOid = perminfo->relid;
         relNamespaceOid = get_rel_namespace(relOid);
 
         if (!auditLogCatalog && IsCatalogNamespace(relNamespaceOid))
@@ -1089,15 +1088,10 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
             first = false;
         }
 
-        if (rte->perminfoindex == 0)
-            continue;
-
-        perminfo = getRTEPermissionInfo(permInfos, rte);
-
         /*
          * We don't have access to the parsetree here, so we have to generate
          * the node type, object type, and command tag by decoding
-         * rte->requiredPerms and rte->relkind. For updates we also check
+         * perminfo->requiredPerms and relkind. For updates we also check
          * rellockmode so that only true UPDATE commands (not
          * SELECT FOR UPDATE, etc.) are logged as UPDATE.
          */
@@ -1107,12 +1101,42 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
             auditEventStack->auditEvent.commandTag = T_InsertStmt;
             auditEventStack->auditEvent.command = CMDTAG_INSERT;
         }
-        else if (perminfo->requiredPerms & ACL_UPDATE &&
-                 rte->rellockmode >= RowExclusiveLock)
+        else if (perminfo->requiredPerms & ACL_UPDATE)
         {
-            auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
-            auditEventStack->auditEvent.commandTag = T_UpdateStmt;
-            auditEventStack->auditEvent.command = CMDTAG_UPDATE;
+            /*
+             * rellockmode is not available in perminfo so we need to look up
+             * the corresponding range table entry.
+             */
+            ListCell *lrs;
+            bool geRowExclusiveLock = false;
+
+            foreach(lrs, rangeTabls)
+            {
+                const RangeTblEntry *rte = lfirst(lrs);
+
+                if (rte->perminfoindex == permInfoIdx && rte->relid == perminfo->relid)
+                {
+                    geRowExclusiveLock = rte->rellockmode >= RowExclusiveLock;
+                    break;
+                }
+            }
+
+            /*
+             * If rellockmode >= RowExclusiveLock then this is an update,
+             * otherwise a select.
+             */
+            if (geRowExclusiveLock)
+            {
+                auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
+                auditEventStack->auditEvent.commandTag = T_UpdateStmt;
+                auditEventStack->auditEvent.command = CMDTAG_UPDATE;
+            }
+            else
+            {
+                auditEventStack->auditEvent.logStmtLevel = LOGSTMT_ALL;
+                auditEventStack->auditEvent.commandTag = T_SelectStmt;
+                auditEventStack->auditEvent.command = CMDTAG_SELECT;
+            }
         }
         else if (perminfo->requiredPerms & ACL_DELETE)
         {
@@ -1134,7 +1158,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
         }
 
         /* Use the relation type to assign object type */
-        switch (rte->relkind)
+        switch (get_rel_relkind(relOid))
         {
             case RELKIND_RELATION:
             case RELKIND_PARTITIONED_TABLE:
