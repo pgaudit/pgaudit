@@ -1048,10 +1048,15 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
         RangeTblEntry *rte = lfirst(lr);
         const RTEPermissionInfo *perminfo;
 
-        /* We only care about tables/views and can ignore subqueries, etc. */
-        if (!(rte->rtekind == RTE_RELATION ||
-             (rte->rtekind == RTE_SUBQUERY && OidIsValid(rte->relid))))
+        /*
+         * We only care about tables/views, which have perminfoindex set.
+         * This excludes table partitions, which do not have perminfoindex set.
+         */
+        if (rte->perminfoindex == 0)
             continue;
+
+        Assert(rte->rtekind == RTE_RELATION ||
+               rte->rtekind == RTE_SUBQUERY && rte->relkind == RELKIND_VIEW);
 
         found = true;
 
@@ -1090,9 +1095,6 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
 
             first = false;
         }
-
-        if (rte->perminfoindex == 0)
-            continue;
 
         perminfo = getRTEPermissionInfo(permInfos, rte);
 
@@ -1137,6 +1139,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
 
         /* Use the relation type to assign object type */
         switch (get_rel_relkind(rte->relid))
+        // !!! XXX CHANGE TO THIS AFTER BETA2: switch (rte->relkind)
         {
             case RELKIND_RELATION:
             case RELKIND_PARTITIONED_TABLE:
