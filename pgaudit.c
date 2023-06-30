@@ -1138,7 +1138,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
         }
 
         /* Use the relation type to assign object type */
-        switch (switch (rte->relkind))
+        switch (rte->relkind)
         {
             case RELKIND_RELATION:
             case RELKIND_PARTITIONED_TABLE:
