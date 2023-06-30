@@ -1049,8 +1049,8 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
         const RTEPermissionInfo *perminfo;
 
         /*
-         * We only care about tables/views, which have perminfoindex set.
-         * This excludes table partitions, which do not have perminfoindex set.
+         * We only care about tables/views, which have perminfoindex set. This
+         * excludes table partitions, which do not have perminfoindex set.
          */
         if (rte->perminfoindex == 0)
             continue;
@@ -1096,8 +1096,6 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
             first = false;
         }
 
-        perminfo = getRTEPermissionInfo(permInfos, rte);
-
         /*
          * We don't have access to the parse tree here, so we have to generate
          * the node type, object type, and command tag by decoding
@@ -1105,6 +1103,8 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
          * rellockmode so that only true UPDATE commands (not
          * SELECT FOR UPDATE, etc.) are logged as UPDATE.
          */
+        perminfo = getRTEPermissionInfo(permInfos, rte);
+
         if (perminfo->requiredPerms & ACL_INSERT)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
@@ -1138,8 +1138,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
         }
 
         /* Use the relation type to assign object type */
-        switch (get_rel_relkind(rte->relid))
-        // !!! XXX CHANGE TO THIS AFTER BETA2: switch (rte->relkind)
+        switch (switch (rte->relkind))
         {
             case RELKIND_RELATION:
             case RELKIND_PARTITIONED_TABLE:
