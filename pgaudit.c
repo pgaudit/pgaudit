@@ -28,6 +28,7 @@
 #include "libpq/auth.h"
 #include "nodes/nodes.h"
 #include "nodes/params.h"
+#include "parser/parse_relation.h"
 #include "tcop/utility.h"
 #include "tcop/deparse_utility.h"
 #include "utils/acl.h"
@@ -249,6 +250,8 @@ typedef struct
     MemoryContext queryContext; /* Context for query tracking rows */
     Oid auditOid;               /* Role running query tracking rows  */
     List *rangeTabls;           /* Tables in query tracking rows */
+    List *permInfos;            /* Permission info rows for each table involved
+                                   in the query */
 } AuditEvent;
 
 /*
@@ -978,7 +981,7 @@ audit_on_any_attribute(Oid relOid,
                        AclMode mode)
 {
     bool result = false;
-    AttrNumber col;
+    AttrNumber index = -1;
     Bitmapset *tmpSet;
 
     /* If bms is empty then check for any column match */
@@ -1007,9 +1010,9 @@ audit_on_any_attribute(Oid relOid,
     tmpSet = bms_copy(attributeSet);
 
     /* Check each column */
-    while ((col = bms_first_member(tmpSet)) >= 0)
+    while ((index = bms_next_member(tmpSet, index)) >= 0)
     {
-        col += FirstLowInvalidHeapAttributeNumber;
+        const AttrNumber col = index + FirstLowInvalidHeapAttributeNumber;
 
         if (col != InvalidAttrNumber &&
             audit_on_attribute(relOid, col, auditOid, mode))
@@ -1028,7 +1031,7 @@ audit_on_any_attribute(Oid relOid,
  * Create AuditEvents for SELECT/DML operations via executor permissions checks.
  */
 static void
-log_select_dml(Oid auditOid, List *rangeTabls)
+log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
 {
     ListCell *lr;
     bool first = true;
@@ -1043,10 +1046,17 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         Oid relOid;
         Oid relNamespaceOid;
         RangeTblEntry *rte = lfirst(lr);
+        const RTEPermissionInfo *perminfo;
 
-        /* We only care about tables, and can ignore subqueries etc. */
-        if (rte->rtekind != RTE_RELATION)
+        /*
+         * We only care about tables/views, which have perminfoindex set. This
+         * excludes table partitions, which do not have perminfoindex set.
+         */
+        if (rte->perminfoindex == 0)
             continue;
+
+        Assert(rte->rtekind == RTE_RELATION ||
+               rte->rtekind == RTE_SUBQUERY && rte->relkind == RELKIND_VIEW);
 
         found = true;
 
@@ -1093,26 +1103,28 @@ log_select_dml(Oid auditOid, List *rangeTabls)
          * rellockmode so that only true UPDATE commands (not
          * SELECT FOR UPDATE, etc.) are logged as UPDATE.
          */
-        if (rte->requiredPerms & ACL_INSERT)
+        perminfo = getRTEPermissionInfo(permInfos, rte);
+
+        if (perminfo->requiredPerms & ACL_INSERT)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
             auditEventStack->auditEvent.commandTag = T_InsertStmt;
             auditEventStack->auditEvent.command = CMDTAG_INSERT;
         }
-        else if (rte->requiredPerms & ACL_UPDATE &&
+        else if (perminfo->requiredPerms & ACL_UPDATE &&
                  rte->rellockmode >= RowExclusiveLock)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
             auditEventStack->auditEvent.commandTag = T_UpdateStmt;
             auditEventStack->auditEvent.command = CMDTAG_UPDATE;
         }
-        else if (rte->requiredPerms & ACL_DELETE)
+        else if (perminfo->requiredPerms & ACL_DELETE)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
             auditEventStack->auditEvent.commandTag = T_DeleteStmt;
             auditEventStack->auditEvent.command = CMDTAG_DELETE;
         }
-        else if (rte->requiredPerms & ACL_SELECT)
+        else if (perminfo->requiredPerms & ACL_SELECT)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_ALL;
             auditEventStack->auditEvent.commandTag = T_SelectStmt;
@@ -1177,7 +1189,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         {
             AclMode auditPerms =
                 (ACL_SELECT | ACL_UPDATE | ACL_INSERT | ACL_DELETE) &
-                rte->requiredPerms;
+                perminfo->requiredPerms;
 
             /*
              * If any of the required permissions for the relation are granted
@@ -1198,7 +1210,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                 if (auditPerms & ACL_SELECT)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
-                                               rte->selectedCols,
+                                               perminfo->selectedCols,
                                                ACL_SELECT);
 
                 /*
@@ -1208,7 +1220,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                     auditPerms & ACL_INSERT)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
-                                               rte->insertedCols,
+                                               perminfo->insertedCols,
                                                auditPerms);
 
                 /*
@@ -1218,7 +1230,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                     auditPerms & ACL_UPDATE)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
-                                               rte->updatedCols,
+                                               perminfo->updatedCols,
                                                auditPerms);
             }
         }
@@ -1399,7 +1411,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
  * Hook ExecutorCheckPerms to do session and object auditing for DML.
  */
 static bool
-pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
+pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, List *permInfos, bool abort)
 {
     Oid auditOid;
 
@@ -1424,7 +1436,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
                  * The SELECT event for CREATE TABLE AS will be logged
                  * in pgaudit_ExecutorEnd_hook() later to get rows.
                  */
-                log_select_dml(auditOid, rangeTabls);
+                log_select_dml(auditOid, rangeTabls, permInfos);
             }
             else
             {
@@ -1434,15 +1446,16 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
                  */
                 auditEventStack->auditEvent.auditOid = auditOid;
                 auditEventStack->auditEvent.rangeTabls = rangeTabls;
+                auditEventStack->auditEvent.permInfos = permInfos;
             }
         }
         else
-            log_select_dml(auditOid, rangeTabls);
+            log_select_dml(auditOid, rangeTabls, permInfos);
     }
 
     /* Call the next hook function */
     if (next_ExecutorCheckPerms_hook &&
-        !(*next_ExecutorCheckPerms_hook) (rangeTabls, abort))
+        !(*next_ExecutorCheckPerms_hook) (rangeTabls, permInfos, abort))
         return false;
 
     return true;
@@ -1495,7 +1508,8 @@ pgaudit_ExecutorEnd_hook(QueryDesc *queryDesc)
 
             /* Log SELECT/DML audit entry */
             log_select_dml(stackItem->auditEvent.auditOid,
-                           stackItem->auditEvent.rangeTabls);
+                           stackItem->auditEvent.rangeTabls,
+                           stackItem->auditEvent.permInfos);
 
             /* Switch back to the previous auditEventStack */
             auditEventStack = auditEventStackFull;
@@ -1887,7 +1901,7 @@ check_pgaudit_log(char **newVal, void **extra, GucSource source)
      * Check that we recognise each token, and add it to the bitmap we're
      * building up in a newly-allocated int *f.
      */
-    if (!(flags = (int *) malloc(sizeof(int))))
+    if (!(flags = (int *)guc_malloc(FATAL, sizeof(int))))
         return false;
 
     *flags = 0;
@@ -1926,7 +1940,7 @@ check_pgaudit_log(char **newVal, void **extra, GucSource source)
             class = LOG_WRITE;
         else
         {
-            free(flags);
+            guc_free(flags);
             pfree(rawVal);
             list_free(flagRawList);
             return false;
@@ -1971,7 +1985,7 @@ check_pgaudit_log_level(char **newVal, void **extra, GucSource source)
     int *logLevel;
 
     /* Allocate memory to store the log level */
-    if (!(logLevel = (int *) malloc(sizeof(int))))
+    if (!(logLevel = (int *)guc_malloc(FATAL, sizeof(int))))
         return false;
 
     /* Find the log level enum */
@@ -1999,7 +2013,7 @@ check_pgaudit_log_level(char **newVal, void **extra, GucSource source)
     /* Error if the log level enum is not found */
     else
     {
-        free(logLevel);
+        guc_free(logLevel);
         return false;
     }
 
