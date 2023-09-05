@@ -1056,7 +1056,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
             continue;
 
         Assert(rte->rtekind == RTE_RELATION ||
-               rte->rtekind == RTE_SUBQUERY && rte->relkind == RELKIND_VIEW);
+               (rte->rtekind == RTE_SUBQUERY && rte->relkind == RELKIND_VIEW));
 
         found = true;
 
