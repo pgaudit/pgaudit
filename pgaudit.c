@@ -1326,8 +1326,20 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
     /* Log DML if the audit role is valid or session logging is enabled */
     if ((auditOid != InvalidOid || auditLogBitmap != 0) &&
         !IsAbortedTransactionBlockState())
+    {
+        int iFlagPrivate=0;
+        if(auditEventStack==NULL)
+        {
+            iFlagPrivate=1;
+            auditEventStack=stack_push();
+        }
         log_select_dml(auditOid, rangeTabls);
-
+        if(iFlagPrivate==1)
+        {
+            stack_pop(auditEventStack->stackId);
+        }
+    }
+    
     /* Call the next hook function */
     if (next_ExecutorCheckPerms_hook &&
         !(*next_ExecutorCheckPerms_hook) (rangeTabls, abort))
