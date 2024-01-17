@@ -195,8 +195,8 @@ SELECT *
   FROM vw_test3, test2;
 WARNING:  AUDIT: SESSION,2,1,READ,SELECT,,,"SELECT *
   FROM vw_test3, test2;",<not logged>
-WARNING:  AUDIT: OBJECT,2,1,READ,SELECT,TABLE,public.test2,<previously logged>,<previously logged>
 WARNING:  AUDIT: OBJECT,2,1,READ,SELECT,VIEW,public.vw_test3,<previously logged>,<previously logged>
+WARNING:  AUDIT: OBJECT,2,1,READ,SELECT,TABLE,public.test2,<previously logged>,<previously logged>
  id | id 
 ----+----
 (0 rows)
@@ -381,6 +381,34 @@ WARNING:  AUDIT: OBJECT,3,1,WRITE,UPDATE,TABLE,public.test4,"UPDATE public.test4
 -- update (name) takes precedence over select (name) due to ordering
 update public.test4 set name = 'foo' where name = 'bar';
 WARNING:  AUDIT: OBJECT,4,1,WRITE,UPDATE,TABLE,public.test4,update public.test4 set name = 'foo' where name = 'bar';,<not logged>
+--
+-- Confirm that "long" parameter values will not be logged if pgaudit.log_parameter_max_size
+-- is set.
+\connect - :current_user
+ALTER ROLE user2 SET pgaudit.log_parameter_max_size = 50;
+NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.log_parameter_max_size = 50;,<not logged>
+ALTER ROLE user2 SET pgaudit.log_parameter = 'on';
+NOTICE:  AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 SET pgaudit.log_parameter = 'on';,<not logged>
+\connect - user2
+PREPARE testinsert(int, text) AS
+    INSERT INTO test4 VALUES($1, $2);
+EXECUTE testinsert(1, '*******************************************************');
+WARNING:  AUDIT: OBJECT,1,1,WRITE,INSERT,TABLE,public.test4,"PREPARE testinsert(int, text) AS
+    INSERT INTO test4 VALUES($1, $2);","1,<long param suppressed>"
+DEALLOCATE testinsert;
+\connect - :current_user
+ALTER ROLE user2 RESET pgaudit.log_parameter_max_size;
+NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 RESET pgaudit.log_parameter_max_size;,<not logged>
+\connect - user2
+PREPARE testinsert(int, text) AS
+    INSERT INTO test4 VALUES($1, $2);
+EXECUTE testinsert(2, '*******************************************************');
+WARNING:  AUDIT: OBJECT,1,1,WRITE,INSERT,TABLE,public.test4,"PREPARE testinsert(int, text) AS
+    INSERT INTO test4 VALUES($1, $2);","2,*******************************************************"
+DEALLOCATE testinsert;
+\connect - :current_user
+ALTER ROLE user2 RESET pgaudit.log_parameter;
+NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE user2 RESET pgaudit.log_parameter;,<not logged>
 --
 -- Change permissions of user 1 so that session logging will be done
 \connect - :current_user
@@ -1406,11 +1434,9 @@ NOTICE:  AUDIT: SESSION,19,1,READ,SELECT,TABLE,public.test2,"SELECT *
 
 SELECT *
   FROM vw_test3, test2;
-NOTICE:  AUDIT: SESSION,20,1,READ,SELECT,TABLE,public.test2,"SELECT *
-  FROM vw_test3, test2;",<none>,9
 NOTICE:  AUDIT: SESSION,20,1,READ,SELECT,VIEW,public.vw_test3,"SELECT *
   FROM vw_test3, test2;",<none>,9
-NOTICE:  AUDIT: SESSION,20,1,MISC,???,VIEW,public.vw_test3,"SELECT *
+NOTICE:  AUDIT: SESSION,20,1,READ,SELECT,TABLE,public.test2,"SELECT *
   FROM vw_test3, test2;",<none>,9
 NOTICE:  AUDIT: SESSION,20,1,READ,SELECT,TABLE,public.test3,"SELECT *
   FROM vw_test3, test2;",<none>,9
@@ -2515,6 +2541,21 @@ NOTICE:  version "1.10" of extension "pg_stat_statements" is already installed
 DROP EXTENSION pg_stat_statements;
 WARNING:  AUDIT: SESSION,5,1,DDL,DROP EXTENSION,,,DROP EXTENSION pg_stat_statements;,<not logged>
 SET pgaudit.log_level = 'notice';
+-- Check that password redaction works with CREATE/ALTER USER MAPPING
+CREATE EXTENSION postgres_fdw;
+NOTICE:  AUDIT: SESSION,6,1,DDL,CREATE EXTENSION,,,CREATE EXTENSION postgres_fdw;,<not logged>
+CREATE SERVER fdw_server FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host 'foo', dbname 'foodb', port '5432');
+NOTICE:  AUDIT: SESSION,7,1,DDL,CREATE SERVER,,,"CREATE SERVER fdw_server FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host 'foo', dbname 'foodb', port '5432');",<not logged>
+CREATE USER MAPPING FOR user1 SERVER fdw_server OPTIONS (user 'user1', password 'secret');
+NOTICE:  AUDIT: SESSION,8,1,ROLE,CREATE USER MAPPING,,,"CREATE USER MAPPING FOR user1 SERVER fdw_server OPTIONS (user 'user1', password <REDACTED>",<not logged>
+ALTER USER MAPPING FOR user1 SERVER fdw_server OPTIONS (SET /* comment */ password 'secret2');
+NOTICE:  AUDIT: SESSION,9,1,ROLE,ALTER USER MAPPING,,,ALTER USER MAPPING FOR user1 SERVER fdw_server OPTIONS (SET /* comment */ password <REDACTED>,<not logged>
+DROP USER MAPPING FOR user1 SERVER fdw_server;
+NOTICE:  AUDIT: SESSION,10,1,DDL,DROP USER MAPPING,,,DROP USER MAPPING FOR user1 SERVER fdw_server;,<not logged>
+DROP SERVER fdw_server;
+NOTICE:  AUDIT: SESSION,11,1,DDL,DROP SERVER,,,DROP SERVER fdw_server;,<not logged>
+DROP EXTENSION postgres_fdw;
+NOTICE:  AUDIT: SESSION,12,1,DDL,DROP EXTENSION,,,DROP EXTENSION postgres_fdw;,<not logged>
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
@@ -2523,6 +2564,7 @@ ALTER ROLE :current_user RESET pgaudit.log_catalog;
 ALTER ROLE :current_user RESET pgaudit.log_client;
 ALTER ROLE :current_user RESET pgaudit.log_level;
 ALTER ROLE :current_user RESET pgaudit.log_parameter;
+ALTER ROLE :current_user RESET pgaudit.log_parameter_max_size;
 ALTER ROLE :current_user RESET pgaudit.log_relation;
 ALTER ROLE :current_user RESET pgaudit.log_statement;
 ALTER ROLE :current_user RESET pgaudit.log_statement_once;
@@ -2531,6 +2573,7 @@ RESET pgaudit.log;
 RESET pgaudit.log_catalog;
 RESET pgaudit.log_level;
 RESET pgaudit.log_parameter;
+RESET pgaudit.log_parameter_max_size;
 RESET pgaudit.log_relation;
 RESET pgaudit.log_statement;
 RESET pgaudit.log_statement_once;
