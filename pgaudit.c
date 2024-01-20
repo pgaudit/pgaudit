@@ -182,6 +182,14 @@ bool auditLogStatementOnce = false;
 char *auditRole = NULL;
 
 /*
+ * GUC variable for pgaudit.exclude_objects
+ *
+ * Administrators can choose which objects must be excluded from audit
+ * without enabling role-based access.
+ */
+char *auditExcludeObjects = NULL;
+
+/*
  * String constants for the audit log fields.
  */
 
@@ -487,6 +495,34 @@ append_valid_csv(StringInfoData *buffer, const char *appendStr)
 }
 
 /*
+ * Check if the object name in exclude_objects list.
+ */
+static bool
+object_must_be_excluded(char *objectName)
+{
+    char *excludeObjects;
+    char *name;
+    bool result = false;
+    if (objectName == NULL || auditExcludeObjects == NULL)
+        return result;
+
+    excludeObjects = (char*) malloc(strlen(auditExcludeObjects)*sizeof(char));
+    strcpy(excludeObjects, auditExcludeObjects);
+    name = strtok(excludeObjects,",");
+    while (name != NULL)
+    {
+        if (!strcmp(objectName, name)) {
+            result = true;
+            break;
+        }
+        name = strtok(NULL, ",");
+    }
+
+    free(excludeObjects);
+    return result;
+}
+
+/*
  * Takes an AuditEvent, classifies it, then logs it if appropriate.
  *
  * Logging is decided based on if the statement is in one of the classes being
@@ -507,6 +543,12 @@ log_audit_event(AuditEventStackItem *stackItem)
     const char *className = CLASS_MISC;
     MemoryContext contextOld;
     StringInfoData auditStr;
+
+    /*
+     * Skip logging if object name in exclude_objects list.
+     */
+    if (object_must_be_excluded(stackItem->auditEvent.objectName))
+        return;
 
     /*
      * Skip logging script statements if an extension is currently being created
@@ -2231,6 +2273,20 @@ _PG_init(void)
         NULL,
         &auditRole,
         "",
+        PGC_SUSET,
+        GUC_NOT_IN_SAMPLE,
+        NULL, NULL, NULL);
+
+    /* Define pgaudit.exclude_objects */
+    DefineCustomStringVariable(
+        "pgaudit.exclude_objects",
+
+        "Specifies which objects will not be logged by session audit "
+        "logging. Multiple objects names can be provided using a comma-separated list.",
+
+        NULL,
+        &auditExcludeObjects,
+        "none",
         PGC_SUSET,
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);

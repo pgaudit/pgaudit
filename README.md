@@ -102,6 +102,12 @@ In addition, `CREATE EXTENSION pgaudit` must be called before `pgaudit.log` is s
 
 If the `pgaudit` extension is dropped and needs to be recreated then `pgaudit.log` must be unset first otherwise an error will be raised.
 
+### pgaudit.exclude_objects
+
+Specifies which objects will not be logged by session audit logging. Multiple objects names can be provided using a comma-separated list.
+
+There is no default.
+
 ### pgaudit.log
 
 Specifies which classes of statements will be logged by session audit logging. Possible values are:
