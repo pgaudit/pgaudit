@@ -13,20 +13,25 @@ An audit is an official inspection of an individual's or organization's accounts
 Basic statement logging can be provided by the standard logging facility with `log_statement = all`. This is acceptable for monitoring and other usages but does not provide the level of detail generally required for an audit. It is not enough to have a list of all the operations performed against the database. It must also be possible to find particular statements that are of interest to an auditor. The standard logging facility shows what the user requested, while pgAudit focuses on the details of what happened while the database was satisfying the request.
 
 For example, an auditor may want to verify that a particular table was created inside a documented maintenance window. This might seem like a simple job for grep, but what if you are presented with something like this (intentionally obfuscated) example:
+
 ```
 DO $$
 BEGIN
     EXECUTE 'CREATE TABLE import' || 'ant_table (id INT)';
 END $$;
 ```
+
 Standard logging will give you this:
+
 ```
 LOG:  statement: DO $$
 BEGIN
     EXECUTE 'CREATE TABLE import' || 'ant_table (id INT)';
 END $$;
 ```
+
 It appears that finding the table of interest may require some knowledge of the code in cases where tables are created dynamically. This is not ideal since it would be preferable to just search on the table name. This is where pgAudit comes in. For the same input, it will produce this output in the log:
+
 ```
 AUDIT: SESSION,33,1,FUNCTION,DO,,,"DO $$
 BEGIN
@@ -34,6 +39,7 @@ BEGIN
 END $$;"
 AUDIT: SESSION,33,2,DDL,CREATE TABLE,TABLE,public.important_table,CREATE TABLE important_table (id INT)
 ```
+
 Not only is the `DO` block logged, but substatement 2 contains the full text of the `CREATE TABLE` with the statement type, object type, and full-qualified name to make searches easy.
 
 When logging `SELECT` and `DML` statements, pgAudit can be configured to log a separate entry for each relation referenced in a statement. No parsing is required to find all statements that touch a particular table. In fact, the goal is that the statement text is provided primarily for deep forensics and should not be required for an audit.
@@ -56,15 +62,15 @@ Aside from bug fixes, no further development is allowed for stable branches. New
 
 pgAudit versions relate to PostgreSQL major versions as follows:
 
-- **pgAudit v16.X** is intended to support PostgreSQL 16.
+-   **pgAudit v16.X** is intended to support PostgreSQL 16.
 
-- **pgAudit v1.7.X** is intended to support PostgreSQL 15.
+-   **pgAudit v1.7.X** is intended to support PostgreSQL 15.
 
-- **pgAudit v1.6.X** is intended to support PostgreSQL 14.
+-   **pgAudit v1.6.X** is intended to support PostgreSQL 14.
 
-- **pgAudit v1.5.X** is intended to support PostgreSQL 13.
+-   **pgAudit v1.5.X** is intended to support PostgreSQL 13.
 
-- **pgAudit v1.4.X** is intended to support PostgreSQL 12.
+-   **pgAudit v1.4.X** is intended to support PostgreSQL 12.
 
 ## Compile and Install
 
@@ -73,21 +79,29 @@ pgAudit can be compiled against an installed copy of PostgreSQL with development
 The following instructions are for RHEL 7.
 
 Clone the pgAudit extension:
+
 ```
 git clone https://github.com/pgaudit/pgaudit.git
 ```
+
 Change to pgAudit directory:
+
 ```
 cd pgaudit
 ```
+
 Checkout `REL_16_STABLE` branch (note that the stable branch may not exist for unreleased versions of PostgreSQL):
+
 ```
 git checkout REL_16_STABLE
 ```
+
 Build and install pgAudit:
+
 ```
 make install USE_PGXS=1 PG_CONFIG=/usr/pgsql-16/bin/pg_config
 ```
+
 Instructions for testing and development may be found in `test`.
 
 ## Settings
@@ -106,21 +120,21 @@ If the `pgaudit` extension is dropped and needs to be recreated then `pgaudit.lo
 
 Specifies which classes of statements will be logged by session audit logging. Possible values are:
 
-- **READ**: `SELECT` and `COPY` when the source is a relation or a query.
+-   **READ**: `SELECT` and `COPY` when the source is a relation or a query.
 
-- **WRITE**: `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, and `COPY` when the destination is a relation.
+-   **WRITE**: `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, and `COPY` when the destination is a relation.
 
-- **FUNCTION**: Function calls and `DO` blocks.
+-   **FUNCTION**: Function calls and `DO` blocks.
 
-- **ROLE**: Statements related to roles and privileges: `GRANT`, `REVOKE`, `CREATE/ALTER/DROP ROLE`.
+-   **ROLE**: Statements related to roles and privileges: `GRANT`, `REVOKE`, `CREATE/ALTER/DROP ROLE`.
 
-- **DDL**: All `DDL` that is not included in the `ROLE` class.
+-   **DDL**: All `DDL` that is not included in the `ROLE` class.
 
-- **MISC**: Miscellaneous commands, e.g. `DISCARD`, `FETCH`, `CHECKPOINT`, `VACUUM`, `SET`.
+-   **MISC**: Miscellaneous commands, e.g. `DISCARD`, `FETCH`, `CHECKPOINT`, `VACUUM`, `SET`.
 
-- **MISC_SET**: Miscellaneous `SET` commands, e.g. `SET ROLE`.
+-   **MISC_SET**: Miscellaneous `SET` commands, e.g. `SET ROLE`.
 
-- **ALL**: Include all of the above.
+-   **ALL**: Include all of the above.
 
 Multiple classes can be provided using a comma-separated list and classes can be subtracted by prefacing the class with a `-` sign (see [Session Audit Logging](#session-audit-logging)).
 
@@ -199,11 +213,14 @@ Session audit logging provides detailed logs of all statements executed by a use
 Session logging is enabled with the [pgaudit.log](#pgauditlog) setting.
 
 Enable session logging for all `DML` and `DDL` and log all relations in `DML` statements:
+
 ```
 set pgaudit.log = 'write, ddl';
 set pgaudit.log_relation = on;
 ```
+
 Enable session logging for all commands except `MISC` and raise audit log messages as `NOTICE`:
+
 ```
 set pgaudit.log = 'all, -misc';
 set pgaudit.log_level = notice;
@@ -214,6 +231,7 @@ set pgaudit.log_level = notice;
 In this example session audit logging is used for logging `DDL` and `SELECT` statements. Note that the insert statement is not logged since the `WRITE` class is not enabled
 
 _SQL_:
+
 ```
 set pgaudit.log = 'read, ddl';
 
@@ -231,7 +249,9 @@ insert into account (id, name, password, description)
 select *
     from account;
 ```
+
 _Log Output_:
+
 ```
 AUDIT: SESSION,1,1,DDL,CREATE TABLE,TABLE,public.account,create table account
 (
@@ -255,6 +275,7 @@ Object audit logging is intended to be a finer-grained replacement for `pgaudit.
 Object-level audit logging is implemented via the roles system. The [pgaudit.role](#pgauditrole) setting defines the role that will be used for audit logging. A relation (`TABLE`, `VIEW`, etc.) will be audit logged when the audit role has permissions for the command executed or inherits the permissions from another role. This allows you to effectively have multiple audit roles even though there is a single master role in any context.
 
 Set [pgaudit.role](#pgauditrole) to `auditor` and grant `SELECT` and `DELETE` privileges on the `account` table. Any `SELECT` or `DELETE` statements on the `account` table will now be logged:
+
 ```
 set pgaudit.role = 'auditor';
 
@@ -268,6 +289,7 @@ grant select, delete
 In this example object audit logging is used to illustrate how a granular approach may be taken towards logging of `SELECT` and `DML` statements. Note that logging on the `account` table is controlled by column-level permissions, while logging on the `account_role_map` table is table-level.
 
 _SQL_:
+
 ```
 set pgaudit.role = 'auditor';
 
@@ -315,7 +337,9 @@ select account.password,
        inner join account_role_map
             on account.id = account_role_map.account_id
 ```
+
 _Log Output_:
+
 ```
 AUDIT: OBJECT,1,1,READ,SELECT,TABLE,public.account,select password
   from account,<not logged>
@@ -337,34 +361,36 @@ AUDIT: OBJECT,3,1,READ,SELECT,TABLE,public.account_role_map,select account.passw
 
 Audit entries are written to the standard logging facility and contain the following columns in comma-separated format. Output is compliant CSV format only if the log line prefix portion of each log entry is removed.
 
-- **AUDIT_TYPE** - `SESSION` or `OBJECT`.
+-   **AUDIT_TYPE** - `SESSION` or `OBJECT`.
 
-- **STATEMENT_ID** - Unique statement ID for this session. Each statement ID represents a backend call. Statement IDs are sequential even if some statements are not logged. There may be multiple entries for a statement ID when more than one relation is logged.
+-   **STATEMENT_ID** - Unique statement ID for this session. Each statement ID represents a backend call. Statement IDs are sequential even if some statements are not logged. There may be multiple entries for a statement ID when more than one relation is logged.
 
-- **SUBSTATEMENT_ID** - Sequential ID for each sub-statement within the main statement. For example, calling a function from a query. Sub-statement IDs are continuous even if some sub-statements are not logged. There may be multiple entries for a sub-statement ID when more than one relation is logged.
+-   **SUBSTATEMENT_ID** - Sequential ID for each sub-statement within the main statement. For example, calling a function from a query. Sub-statement IDs are continuous even if some sub-statements are not logged. There may be multiple entries for a sub-statement ID when more than one relation is logged.
 
-- **CLASS** - e.g. `READ`, `ROLE` (see [pgaudit.log](#pgauditlog)).
+-   **CLASS** - e.g. `READ`, `ROLE` (see [pgaudit.log](#pgauditlog)).
 
-- **COMMAND** - e.g. `ALTER TABLE`, `SELECT`.
+-   **COMMAND** - e.g. `ALTER TABLE`, `SELECT`.
 
-- **OBJECT_TYPE** - `TABLE`, `INDEX`, `VIEW`, etc. Available for `SELECT`, `DML` and most `DDL` statements.
+-   **OBJECT_TYPE** - `TABLE`, `INDEX`, `VIEW`, etc. Available for `SELECT`, `DML` and most `DDL` statements.
 
-- **OBJECT_NAME** - The fully-qualified object name (e.g. public.account). Available for `SELECT`, `DML` and most `DDL` statements.
+-   **OBJECT_NAME** - The fully-qualified object name (e.g. public.account). Available for `SELECT`, `DML` and most `DDL` statements.
 
-- **STATEMENT** - Statement executed on the backend.
+-   **STATEMENT** - Statement executed on the backend.
 
-- **PARAMETER** - If `pgaudit.log_parameter` is set then this field will contain the statement parameters as quoted CSV or `<none>` if there are no parameters. Otherwise, the field is `<not logged>`.
+-   **PARAMETER** - If `pgaudit.log_parameter` is set then this field will contain the statement parameters as quoted CSV or `<none>` if there are no parameters. Otherwise, the field is `<not logged>`.
 
 Use [log_line_prefix](http://www.postgresql.org/docs/16/runtime-config-logging.html#GUC-LOG-LINE-PREFIX) to add any other fields that are needed to satisfy your audit log requirements. A typical log line prefix might be `'%m %u %d [%p]: '` which would provide the date/time, user name, database name, and process id for each audit log.
 
 ## Caveats
 
 Object renames are logged under the name they were renamed to. For example, renaming a table will produce the following result:
+
 ```
 ALTER TABLE test RENAME TO test2;
 
 AUDIT: SESSION,36,1,DDL,ALTER TABLE,TABLE,public.test2,ALTER TABLE test RENAME TO test2,<not logged>
 ```
+
 It is possible to have a command logged more than once. For example, when a table is created with a primary key specified at creation time the index for the primary key will be logged independently and another audit log will be made for the index under the create entry. The multiple entries will however be contained within one statement ID.
 
 Autovacuum and Autoanalyze are not logged.
