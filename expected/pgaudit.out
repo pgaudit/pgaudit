@@ -802,6 +802,13 @@ NOTICE:  AUDIT: SESSION,23,1,DDL,CREATE TABLE,TABLE,public.test,"CREATE TABLE pu
 	description TEXT,
 	CONSTRAINT test_pkey PRIMARY KEY (id)
 );",<none>
+NOTICE:  AUDIT: SESSION,23,1,DDL,ALTER TABLE,TABLE,public.test,"CREATE TABLE public.test
+(
+	id INT,
+	name TEXT,
+	description TEXT,
+	CONSTRAINT test_pkey PRIMARY KEY (id)
+);",<none>
 NOTICE:  AUDIT: SESSION,23,1,DDL,CREATE INDEX,INDEX,public.test_pkey,"CREATE TABLE public.test
 (
 	id INT,
@@ -2535,9 +2542,9 @@ SET pgaudit.log = 'all,-misc_set';
 SET pgaudit.log_level = 'warning';
 CREATE EXTENSION pg_stat_statements;
 WARNING:  AUDIT: SESSION,3,1,DDL,CREATE EXTENSION,,,CREATE EXTENSION pg_stat_statements;,<not logged>
-ALTER EXTENSION pg_stat_statements UPDATE TO '1.10';
-WARNING:  AUDIT: SESSION,4,1,DDL,ALTER EXTENSION,,,ALTER EXTENSION pg_stat_statements UPDATE TO '1.10';,<not logged>
-NOTICE:  version "1.10" of extension "pg_stat_statements" is already installed
+ALTER EXTENSION pg_stat_statements UPDATE TO '1.11';
+WARNING:  AUDIT: SESSION,4,1,DDL,ALTER EXTENSION,,,ALTER EXTENSION pg_stat_statements UPDATE TO '1.11';,<not logged>
+NOTICE:  version "1.11" of extension "pg_stat_statements" is already installed
 DROP EXTENSION pg_stat_statements;
 WARNING:  AUDIT: SESSION,5,1,DDL,DROP EXTENSION,,,DROP EXTENSION pg_stat_statements;,<not logged>
 SET pgaudit.log_level = 'notice';
