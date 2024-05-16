@@ -240,6 +240,7 @@ typedef struct
                                    generated when not. */
     char *objectName;           /* Fully qualified object identification */
     const char *commandText;    /* sourceText / queryString */
+    int commandLen;             /* Length of commandText */
     ParamListInfo paramList;    /* QueryDesc/ProcessUtility parameters */
 
     bool granted;               /* Audit role has object permissions? */
@@ -525,6 +526,45 @@ log_audit_event(AuditEventStackItem *stackItem)
     if (stackItem->auditEvent.logged)
         return;
 
+    /* Trim leading/trailing whitespace from the command */
+    if (stackItem->auditEvent.commandText != NULL)
+    {
+        // Trim leading whitespace
+        char commandChr = *stackItem->auditEvent.commandText;
+
+        while (commandChr == '\t' || commandChr == '\n'  ||
+               commandChr == '\r' || commandChr == ' ')
+        {
+            stackItem->auditEvent.commandText++;
+            stackItem->auditEvent.commandLen--;
+            commandChr = *stackItem->auditEvent.commandText;
+        }
+
+        /*
+         * If commandLen is zero then use the entire command. Sometimes len is
+         * not set by PostgreSQL.
+         */
+        if (stackItem->auditEvent.commandLen == 0)
+            stackItem->auditEvent.commandLen =
+                strlen(stackItem->auditEvent.commandText);
+
+        /*
+         * Trim trailing whitespace. Also trim trailing semicolons since they
+         * might be included if commandLen was not provided. This makes output
+         * consistent with when commandLen is provided.
+         */
+        commandChr = *(stackItem->auditEvent.commandText +
+            stackItem->auditEvent.commandLen - 1);
+
+        while (commandChr == '\t' || commandChr == '\n'  ||
+               commandChr == '\r' || commandChr == ' ' || commandChr == ';')
+        {
+            stackItem->auditEvent.commandLen--;
+            commandChr = *(stackItem->auditEvent.commandText +
+                stackItem->auditEvent.commandLen - 1);
+        }
+    }
+
     /* Classify the statement using log stmt level and the command tag */
     switch (stackItem->auditEvent.logStmtLevel)
     {
@@ -571,7 +611,8 @@ log_audit_event(AuditEventStackItem *stackItem)
                         int passwordPos;
 
                         /* Copy the command string and convert to lower case */
-                        commandStr = pstrdup(stackItem->auditEvent.commandText);
+                        commandStr = pnstrdup(stackItem->auditEvent.commandText,
+                                              stackItem->auditEvent.commandLen);
 
                         for (i = 0; commandStr[i]; i++)
                             commandStr[i] =
@@ -600,6 +641,7 @@ log_audit_event(AuditEventStackItem *stackItem)
 
                             /* Assign new command string */
                             stackItem->auditEvent.commandText = commandStr;
+                            stackItem->auditEvent.commandLen = strlen(commandStr);
                         }
                     }
 
@@ -726,7 +768,11 @@ log_audit_event(AuditEventStackItem *stackItem)
     appendStringInfoCharMacro(&auditStr, ',');
     if (auditLogStatement && !(stackItem->auditEvent.statementLogged && auditLogStatementOnce))
     {
-        append_valid_csv(&auditStr, stackItem->auditEvent.commandText);
+        char *commandStr = pnstrdup(stackItem->auditEvent.commandText,
+                                    stackItem->auditEvent.commandLen);
+
+        append_valid_csv(&auditStr, commandStr);
+        pfree(commandStr);
 
         appendStringInfoCharMacro(&auditStr, ',');
 
@@ -1311,6 +1357,7 @@ log_function_execute(Oid objectId)
     stackItem->auditEvent.command = CMDTAG_EXECUTE;
     stackItem->auditEvent.objectType = OBJECT_TYPE_FUNCTION;
     stackItem->auditEvent.commandText = stackItem->next->auditEvent.commandText;
+    stackItem->auditEvent.commandLen = stackItem->next->auditEvent.commandLen;
 
     log_audit_event(stackItem);
 
@@ -1379,7 +1426,8 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
         }
 
         /* Initialize the audit event */
-        stackItem->auditEvent.commandText = queryDesc->sourceText;
+        stackItem->auditEvent.commandText = queryDesc->sourceText + queryDesc->plannedstmt->stmt_location;
+        stackItem->auditEvent.commandLen = queryDesc->plannedstmt->stmt_len;
         stackItem->auditEvent.paramList = copyParamList(queryDesc->params);
     }
 
@@ -1580,7 +1628,8 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         stackItem->auditEvent.logStmtLevel = GetCommandLogLevel(pstmt->utilityStmt);
         stackItem->auditEvent.commandTag = nodeTag(pstmt->utilityStmt);
         stackItem->auditEvent.command = CreateCommandTag(pstmt->utilityStmt);
-        stackItem->auditEvent.commandText = queryString;
+        stackItem->auditEvent.commandText = queryString + pstmt->stmt_location;
+        stackItem->auditEvent.commandLen = pstmt->stmt_len;
 
         /*
          * If this is a DO block log it before calling the next ProcessUtility
