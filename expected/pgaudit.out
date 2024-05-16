@@ -802,13 +802,6 @@ NOTICE:  AUDIT: SESSION,23,1,DDL,CREATE TABLE,TABLE,public.test,"CREATE TABLE pu
 	description TEXT,
 	CONSTRAINT test_pkey PRIMARY KEY (id)
 );",<none>
-NOTICE:  AUDIT: SESSION,23,1,DDL,ALTER TABLE,TABLE,public.test,"CREATE TABLE public.test
-(
-	id INT,
-	name TEXT,
-	description TEXT,
-	CONSTRAINT test_pkey PRIMARY KEY (id)
-);",<none>
 NOTICE:  AUDIT: SESSION,23,1,DDL,CREATE INDEX,INDEX,public.test_pkey,"CREATE TABLE public.test
 (
 	id INT,
