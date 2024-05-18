@@ -465,25 +465,24 @@ command_text_set(AuditEvent *auditEvent, const char *commandText,
 
         /* If location is not -1 then offset. */
         if (commandLoc != -1)
-            auditEvent->commandText = commandText + commandLoc;
-        else
-            auditEvent->commandText = commandText;
+            commandText += commandLoc;
 
         /* If len is zero then use the entire string. */
         if (commandLen == 0)
-            auditEvent->commandLen = strlen(auditEvent->commandText);
-        else
-            auditEvent->commandLen = commandLen;
+            commandLen = strlen(commandText);
 
-        /* Trim leading whitespace. */
-        commandChr = *auditEvent->commandText;
+        /*
+         * Trim leading whitespace. This assumes that commandText is a valid
+         * zero-terminated string.
+         */
+        commandChr = *commandText;
 
-        while (commandChr == '\t' || commandChr == '\n'  ||
-               commandChr == '\r' || commandChr == ' ')
+        while (commandChr == ' ' || commandChr == '\t' || commandChr == '\n' ||
+               commandChr == '\r')
         {
-            auditEvent->commandText++;
-            auditEvent->commandLen--;
-            commandChr = *auditEvent->commandText;
+            commandText++;
+            commandLen--;
+            commandChr = *commandText;
         }
 
         /*
@@ -491,15 +490,19 @@ command_text_set(AuditEvent *auditEvent, const char *commandText,
          * might be included if commandLen was not provided. This makes output
          * consistent with when commandLen is provided.
          */
-        commandChr = *(auditEvent->commandText + auditEvent->commandLen - 1);
+        commandChr = *(commandText + commandLen - 1);
 
-        while (commandChr == '\t' || commandChr == '\n'  ||
-               commandChr == '\r' || commandChr == ' ' || commandChr == ';')
+        while (commandLen > 0 &&
+               (commandChr == ' ' || commandChr == ';' || commandChr == '\t' ||
+                commandChr == '\n'  || commandChr == '\r'))
         {
-            auditEvent->commandLen--;
-            commandChr = *(auditEvent->commandText +
-                auditEvent->commandLen - 1);
+            commandLen--;
+            commandChr = *(commandText + commandLen - 1);
         }
+
+        /* Assign final command text and length. */
+        auditEvent->commandText = commandText;
+        auditEvent->commandLen = commandLen;
     }
 }
 
