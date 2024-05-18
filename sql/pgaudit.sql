@@ -639,7 +639,7 @@ DO $$
 DECLARE
 	table_name TEXT = 'do_table';
 BEGIN
-	EXECUTE E'\t\n\r CREATE TABLE ' || table_name || E' ("weird name" INT)\t\n\r ; DROP table ' || table_name || ';';
+	EXECUTE E'\t\n\r CREATE TABLE ' || table_name || E' ("weird name" INT)\t\n\r ; DROP table ' || table_name;
 END $$;
 
 --
