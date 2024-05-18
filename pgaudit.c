@@ -789,9 +789,8 @@ log_audit_event(AuditEventStackItem *stackItem)
                                     stackItem->auditEvent.commandLen);
 
         append_valid_csv(&auditStr, commandStr);
-        pfree(commandStr);
-
         appendStringInfoCharMacro(&auditStr, ',');
+        pfree(commandStr);
 
         /* Handle parameter logging, if enabled. */
         if (auditLogParameter)
