@@ -240,6 +240,7 @@ typedef struct
                                    generated when not. */
     char *objectName;           /* Fully qualified object identification */
     const char *commandText;    /* sourceText / queryString */
+    int commandLen;             /* Length of commandText */
     ParamListInfo paramList;    /* QueryDesc/ProcessUtility parameters */
 
     bool granted;               /* Audit role has object permissions? */
@@ -451,6 +452,61 @@ stack_find_context(MemoryContext findContext)
 }
 
 /*
+ * Set command text.
+ */
+static void
+command_text_set(AuditEvent *auditEvent, const char *commandText,
+                 int commandLoc, int commandLen)
+{
+    /* If statements are being logged then set command text. */
+    if (auditLogStatement)
+    {
+        char commandChr;
+
+        /* If location is not -1 then offset. */
+        if (commandLoc != -1)
+            commandText += commandLoc;
+
+        /* If len is zero then use the entire string. */
+        if (commandLen == 0)
+            commandLen = strlen(commandText);
+
+        /*
+         * Trim leading whitespace. This assumes that commandText is a valid
+         * zero-terminated string.
+         */
+        commandChr = *commandText;
+
+        while (commandChr == ' ' || commandChr == '\t' || commandChr == '\n' ||
+               commandChr == '\r')
+        {
+            commandText++;
+            commandLen--;
+            commandChr = *commandText;
+        }
+
+        /*
+         * Trim trailing whitespace. Also trim trailing semicolons since they
+         * might be included if commandLen was not provided. This makes output
+         * consistent with when commandLen is provided.
+         */
+        commandChr = *(commandText + commandLen - 1);
+
+        while (commandLen > 0 &&
+               (commandChr == ' ' || commandChr == ';' || commandChr == '\t' ||
+                commandChr == '\n'  || commandChr == '\r'))
+        {
+            commandLen--;
+            commandChr = *(commandText + commandLen - 1);
+        }
+
+        /* Assign final command text and length. */
+        auditEvent->commandText = commandText;
+        auditEvent->commandLen = commandLen;
+    }
+}
+
+/*
  * Appends a properly quoted CSV field to StringInfo.
  */
 static void
@@ -571,7 +627,8 @@ log_audit_event(AuditEventStackItem *stackItem)
                         int passwordPos;
 
                         /* Copy the command string and convert to lower case */
-                        commandStr = pstrdup(stackItem->auditEvent.commandText);
+                        commandStr = pnstrdup(stackItem->auditEvent.commandText,
+                                              stackItem->auditEvent.commandLen);
 
                         for (i = 0; commandStr[i]; i++)
                             commandStr[i] =
@@ -600,6 +657,7 @@ log_audit_event(AuditEventStackItem *stackItem)
 
                             /* Assign new command string */
                             stackItem->auditEvent.commandText = commandStr;
+                            stackItem->auditEvent.commandLen = strlen(commandStr);
                         }
                     }
 
@@ -726,9 +784,13 @@ log_audit_event(AuditEventStackItem *stackItem)
     appendStringInfoCharMacro(&auditStr, ',');
     if (auditLogStatement && !(stackItem->auditEvent.statementLogged && auditLogStatementOnce))
     {
-        append_valid_csv(&auditStr, stackItem->auditEvent.commandText);
+        /* Log the command. */
+        char *commandStr = pnstrdup(stackItem->auditEvent.commandText,
+                                    stackItem->auditEvent.commandLen);
 
+        append_valid_csv(&auditStr, commandStr);
         appendStringInfoCharMacro(&auditStr, ',');
+        pfree(commandStr);
 
         /* Handle parameter logging, if enabled. */
         if (auditLogParameter)
@@ -1311,6 +1373,7 @@ log_function_execute(Oid objectId)
     stackItem->auditEvent.command = CMDTAG_EXECUTE;
     stackItem->auditEvent.objectType = OBJECT_TYPE_FUNCTION;
     stackItem->auditEvent.commandText = stackItem->next->auditEvent.commandText;
+    stackItem->auditEvent.commandLen = stackItem->next->auditEvent.commandLen;
 
     log_audit_event(stackItem);
 
@@ -1379,7 +1442,9 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
         }
 
         /* Initialize the audit event */
-        stackItem->auditEvent.commandText = queryDesc->sourceText;
+        command_text_set(&stackItem->auditEvent, queryDesc->sourceText,
+                         queryDesc->plannedstmt->stmt_location,
+                         queryDesc->plannedstmt->stmt_len);
         stackItem->auditEvent.paramList = copyParamList(queryDesc->params);
     }
 
@@ -1580,7 +1645,8 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         stackItem->auditEvent.logStmtLevel = GetCommandLogLevel(pstmt->utilityStmt);
         stackItem->auditEvent.commandTag = nodeTag(pstmt->utilityStmt);
         stackItem->auditEvent.command = CreateCommandTag(pstmt->utilityStmt);
-        stackItem->auditEvent.commandText = queryString;
+        command_text_set(&stackItem->auditEvent, queryString,
+                         pstmt->stmt_location, pstmt->stmt_len);
 
         /*
          * If this is a DO block log it before calling the next ProcessUtility
