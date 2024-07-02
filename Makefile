@@ -4,7 +4,7 @@ MODULE_big = pgaudit
 OBJS = pgaudit.o $(WIN32RES)
 
 EXTENSION = pgaudit
-DATA = pgaudit--1.7.sql
+DATA = pgaudit--17.0.sql
 PGFILEDESC = "pgAudit - An audit logging extension for PostgreSQL"
 
 REGRESS = pgaudit
@@ -20,3 +20,5 @@ top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 include $(top_srcdir)/contrib/contrib-global.mk
 endif
+
+EXTRA_INSTALL += contrib/pg_stat_statements

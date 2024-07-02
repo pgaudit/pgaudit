@@ -5,7 +5,7 @@
  * object level logging, and fully-qualified object names for all DML and DDL
  * statements where possible (See README.md for details).
  *
- * Copyright (c) 2014-2023, PostgreSQL Global Development Group
+ * Copyright (c) 2014-2024, PostgreSQL Global Development Group
  *------------------------------------------------------------------------------
  */
 #include "postgres.h"
@@ -28,6 +28,7 @@
 #include "libpq/auth.h"
 #include "nodes/nodes.h"
 #include "nodes/params.h"
+#include "parser/parse_relation.h"
 #include "tcop/utility.h"
 #include "tcop/deparse_utility.h"
 #include "utils/acl.h"
@@ -136,6 +137,17 @@ bool auditLogParameter = false;
 bool auditLogRelation = false;
 
 /*
+ * GUC variable for pgaudit.log_parameter_max_size
+ *
+ * Administrators can choose to prevent the logging of large variable-length
+ * parameters.  If set to 0 (the default), all parameters are logged.  If set
+ * greater than 0, variable length parameters (before character output) whose
+ * size is greater than the specified number of bytes will be replaced
+ * by a placeholder.
+*/
+int auditLogParameterMaxSize = 0;
+
+/*
  * GUC variable for pgaudit.log_rows
  *
  * Administrators can choose if the rows retrieved or affected by a statement
@@ -156,7 +168,7 @@ bool auditLogStatement = true;
  * Administrators can choose to have the statement run logged only once instead
  * of on every line.  By default, the statement is repeated on every line of
  * the audit log to facilitate searching, but this can cause the log to be
- * unnecessairly bloated in some environments.
+ * unnecessarily bloated in some environments.
  */
 bool auditLogStatementOnce = false;
 
@@ -236,6 +248,7 @@ typedef struct
                                    generated when not. */
     char *objectName;           /* Fully qualified object identification */
     const char *commandText;    /* sourceText / queryString */
+    int commandLen;             /* Length of commandText */
     ParamListInfo paramList;    /* QueryDesc/ProcessUtility parameters */
 
     bool granted;               /* Audit role has object permissions? */
@@ -246,6 +259,8 @@ typedef struct
     MemoryContext queryContext; /* Context for query tracking rows */
     Oid auditOid;               /* Role running query tracking rows  */
     List *rangeTabls;           /* Tables in query tracking rows */
+    List *permInfos;            /* Permission info rows for each table involved
+                                   in the query */
 } AuditEvent;
 
 /*
@@ -445,6 +460,61 @@ stack_find_context(MemoryContext findContext)
 }
 
 /*
+ * Set command text.
+ */
+static void
+command_text_set(AuditEvent *auditEvent, const char *commandText,
+                 int commandLoc, int commandLen)
+{
+    /* If statements are being logged then set command text. */
+    if (auditLogStatement)
+    {
+        char commandChr;
+
+        /* If location is not -1 then offset. */
+        if (commandLoc != -1)
+            commandText += commandLoc;
+
+        /* If len is zero then use the entire string. */
+        if (commandLen == 0)
+            commandLen = strlen(commandText);
+
+        /*
+         * Trim leading whitespace. This assumes that commandText is a valid
+         * zero-terminated string.
+         */
+        commandChr = *commandText;
+
+        while (commandChr == ' ' || commandChr == '\t' || commandChr == '\n' ||
+               commandChr == '\r')
+        {
+            commandText++;
+            commandLen--;
+            commandChr = *commandText;
+        }
+
+        /*
+         * Trim trailing whitespace. Also trim trailing semicolons since they
+         * might be included if commandLen was not provided. This makes output
+         * consistent with when commandLen is provided.
+         */
+        commandChr = *(commandText + commandLen - 1);
+
+        while (commandLen > 0 &&
+               (commandChr == ' ' || commandChr == ';' || commandChr == '\t' ||
+                commandChr == '\n'  || commandChr == '\r'))
+        {
+            commandLen--;
+            commandChr = *(commandText + commandLen - 1);
+        }
+
+        /* Assign final command text and length. */
+        auditEvent->commandText = commandText;
+        auditEvent->commandLen = commandLen;
+    }
+}
+
+/*
  * Appends a properly quoted CSV field to StringInfo.
  */
 static void
@@ -581,13 +651,15 @@ log_audit_event(AuditEventStackItem *stackItem)
             /* Identify role statements */
             switch (stackItem->auditEvent.commandTag)
             {
-                /* In the case of create and alter role redact all text in the
+                /* In the case of create and alter role or user mapping redact all text in the
                  * command after the password token for security.  This doesn't
                  * cover all possible cases where passwords can be leaked but
                  * should take care of the most common usage.
                  */
                 case T_CreateRoleStmt:
                 case T_AlterRoleStmt:
+				case T_CreateUserMappingStmt:
+				case T_AlterUserMappingStmt:
 
                     if (stackItem->auditEvent.commandText != NULL)
                     {
@@ -597,7 +669,8 @@ log_audit_event(AuditEventStackItem *stackItem)
                         int passwordPos;
 
                         /* Copy the command string and convert to lower case */
-                        commandStr = pstrdup(stackItem->auditEvent.commandText);
+                        commandStr = pnstrdup(stackItem->auditEvent.commandText,
+                                              stackItem->auditEvent.commandLen);
 
                         for (i = 0; commandStr[i]; i++)
                             commandStr[i] =
@@ -626,6 +699,7 @@ log_audit_event(AuditEventStackItem *stackItem)
 
                             /* Assign new command string */
                             stackItem->auditEvent.commandText = commandStr;
+                            stackItem->auditEvent.commandLen = strlen(commandStr);
                         }
                     }
 
@@ -746,15 +820,19 @@ log_audit_event(AuditEventStackItem *stackItem)
     append_valid_csv(&auditStr, stackItem->auditEvent.objectName);
 
     /*
-     * If auditLogStatmentOnce is true, then only log the statement and
+     * If auditLogStatementOnce is true, then only log the statement and
      * parameters if they have not already been logged for this substatement.
      */
     appendStringInfoCharMacro(&auditStr, ',');
     if (auditLogStatement && !(stackItem->auditEvent.statementLogged && auditLogStatementOnce))
     {
-        append_valid_csv(&auditStr, stackItem->auditEvent.commandText);
+        /* Log the command. */
+        char *commandStr = pnstrdup(stackItem->auditEvent.commandText,
+                                    stackItem->auditEvent.commandLen);
 
+        append_valid_csv(&auditStr, commandStr);
         appendStringInfoCharMacro(&auditStr, ',');
+        pfree(commandStr);
 
         /* Handle parameter logging, if enabled. */
         if (auditLogParameter)
@@ -776,7 +854,6 @@ log_audit_event(AuditEventStackItem *stackItem)
                 ParamExternData *prm = &paramList->params[paramIdx];
                 Oid typeOutput;
                 bool typeIsVarLena;
-                char *paramStr;
 
                 /* Add a comma for each param */
                 if (paramIdx != 0)
@@ -786,12 +863,27 @@ log_audit_event(AuditEventStackItem *stackItem)
                 if (prm->isnull || !OidIsValid(prm->ptype))
                     continue;
 
-                /* Output the string */
+                /*
+                 * Append the param, suppressing long params if the appropriate
+                 * GUC is set.
+                 */
                 getTypeOutputInfo(prm->ptype, &typeOutput, &typeIsVarLena);
-                paramStr = OidOutputFunctionCall(typeOutput, prm->value);
 
-                append_valid_csv(&paramStrResult, paramStr);
-                pfree(paramStr);
+                if (auditLogParameterMaxSize > 0 &&
+                    typeIsVarLena &&
+                    VARSIZE_ANY_EXHDR(prm->value) > auditLogParameterMaxSize)
+                {
+                    append_valid_csv(&paramStrResult,
+                                     "<long param suppressed>");
+                }
+                else
+                {
+                    char *paramStr = OidOutputFunctionCall(typeOutput,
+                                                           prm->value);
+
+                    append_valid_csv(&paramStrResult, paramStr);
+                    pfree(paramStr);
+                }
             }
 
             if (numParams == 0)
@@ -993,7 +1085,7 @@ audit_on_any_attribute(Oid relOid,
                        AclMode mode)
 {
     bool result = false;
-    AttrNumber col;
+    AttrNumber index = -1;
     Bitmapset *tmpSet;
 
     /* If bms is empty then check for any column match */
@@ -1022,9 +1114,9 @@ audit_on_any_attribute(Oid relOid,
     tmpSet = bms_copy(attributeSet);
 
     /* Check each column */
-    while ((col = bms_first_member(tmpSet)) >= 0)
+    while ((index = bms_next_member(tmpSet, index)) >= 0)
     {
-        col += FirstLowInvalidHeapAttributeNumber;
+        const AttrNumber col = index + FirstLowInvalidHeapAttributeNumber;
 
         if (col != InvalidAttrNumber &&
             audit_on_attribute(relOid, col, auditOid, mode))
@@ -1043,7 +1135,7 @@ audit_on_any_attribute(Oid relOid,
  * Create AuditEvents for SELECT/DML operations via executor permissions checks.
  */
 static void
-log_select_dml(Oid auditOid, List *rangeTabls)
+log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
 {
     ListCell *lr;
     bool first = true;
@@ -1058,17 +1150,24 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         Oid relOid;
         Oid relNamespaceOid;
         RangeTblEntry *rte = lfirst(lr);
+        const RTEPermissionInfo *perminfo;
 
-        /* We only care about tables, and can ignore subqueries etc. */
-        if (rte->rtekind != RTE_RELATION)
+        /*
+         * We only care about tables/views, which have perminfoindex set. This
+         * excludes table partitions, which do not have perminfoindex set.
+         */
+        if (rte->perminfoindex == 0)
             continue;
+
+        Assert(rte->rtekind == RTE_RELATION ||
+               (rte->rtekind == RTE_SUBQUERY && rte->relkind == RELKIND_VIEW));
 
         found = true;
 
         /*
          * Don't log if the session user is not a member of the current
          * role.  This prevents contents of security definer functions
-         * from being logged and supresses foreign key queries unless the
+         * from being logged and suppresses foreign key queries unless the
          * session user is the owner of the referenced table.
          */
         if (!is_member_of_role(GetSessionUserId(), GetUserId()))
@@ -1102,32 +1201,34 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         }
 
         /*
-         * We don't have access to the parsetree here, so we have to generate
+         * We don't have access to the parse tree here, so we have to generate
          * the node type, object type, and command tag by decoding
          * rte->requiredPerms and rte->relkind. For updates we also check
          * rellockmode so that only true UPDATE commands (not
          * SELECT FOR UPDATE, etc.) are logged as UPDATE.
          */
-        if (rte->requiredPerms & ACL_INSERT)
+        perminfo = getRTEPermissionInfo(permInfos, rte);
+
+        if (perminfo->requiredPerms & ACL_INSERT)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
             auditEventStack->auditEvent.commandTag = T_InsertStmt;
             auditEventStack->auditEvent.command = CMDTAG_INSERT;
         }
-        else if (rte->requiredPerms & ACL_UPDATE &&
+        else if (perminfo->requiredPerms & ACL_UPDATE &&
                  rte->rellockmode >= RowExclusiveLock)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
             auditEventStack->auditEvent.commandTag = T_UpdateStmt;
             auditEventStack->auditEvent.command = CMDTAG_UPDATE;
         }
-        else if (rte->requiredPerms & ACL_DELETE)
+        else if (perminfo->requiredPerms & ACL_DELETE)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_MOD;
             auditEventStack->auditEvent.commandTag = T_DeleteStmt;
             auditEventStack->auditEvent.command = CMDTAG_DELETE;
         }
-        else if (rte->requiredPerms & ACL_SELECT)
+        else if (perminfo->requiredPerms & ACL_SELECT)
         {
             auditEventStack->auditEvent.logStmtLevel = LOGSTMT_ALL;
             auditEventStack->auditEvent.commandTag = T_SelectStmt;
@@ -1192,7 +1293,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         {
             AclMode auditPerms =
                 (ACL_SELECT | ACL_UPDATE | ACL_INSERT | ACL_DELETE) &
-                rte->requiredPerms;
+                perminfo->requiredPerms;
 
             /*
              * If any of the required permissions for the relation are granted
@@ -1213,7 +1314,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                 if (auditPerms & ACL_SELECT)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
-                                               rte->selectedCols,
+                                               perminfo->selectedCols,
                                                ACL_SELECT);
 
                 /*
@@ -1223,7 +1324,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                     auditPerms & ACL_INSERT)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
-                                               rte->insertedCols,
+                                               perminfo->insertedCols,
                                                auditPerms);
 
                 /*
@@ -1233,7 +1334,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                     auditPerms & ACL_UPDATE)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
-                                               rte->updatedCols,
+                                               perminfo->updatedCols,
                                                auditPerms);
             }
         }
@@ -1314,6 +1415,7 @@ log_function_execute(Oid objectId)
     stackItem->auditEvent.command = CMDTAG_EXECUTE;
     stackItem->auditEvent.objectType = OBJECT_TYPE_FUNCTION;
     stackItem->auditEvent.commandText = stackItem->next->auditEvent.commandText;
+    stackItem->auditEvent.commandLen = stackItem->next->auditEvent.commandLen;
 
     log_audit_event(stackItem);
 
@@ -1382,7 +1484,9 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
         }
 
         /* Initialize the audit event */
-        stackItem->auditEvent.commandText = queryDesc->sourceText;
+        command_text_set(&stackItem->auditEvent, queryDesc->sourceText,
+                         queryDesc->plannedstmt->stmt_location,
+                         queryDesc->plannedstmt->stmt_len);
         stackItem->auditEvent.paramList = copyParamList(queryDesc->params);
     }
 
@@ -1414,7 +1518,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
  * Hook ExecutorCheckPerms to do session and object auditing for DML.
  */
 static bool
-pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
+pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, List *permInfos, bool abort)
 {
     Oid auditOid;
 
@@ -1439,7 +1543,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
                  * The SELECT event for CREATE TABLE AS will be logged
                  * in pgaudit_ExecutorEnd_hook() later to get rows.
                  */
-                log_select_dml(auditOid, rangeTabls);
+                log_select_dml(auditOid, rangeTabls, permInfos);
             }
             else
             {
@@ -1449,15 +1553,16 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
                  */
                 auditEventStack->auditEvent.auditOid = auditOid;
                 auditEventStack->auditEvent.rangeTabls = rangeTabls;
+                auditEventStack->auditEvent.permInfos = permInfos;
             }
         }
         else
-            log_select_dml(auditOid, rangeTabls);
+            log_select_dml(auditOid, rangeTabls, permInfos);
     }
 
     /* Call the next hook function */
     if (next_ExecutorCheckPerms_hook &&
-        !(*next_ExecutorCheckPerms_hook) (rangeTabls, abort))
+        !(*next_ExecutorCheckPerms_hook) (rangeTabls, permInfos, abort))
         return false;
 
     return true;
@@ -1510,7 +1615,8 @@ pgaudit_ExecutorEnd_hook(QueryDesc *queryDesc)
 
             /* Log SELECT/DML audit entry */
             log_select_dml(stackItem->auditEvent.auditOid,
-                           stackItem->auditEvent.rangeTabls);
+                           stackItem->auditEvent.rangeTabls,
+                           stackItem->auditEvent.permInfos);
 
             /* Switch back to the previous auditEventStack */
             auditEventStack = auditEventStackFull;
@@ -1581,7 +1687,8 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         stackItem->auditEvent.logStmtLevel = GetCommandLogLevel(pstmt->utilityStmt);
         stackItem->auditEvent.commandTag = nodeTag(pstmt->utilityStmt);
         stackItem->auditEvent.command = CreateCommandTag(pstmt->utilityStmt);
-        stackItem->auditEvent.commandText = queryString;
+        command_text_set(&stackItem->auditEvent, queryString,
+                         pstmt->stmt_location, pstmt->stmt_len);
 
         /*
          * If this is a DO block log it before calling the next ProcessUtility
@@ -1902,7 +2009,7 @@ check_pgaudit_log(char **newVal, void **extra, GucSource source)
      * Check that we recognise each token, and add it to the bitmap we're
      * building up in a newly-allocated int *f.
      */
-    if (!(flags = (int *) malloc(sizeof(int))))
+    if (!(flags = (int *)guc_malloc(FATAL, sizeof(int))))
         return false;
 
     *flags = 0;
@@ -1941,7 +2048,7 @@ check_pgaudit_log(char **newVal, void **extra, GucSource source)
             class = LOG_WRITE;
         else
         {
-            free(flags);
+            guc_free(flags);
             pfree(rawVal);
             list_free(flagRawList);
             return false;
@@ -1986,7 +2093,7 @@ check_pgaudit_log_level(char **newVal, void **extra, GucSource source)
     int *logLevel;
 
     /* Allocate memory to store the log level */
-    if (!(logLevel = (int *) malloc(sizeof(int))))
+    if (!(logLevel = (int *)guc_malloc(FATAL, sizeof(int))))
         return false;
 
     /* Find the log level enum */
@@ -2014,7 +2121,7 @@ check_pgaudit_log_level(char **newVal, void **extra, GucSource source)
     /* Error if the log level enum is not found */
     else
     {
-        free(logLevel);
+        guc_free(logLevel);
         return false;
     }
 
@@ -2136,6 +2243,26 @@ _PG_init(void)
         GUC_NOT_IN_SAMPLE,
         NULL, NULL, NULL);
 
+    /* Define pgaudit.log_parameter_max_size */
+    DefineCustomIntVariable(
+        "pgaudit.log_parameter_max_size",
+
+        "Specifies, in bytes, the maximum length of variable-length parameters "
+        "to log.  If 0 (the default), parameters are not checked for size.  If "
+        "set, when the size of the parameter is longer than the setting, the "
+        "value in the audit log is replaced with a placeholder. Note that for "
+        "character types, the length is in bytes for the parameter's encoding, "
+        "not characters.",
+
+        NULL,
+        &auditLogParameterMaxSize,
+        0,
+        0,
+        (1 << 30) - 1,
+        PGC_SUSET,
+        GUC_NOT_IN_SAMPLE,
+        NULL, NULL, NULL);
+
     /* Define pgaudit.log_relation */
     DefineCustomBoolVariable(
         "pgaudit.log_relation",
@@ -2187,7 +2314,7 @@ _PG_init(void)
 
         "Specifies whether logging will include the statement text and "
         "parameters with the first log entry for a statement/substatement "
-        "combination or with every entry.  Disabling this setting will result "
+        "combination or with every entry.  Enabling this setting will result "
         "in less verbose logging but may make it more difficult to determine "
         "the statement that generated a log entry, though the "
         "statement/substatement pair along with the process id should suffice "
