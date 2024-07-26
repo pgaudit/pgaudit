@@ -1410,8 +1410,6 @@ NOTICE:  AUDIT: SESSION,20,1,READ,SELECT,TABLE,public.test2,"SELECT *
   FROM vw_test3, test2;",<none>,9
 NOTICE:  AUDIT: SESSION,20,1,READ,SELECT,VIEW,public.vw_test3,"SELECT *
   FROM vw_test3, test2;",<none>,9
-NOTICE:  AUDIT: SESSION,20,1,MISC,???,VIEW,public.vw_test3,"SELECT *
-  FROM vw_test3, test2;",<none>,9
 NOTICE:  AUDIT: SESSION,20,1,READ,SELECT,TABLE,public.test3,"SELECT *
   FROM vw_test3, test2;",<none>,9
  id | name | id | name 

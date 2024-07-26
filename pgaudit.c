@@ -1021,6 +1021,13 @@ log_select_dml(Oid auditOid, List *rangeTabls)
         if (rte->rtekind != RTE_RELATION)
             continue;
 
+		/*
+		 * Rewriter adds a second VIEW entry, with requiredPerms == 0,
+		 * to avoid permissions check for the second time.
+		 */
+		if (rte->relkind == RELKIND_VIEW && rte->requiredPerms == 0)
+			continue;
+
         found = true;
 
         /*
