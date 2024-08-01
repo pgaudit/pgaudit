@@ -1281,6 +1281,56 @@ NOTICE:  version "1.7" of extension "pg_stat_statements" is already installed
 DROP EXTENSION pg_stat_statements;
 WARNING:  AUDIT: SESSION,106,1,DDL,DROP EXTENSION,,,DROP EXTENSION pg_stat_statements;,<none>
 SET pgaudit.log_level = 'notice';
+-- Check that partition scans are skipped for auditing and do no result in an empty stack
+SET pgaudit.log = 'all';
+NOTICE:  AUDIT: SESSION,107,1,MISC,SET,,,SET pgaudit.log = 'all';,<none>
+CREATE TABLE part_test (c1 int, c2 int) PARTITION BY RANGE (c1);
+NOTICE:  AUDIT: SESSION,108,1,DDL,CREATE TABLE,,,"CREATE TABLE part_test (c1 int, c2 int) PARTITION BY RANGE (c1);",<none>
+CREATE TABLE part_test_1_to_10 PARTITION OF part_test FOR VALUES FROM (1) TO (10);
+NOTICE:  AUDIT: SESSION,109,1,DDL,CREATE TABLE,,,CREATE TABLE part_test_1_to_10 PARTITION OF part_test FOR VALUES FROM (1) TO (10);,<none>
+INSERT INTO part_test VALUES (generate_series(1,9));
+NOTICE:  AUDIT: SESSION,110,1,WRITE,INSERT,TABLE,public.part_test,"INSERT INTO part_test VALUES (generate_series(1,9));",<none>
+CREATE OR REPLACE FUNCTION get_test_id(_ret REFCURSOR) RETURNS REFCURSOR
+LANGUAGE plpgsql IMMUTABLE AS $$
+BEGIN
+    OPEN _ret FOR SELECT * FROM part_test;
+    RETURN _ret;
+END $$;
+NOTICE:  AUDIT: SESSION,111,1,DDL,CREATE FUNCTION,,,"CREATE OR REPLACE FUNCTION get_test_id(_ret REFCURSOR) RETURNS REFCURSOR
+LANGUAGE plpgsql IMMUTABLE AS $$
+BEGIN
+    OPEN _ret FOR SELECT * FROM part_test;
+    RETURN _ret;
+END $$;",<none>
+BEGIN;
+NOTICE:  AUDIT: SESSION,112,1,MISC,BEGIN,,,BEGIN;,<none>
+SELECT get_test_id('_ret');
+NOTICE:  AUDIT: SESSION,113,1,READ,SELECT,TABLE,public.part_test,SELECT * FROM part_test,<none>
+NOTICE:  AUDIT: SESSION,113,2,READ,SELECT,,,SELECT get_test_id('_ret');,<none>
+ get_test_id 
+-------------
+ _ret
+(1 row)
+
+FETCH ALL FROM _ret;
+NOTICE:  AUDIT: SESSION,113,3,MISC,FETCH,,,FETCH ALL FROM _ret;,<none>
+ c1 | c2 
+----+----
+  1 |   
+  2 |   
+  3 |   
+  4 |   
+  5 |   
+  6 |   
+  7 |   
+  8 |   
+  9 |   
+(9 rows)
+
+COMMIT;
+NOTICE:  AUDIT: SESSION,113,4,MISC,COMMIT,,,COMMIT;,<none>
+DROP TABLE part_test;
+NOTICE:  AUDIT: SESSION,114,1,DDL,DROP TABLE,,,DROP TABLE part_test;,<none>
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
