@@ -1625,7 +1625,8 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
                 {
                     if (nextItem->auditEvent.commandTag != T_SelectStmt &&
                         nextItem->auditEvent.commandTag != T_VariableShowStmt &&
-                        nextItem->auditEvent.commandTag != T_ExplainStmt)
+                        nextItem->auditEvent.commandTag != T_ExplainStmt &&
+                        nextItem->auditEvent.commandTag != T_CallStmt)
                     {
                         elog(ERROR, "pgaudit stack is not empty");
                     }
