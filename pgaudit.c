@@ -1514,7 +1514,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, List *permInfos, bool abort)
                 auditEventStack->auditEvent.permInfos = permInfos;
             }
         }
-        else
+        else if (auditEventStack != NULL)
             log_select_dml(auditOid, rangeTabls, permInfos);
     }
 
