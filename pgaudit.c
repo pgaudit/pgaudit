@@ -383,11 +383,7 @@ stack_push()
                                        &stackItem->contextCallback);
 
     /* Push new item onto the stack */
-    if (auditEventStack != NULL)
-        stackItem->next = auditEventStack;
-    else
-        stackItem->next = NULL;
-
+    stackItem->next = auditEventStack;
     auditEventStack = stackItem;
 
     MemoryContextSwitchTo(contextOld);
@@ -440,13 +436,8 @@ stack_find_context(MemoryContext findContext)
     AuditEventStackItem *nextItem = auditEventStack;
 
     /* Look through the stack for the stack entry by query memory context */
-    while (nextItem != NULL)
-    {
-        if (nextItem->auditEvent.queryContext == findContext)
-            break;
-
+    while (nextItem != NULL && nextItem->auditEvent.queryContext != findContext)
         nextItem = nextItem->next;
-    }
 
     return nextItem;
 }
