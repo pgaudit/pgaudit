@@ -282,7 +282,7 @@ stack_free(void *stackFree)
             /* Move top of stack to the item after the freed item */
             auditEventStack = nextItem->next;
 
-            /* If the stack is not empty */
+            /* If the stack is now empty */
             if (auditEventStack == NULL)
             {
                 /*
