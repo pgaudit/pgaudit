@@ -316,7 +316,7 @@ stack_free(void *stackFree)
             /* Move top of stack to the item after the freed item */
             auditEventStack = nextItem->next;
 
-            /* If the stack is not empty */
+            /* If the stack is empty */
             if (auditEventStack == NULL)
             {
                 /*
@@ -383,11 +383,7 @@ stack_push()
                                        &stackItem->contextCallback);
 
     /* Push new item onto the stack */
-    if (auditEventStack != NULL)
-        stackItem->next = auditEventStack;
-    else
-        stackItem->next = NULL;
-
+    stackItem->next = auditEventStack;
     auditEventStack = stackItem;
 
     MemoryContextSwitchTo(contextOld);
@@ -440,13 +436,8 @@ stack_find_context(MemoryContext findContext)
     AuditEventStackItem *nextItem = auditEventStack;
 
     /* Look through the stack for the stack entry by query memory context */
-    while (nextItem != NULL)
-    {
-        if (nextItem->auditEvent.queryContext == findContext)
-            break;
-
+    while (nextItem != NULL && nextItem->auditEvent.queryContext != findContext)
         nextItem = nextItem->next;
-    }
 
     return nextItem;
 }
@@ -643,6 +634,7 @@ log_audit_event(AuditEventStackItem *stackItem)
                             passwordPos = (passwordToken - commandStr) +
                                           strlen(TOKEN_PASSWORD);
 
+                            pfree(commandStr);
                             commandStr = palloc(passwordPos + 1 +
                                                 strlen(TOKEN_REDACTED) + 1);
 
@@ -659,6 +651,8 @@ log_audit_event(AuditEventStackItem *stackItem)
                             stackItem->auditEvent.commandText = commandStr;
                             stackItem->auditEvent.commandLen = strlen(commandStr);
                         }
+                        else
+                            pfree(commandStr);
                     }
 
                 /* Fall through */
@@ -1506,7 +1500,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, List *permInfos, bool abort)
             else
             {
                 /*
-                 * Save auditOid and rangeTabls to call log_select_dml()
+                 * Save auditOid, rangeTabls and permInfos to call log_select_dml()
                  * in pgaudit_ExecutorEnd_hook() later.
                  */
                 auditEventStack->auditEvent.auditOid = auditOid;
