@@ -316,7 +316,7 @@ stack_free(void *stackFree)
             /* Move top of stack to the item after the freed item */
             auditEventStack = nextItem->next;
 
-            /* If the stack is not empty */
+            /* If the stack is now empty */
             if (auditEventStack == NULL)
             {
                 /*
@@ -1506,8 +1506,8 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, List *permInfos, bool abort)
             else
             {
                 /*
-                 * Save auditOid and rangeTabls to call log_select_dml()
-                 * in pgaudit_ExecutorEnd_hook() later.
+                 * Save auditOid, rangeTabls, and permInfos to call
+                 * log_select_dml() in pgaudit_ExecutorEnd_hook() later.
                  */
                 auditEventStack->auditEvent.auditOid = auditOid;
                 auditEventStack->auditEvent.rangeTabls = rangeTabls;
