@@ -1500,8 +1500,8 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, List *permInfos, bool abort)
             else
             {
                 /*
-                 * Save auditOid, rangeTabls and permInfos to call log_select_dml()
-                 * in pgaudit_ExecutorEnd_hook() later.
+                 * Save auditOid, rangeTabls, and permInfos to call
+                 * log_select_dml() in pgaudit_ExecutorEnd_hook() later.
                  */
                 auditEventStack->auditEvent.auditOid = auditOid;
                 auditEventStack->auditEvent.rangeTabls = rangeTabls;
