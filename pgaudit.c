@@ -316,7 +316,7 @@ stack_free(void *stackFree)
             /* Move top of stack to the item after the freed item */
             auditEventStack = nextItem->next;
 
-            /* If the stack is empty */
+            /* If the stack is now empty */
             if (auditEventStack == NULL)
             {
                 /*
@@ -607,8 +607,8 @@ log_audit_event(AuditEventStackItem *stackItem)
                  */
                 case T_CreateRoleStmt:
                 case T_AlterRoleStmt:
-				case T_CreateUserMappingStmt:
-				case T_AlterUserMappingStmt:
+                case T_CreateUserMappingStmt:
+                case T_AlterUserMappingStmt:
 
                     if (stackItem->auditEvent.commandText != NULL)
                     {
