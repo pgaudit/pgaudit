@@ -643,6 +643,7 @@ log_audit_event(AuditEventStackItem *stackItem)
                             passwordPos = (passwordToken - commandStr) +
                                           strlen(TOKEN_PASSWORD);
 
+                            pfree(commandStr);
                             commandStr = palloc(passwordPos + 1 +
                                                 strlen(TOKEN_REDACTED) + 1);
 
@@ -659,6 +660,8 @@ log_audit_event(AuditEventStackItem *stackItem)
                             stackItem->auditEvent.commandText = commandStr;
                             stackItem->auditEvent.commandLen = strlen(commandStr);
                         }
+                        else
+                            pfree(commandStr);
                     }
 
                 /* Fall through */
