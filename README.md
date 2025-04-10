@@ -70,6 +70,8 @@ pgAudit versions relate to PostgreSQL major versions as follows:
 
 ## Compile and Install
 
+### Linux
+
 pgAudit can be compiled against an installed copy of PostgreSQL with development packages using `PGXS`.
 
 The following instructions are for RHEL 7.
@@ -91,6 +93,24 @@ Build and install pgAudit:
 make install USE_PGXS=1 PG_CONFIG=/usr/pgsql-17/bin/pg_config
 ```
 Instructions for testing and development may be found in `test`.
+
+### macOS (Apple Silicon)
+
+For macOS users, especially those with Apple Silicon (M1/M2/M3) processors, there are additional steps required to compile and install pgAudit. We provide dedicated scripts in the `scripts/macos` directory to handle the specific requirements of macOS systems.
+
+For detailed instructions on installing pgAudit on macOS with Apple Silicon, see the [macOS Installation Guide](macos-install.md).
+
+Key steps include:
+
+1. Clone the pgAudit repository and checkout the appropriate branch for your PostgreSQL version
+2. Run the custom build script that handles SDK compatibility issues common on macOS
+3. Apply the pgAudit configuration to PostgreSQL
+4. Restart the PostgreSQL server
+
+The macOS scripts automatically handle:
+- SDK version detection and compatibility
+- Architecture-specific compilation flags
+- Control file and SQL file setup
 
 ## Settings
 
