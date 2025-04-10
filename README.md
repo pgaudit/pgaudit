@@ -28,10 +28,10 @@ END $$;
 ```
 It appears that finding the table of interest may require some knowledge of the code in cases where tables are created dynamically. This is not ideal since it would be preferable to just search on the table name. This is where pgAudit comes in. For the same input, it will produce this output in the log:
 ```
-AUDIT: SESSION,33,1,FUNCTION,DO,,,"DO $$
+AUDIT: SESSION,33,1,FUNCTION,DO,,,\"DO $$
 BEGIN
     EXECUTE 'CREATE TABLE import' || 'ant_table (id INT)';
-END $$;"
+END $$;\"
 AUDIT: SESSION,33,2,DDL,CREATE TABLE,TABLE,public.important_table,CREATE TABLE important_table (id INT)
 ```
 Not only is the `DO` block logged, but substatement 2 contains the full text of the `CREATE TABLE` with the statement type, object type, and full-qualified name to make searches easy.
@@ -72,6 +72,8 @@ pgAudit versions relate to PostgreSQL major versions as follows:
 
 pgAudit can be compiled against an installed copy of PostgreSQL with development packages using `PGXS`.
 
+### Linux (RHEL/CentOS)
+
 The following instructions are for RHEL 7.
 
 Clone the pgAudit extension:
@@ -91,6 +93,15 @@ Build and install pgAudit:
 make install USE_PGXS=1 PG_CONFIG=/usr/pgsql-17/bin/pg_config
 ```
 Instructions for testing and development may be found in `test`.
+
+### macOS (including Apple Silicon)
+
+macOS users, especially those on Apple Silicon (M1/M2/M3) systems, may face specific challenges when installing pgAudit. Please refer to our detailed [macOS Installation Guide](docs/macos-installation-guide.md) which covers:
+
+- Installation on Apple Silicon and Intel-based Macs
+- Solutions for common SDK compatibility issues
+- Step-by-step instructions for compiling with the correct architecture
+- Homebrew-based installation options
 
 ## Settings
 
