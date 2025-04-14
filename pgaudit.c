@@ -1391,10 +1391,11 @@ static ExecutorEnd_hook_type next_ExecutorEnd_hook = NULL;
  * that do not contain a table and so can't be idenitified accurately in
  * ExecutorCheckPerms.
  */
-static void
+static bool
 pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
 {
     AuditEventStackItem *stackItem = NULL;
+	bool plan_valid;
 
     if (!internalStatement)
     {
@@ -1444,9 +1445,9 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
 
     /* Call the previous hook or standard function */
     if (next_ExecutorStart_hook)
-        next_ExecutorStart_hook(queryDesc, eflags);
+        plan_valid = next_ExecutorStart_hook(queryDesc, eflags);
     else
-        standard_ExecutorStart(queryDesc, eflags);
+        plan_valid = standard_ExecutorStart(queryDesc, eflags);
 
     /*
      * Move the stack memory context to the query memory context.  This needs
@@ -1464,6 +1465,8 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
         if (auditLogRows)
             stackItem->auditEvent.queryContext = queryDesc->estate->es_query_cxt;
     }
+
+    return plan_valid;
 }
 
 /*
@@ -1524,15 +1527,15 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, List *permInfos, bool abort)
  * Hook ExecutorRun to get rows processed by the current statement.
  */
 static void
-pgaudit_ExecutorRun_hook(QueryDesc *queryDesc, ScanDirection direction, uint64 count, bool execute_once)
+pgaudit_ExecutorRun_hook(QueryDesc *queryDesc, ScanDirection direction, uint64 count)
 {
     AuditEventStackItem *stackItem = NULL;
 
     /* Call the previous hook or standard function */
     if (next_ExecutorRun_hook)
-        next_ExecutorRun_hook(queryDesc, direction, count, execute_once);
+        next_ExecutorRun_hook(queryDesc, direction, count);
     else
-        standard_ExecutorRun(queryDesc, direction, count, execute_once);
+        standard_ExecutorRun(queryDesc, direction, count);
 
     if (auditLogRows && !internalStatement)
     {

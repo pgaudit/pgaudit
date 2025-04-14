@@ -11,7 +11,7 @@ NOTICE:  AUDIT: SESSION,3,1,MISC,SET,,,SET pgaudit.log_level = 'notice',<not log
 CREATE TABLE tmp (id int, data text);
 NOTICE:  AUDIT: SESSION,4,1,DDL,CREATE TABLE,TABLE,public.tmp,"CREATE TABLE tmp (id int, data text)",<not logged>
 CREATE TABLE tmp2 AS (SELECT * FROM tmp);
-NOTICE:  AUDIT: SESSION,5,1,READ,SELECT,,,CREATE TABLE tmp2 AS (SELECT * FROM tmp),<not logged>
+NOTICE:  AUDIT: SESSION,5,1,READ,SELECT,,,SELECT * FROM tmp,<not logged>
 NOTICE:  AUDIT: SESSION,5,2,DDL,CREATE TABLE AS,TABLE,public.tmp2,CREATE TABLE tmp2 AS (SELECT * FROM tmp),<not logged>
 -- Reset log_client first to show that audits logs are not set to client
 RESET pgaudit.log_client;
@@ -56,6 +56,7 @@ NOTICE:  AUDIT: SESSION,5,1,ROLE,ALTER ROLE,,,ALTER ROLE regress_user1 PassWord 
 ALTER USER regress_user1 encrypted /* random comment */PASSWORD
 	/* random comment */
     'md565cb1da342495ea6bb0418a6e5718c38' LOGIN;
+WARNING:  setting an MD5-encrypted password
 NOTICE:  AUDIT: SESSION,6,1,ROLE,ALTER ROLE,,,ALTER USER regress_user1 encrypted /* random comment */PASSWORD <REDACTED>,<not logged>
 ALTER ROLE regress_user1 SET pgaudit.log_client = ON;
 NOTICE:  AUDIT: SESSION,7,1,ROLE,ALTER ROLE,,,ALTER ROLE regress_user1 SET pgaudit.log_client = ON,<not logged>
@@ -393,8 +394,7 @@ NOTICE:  AUDIT: SESSION,2,1,ROLE,ALTER ROLE,,,ALTER ROLE regress_user2 SET pgaud
 PREPARE testinsert(int, text) AS
     INSERT INTO test4 VALUES($1, $2);
 EXECUTE testinsert(1, '*******************************************************');
-WARNING:  AUDIT: OBJECT,1,1,WRITE,INSERT,TABLE,public.test4,"PREPARE testinsert(int, text) AS
-    INSERT INTO test4 VALUES($1, $2)","1,<long param suppressed>"
+WARNING:  AUDIT: OBJECT,1,1,WRITE,INSERT,TABLE,public.test4,"INSERT INTO test4 VALUES($1, $2)","1,<long param suppressed>"
 DEALLOCATE testinsert;
 \connect - :current_user
 ALTER ROLE regress_user2 RESET pgaudit.log_parameter_max_size;
@@ -403,8 +403,7 @@ NOTICE:  AUDIT: SESSION,1,1,ROLE,ALTER ROLE,,,ALTER ROLE regress_user2 RESET pga
 PREPARE testinsert(int, text) AS
     INSERT INTO test4 VALUES($1, $2);
 EXECUTE testinsert(2, '*******************************************************');
-WARNING:  AUDIT: OBJECT,1,1,WRITE,INSERT,TABLE,public.test4,"PREPARE testinsert(int, text) AS
-    INSERT INTO test4 VALUES($1, $2)","2,*******************************************************"
+WARNING:  AUDIT: OBJECT,1,1,WRITE,INSERT,TABLE,public.test4,"INSERT INTO test4 VALUES($1, $2)","2,*******************************************************"
 DEALLOCATE testinsert;
 \connect - :current_user
 ALTER ROLE regress_user2 RESET pgaudit.log_parameter;
@@ -677,8 +676,7 @@ NOTICE:  AUDIT: SESSION,8,1,READ,SELECT,TABLE,public.account,COPY account TO std
 CREATE TABLE test.account_copy AS
 SELECT *
   FROM account;
-NOTICE:  AUDIT: SESSION,9,1,READ,SELECT,TABLE,public.account,"CREATE TABLE test.account_copy AS
-SELECT *
+NOTICE:  AUDIT: SESSION,9,1,READ,SELECT,TABLE,public.account,"SELECT *
   FROM account",<none>
 NOTICE:  AUDIT: SESSION,9,2,DDL,CREATE TABLE AS,TABLE,test.account_copy,"CREATE TABLE test.account_copy AS
 SELECT *
@@ -698,8 +696,7 @@ SELECT *
   FROM account
  WHERE id = $1",<none>
 EXECUTE pgclassstmt (1);
-NOTICE:  AUDIT: SESSION,12,1,READ,SELECT,TABLE,public.account,"PREPARE pgclassstmt (oid) AS
-SELECT *
+NOTICE:  AUDIT: SESSION,12,1,READ,SELECT,TABLE,public.account,"SELECT *
   FROM account
  WHERE id = $1",1
 NOTICE:  AUDIT: SESSION,12,2,MISC,EXECUTE,,,EXECUTE pgclassstmt (1),<none>
@@ -722,8 +719,7 @@ SELECT count(*)
 	  FROM pg_class
 	 LIMIT 1
  ) subquery;
-NOTICE:  AUDIT: SESSION,15,1,READ,SELECT,TABLE,pg_catalog.pg_class,"DECLARE ctest SCROLL CURSOR FOR
-SELECT count(*)
+NOTICE:  AUDIT: SESSION,15,1,READ,SELECT,TABLE,pg_catalog.pg_class,"SELECT count(*)
   FROM
 (
 	SELECT relname
@@ -782,8 +778,7 @@ NOTICE:  AUDIT: SESSION,21,1,WRITE,PREPARE,,,"PREPARE pgclassstmt (oid) AS
 INSERT INTO test.test_insert (id)
 					  VALUES ($1)",<none>
 EXECUTE pgclassstmt (1);
-NOTICE:  AUDIT: SESSION,22,1,WRITE,INSERT,TABLE,test.test_insert,"PREPARE pgclassstmt (oid) AS
-INSERT INTO test.test_insert (id)
+NOTICE:  AUDIT: SESSION,22,1,WRITE,INSERT,TABLE,test.test_insert,"INSERT INTO test.test_insert (id)
 					  VALUES ($1)",1
 NOTICE:  AUDIT: SESSION,22,2,MISC,EXECUTE,,,EXECUTE pgclassstmt (1),<none>
 --
@@ -863,7 +858,7 @@ BEGIN
 END $$",<none>
 NOTICE:  AUDIT: SESSION,29,2,READ,SELECT,,,SELECT 1,<none>
 explain select 1;
-NOTICE:  AUDIT: SESSION,30,1,READ,SELECT,,,explain select 1,<none>
+NOTICE:  AUDIT: SESSION,30,1,READ,SELECT,,,select 1,<none>
 NOTICE:  AUDIT: SESSION,30,2,MISC,EXPLAIN,,,explain select 1,<none>
                 QUERY PLAN                
 ------------------------------------------
@@ -931,7 +926,8 @@ BEGIN
 	EXECUTE E'\t\n\r CREATE TABLE ' || table_name || E' (""weird name"" INT)\t\n\r ; DROP table ' || table_name;
 END $$",<none>
 NOTICE:  AUDIT: SESSION,35,2,DDL,CREATE TABLE,TABLE,public.do_table,"CREATE TABLE do_table (""weird name"" INT)",<none>
-NOTICE:  AUDIT: SESSION,35,3,DDL,DROP TABLE,TABLE,public.do_table,DROP table do_table,<none>
+NOTICE:  AUDIT: SESSION,35,3,DDL,DROP TABLE,TABLE,public.do_table,"CREATE TABLE do_table (""weird name"" INT)	
+ ; DROP table do_table",<none>
 --
 -- Generate an error and make sure the stack gets cleared
 DO $$
@@ -977,6 +973,7 @@ NOTICE:  AUDIT: SESSION,41,1,DDL,ALTER TABLE,TABLE,test.test2,"ALTER TABLE test.
 	DROP COLUMN description",<none>
 DROP TABLE test.test2;
 NOTICE:  AUDIT: SESSION,42,1,DDL,DROP TABLE,TABLE,test.test2,DROP TABLE test.test2,<none>
+NOTICE:  AUDIT: SESSION,42,1,DDL,DROP TABLE,TABLE CONSTRAINT,test_id_not_null on test.test2,DROP TABLE test.test2,<none>
 NOTICE:  AUDIT: SESSION,42,1,DDL,DROP TABLE,TABLE CONSTRAINT,test_pkey on test.test2,DROP TABLE test.test2,<none>
 NOTICE:  AUDIT: SESSION,42,1,DDL,DROP TABLE,INDEX,test.test_pkey,DROP TABLE test.test2,<none>
 --
@@ -1216,7 +1213,7 @@ DROP TABLE aaa;
 DROP EXTENSION pgaudit;
 CREATE TABLE tmp (id int, data text);
 CREATE TABLE tmp2 AS (SELECT * FROM tmp);
-NOTICE:  AUDIT: SESSION,68,1,READ,SELECT,TABLE,public.tmp,CREATE TABLE tmp2 AS (SELECT * FROM tmp),<none>
+NOTICE:  AUDIT: SESSION,68,1,READ,SELECT,TABLE,public.tmp,SELECT * FROM tmp,<none>
 DROP TABLE tmp;
 DROP TABLE tmp2;
 --
@@ -1817,11 +1814,9 @@ NOTICE:  AUDIT: SESSION,52,1,DDL,DROP TABLE,,,DROP TABLE test.account_copy,<none
 CREATE TABLE test.account_copy AS
 SELECT *
   FROM account;
-NOTICE:  AUDIT: OBJECT,53,1,READ,SELECT,TABLE,public.account,"CREATE TABLE test.account_copy AS
-SELECT *
+NOTICE:  AUDIT: OBJECT,53,1,READ,SELECT,TABLE,public.account,"SELECT *
   FROM account",<none>,3
-NOTICE:  AUDIT: SESSION,53,1,READ,SELECT,TABLE,public.account,"CREATE TABLE test.account_copy AS
-SELECT *
+NOTICE:  AUDIT: SESSION,53,1,READ,SELECT,TABLE,public.account,"SELECT *
   FROM account",<none>,3
 NOTICE:  AUDIT: SESSION,53,2,DDL,CREATE TABLE AS,,,"CREATE TABLE test.account_copy AS
 SELECT *
@@ -1849,8 +1844,7 @@ SELECT 2
   FROM account
  WHERE id = $1",<none>,0
 EXECUTE pgclassstmt2 (1);
-NOTICE:  AUDIT: SESSION,57,1,READ,SELECT,TABLE,public.account,"PREPARE pgclassstmt2 (oid) AS
-SELECT 2
+NOTICE:  AUDIT: SESSION,57,1,READ,SELECT,TABLE,public.account,"SELECT 2
   FROM account
  WHERE id = $1",1,3
 NOTICE:  AUDIT: SESSION,57,2,MISC,EXECUTE,,,EXECUTE pgclassstmt2 (1),<none>,0
@@ -1862,8 +1856,7 @@ NOTICE:  AUDIT: SESSION,57,2,MISC,EXECUTE,,,EXECUTE pgclassstmt2 (1),<none>,0
 (3 rows)
 
 EXECUTE pgclassstmt1 (1);
-NOTICE:  AUDIT: SESSION,58,1,READ,SELECT,TABLE,public.account,"PREPARE pgclassstmt1 (oid) AS
-SELECT 1
+NOTICE:  AUDIT: SESSION,58,1,READ,SELECT,TABLE,public.account,"SELECT 1
   FROM account
  WHERE id = $1",1,3
 NOTICE:  AUDIT: SESSION,58,2,MISC,EXECUTE,,,EXECUTE pgclassstmt1 (1),<none>,0
@@ -1999,8 +1992,7 @@ NOTICE:  AUDIT: SESSION,76,1,WRITE,PREPARE,,,"PREPARE pgclassstmt (oid) AS
 INSERT INTO test.test_insert (id)
 					  VALUES ($1)",<none>,0
 EXECUTE pgclassstmt (1);
-NOTICE:  AUDIT: SESSION,77,1,WRITE,INSERT,TABLE,test.test_insert,"PREPARE pgclassstmt (oid) AS
-INSERT INTO test.test_insert (id)
+NOTICE:  AUDIT: SESSION,77,1,WRITE,INSERT,TABLE,test.test_insert,"INSERT INTO test.test_insert (id)
 					  VALUES ($1)",1,1
 NOTICE:  AUDIT: SESSION,77,2,MISC,EXECUTE,,,EXECUTE pgclassstmt (1),<none>,0
 --
@@ -2073,7 +2065,7 @@ BEGIN
 END $$",<none>,0
 NOTICE:  AUDIT: SESSION,84,2,READ,SELECT,,,SELECT 1,<none>,1
 explain select 1;
-NOTICE:  AUDIT: SESSION,85,1,READ,SELECT,,,explain select 1,<none>,0
+NOTICE:  AUDIT: SESSION,85,1,READ,SELECT,,,select 1,<none>,0
 NOTICE:  AUDIT: SESSION,85,2,MISC,EXPLAIN,,,explain select 1,<none>,0
                 QUERY PLAN                
 ------------------------------------------
@@ -2533,9 +2525,9 @@ SET pgaudit.log = 'all,-misc_set';
 SET pgaudit.log_level = 'warning';
 CREATE EXTENSION pg_stat_statements;
 WARNING:  AUDIT: SESSION,3,1,DDL,CREATE EXTENSION,,,CREATE EXTENSION pg_stat_statements,<not logged>
-ALTER EXTENSION pg_stat_statements UPDATE TO '1.11';
-WARNING:  AUDIT: SESSION,4,1,DDL,ALTER EXTENSION,,,ALTER EXTENSION pg_stat_statements UPDATE TO '1.11',<not logged>
-NOTICE:  version "1.11" of extension "pg_stat_statements" is already installed
+ALTER EXTENSION pg_stat_statements UPDATE TO '1.12';
+WARNING:  AUDIT: SESSION,4,1,DDL,ALTER EXTENSION,,,ALTER EXTENSION pg_stat_statements UPDATE TO '1.12',<not logged>
+NOTICE:  version "1.12" of extension "pg_stat_statements" is already installed
 DROP EXTENSION pg_stat_statements;
 WARNING:  AUDIT: SESSION,5,1,DDL,DROP EXTENSION,,,DROP EXTENSION pg_stat_statements,<not logged>
 SET pgaudit.log_level = 'notice';
