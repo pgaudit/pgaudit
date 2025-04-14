@@ -20,9 +20,6 @@ RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-`
 # Disable PostgreSQL in default repository
 RUN dnf -qy module disable postgresql
 
-# Enable PG17 repo (can be removed after the official release)
-RUN dnf config-manager --set-enabled pgdg17-updates-testing
-
 # Install PostgreSQL
 ENV PGVERSION=17
 
