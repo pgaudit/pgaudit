@@ -68,9 +68,7 @@ pgAudit versions relate to PostgreSQL major versions as follows:
 
 ## Compile and Install
 
-pgAudit can be compiled against an installed copy of PostgreSQL with development packages using `PGXS`.
-
-The following instructions are for RHEL 7.
+pgAudit can be compiled against an installed copy of PostgreSQL with development packages using `PGXS`. The following instructions should work on most Unix-like operating systems.
 
 Clone the pgAudit extension:
 ```
