@@ -1289,6 +1289,16 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
                                                perminfo->updatedCols,
                                                auditPerms);
             }
+
+            /*
+             * SELECT FOR UPDATE is not logged when SELECT is not granted
+             */
+            if (rte->rellockmode == RowShareLock &&
+                !audit_on_relation(relOid, auditOid, ACL_SELECT))
+                auditEventStack->auditEvent.granted =
+                    audit_on_any_attribute(relOid, auditOid,
+                                           perminfo->selectedCols,
+                                           ACL_SELECT);
         }
 
         /* Do relation level logging if a grant was found */
