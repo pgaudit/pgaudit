@@ -290,12 +290,12 @@ static int64 stackTotal = 0;
 static bool statementLogged = false;
 
 /*
- * Check that the stack is not empty for callbacks that add data to an audit
- * event that was started by the ProcessUtility or ExecutorCheckPerms hooks.
+ * Check that the stack is not empty for hooks that add data to an audit event
+ * that was started by the ProcessUtility or ExecutorCheckPerms hooks.
  *
- * We are unable to continue in this case without losing an audit record. If
- * the caller is purposefully breaking the hook sequence when they will need
- * to disable auditing for the duration of the operation.
+ * We are unable to continue in this case without losing an audit record. If the
+ * caller is purposefully breaking the hook sequence then they will need to
+ * disable auditing for the duration of the operation.
  */
  #define STACK_NOT_EMPTY() \
     if (auditEventStack == NULL) \
