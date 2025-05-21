@@ -1,9 +1,12 @@
-FROM ubuntu:jammy
+FROM ubuntu:noble
 
 # Install packages
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y sudo wget gnupg tzdata locales lsb-release apt-utils make gcc libssl-dev \
     libkrb5-dev
+
+# Remove the default ubuntu user to reduce the chance of a conflict with the host user
+RUN userdel ubuntu
 
 # Create postgres user/group with specific IDs
 ARG UID=1000
