@@ -5,7 +5,7 @@
  * object level logging, and fully-qualified object names for all DML and DDL
  * statements where possible (See README.md for details).
  *
- * Copyright (c) 2014-2023, PostgreSQL Global Development Group
+ * Copyright (c) 2014-2025, PostgreSQL Global Development Group
  *------------------------------------------------------------------------------
  */
 #include "postgres.h"
@@ -71,7 +71,7 @@ PG_FUNCTION_INFO_V1(pgaudit_sql_drop);
 #define LOG_ALL         (0xFFFFFFFF)    /* All */
 
 /* GUC variable for pgaudit.log, which defines the classes to log. */
-char *auditLog = NULL;
+static char *auditLog = NULL;
 
 /* Bitmap of classes selected */
 static int auditLogBitmap = LOG_NONE;
@@ -98,7 +98,7 @@ static int auditLogBitmap = LOG_NONE;
  * the query are in pg_catalog.  Interactive sessions (eg: psql) can cause
  * a lot of noise in the logs which might be uninteresting.
  */
-bool auditLogCatalog = true;
+static bool auditLogCatalog = true;
 
 /*
  * GUC variable for pgaudit.log_client
@@ -107,7 +107,7 @@ bool auditLogCatalog = true;
  * setting should generally be left disabled but may be useful for debugging or
  * other purposes.
  */
-bool auditLogClient = false;
+static bool auditLogClient = false;
 
 /*
  * GUC variable for pgaudit.log_level
@@ -116,8 +116,8 @@ bool auditLogClient = false;
  * at.  The default level is LOG, which goes into the server log but does
  * not go to the client.  Set to NOTICE in the regression tests.
  */
-char *auditLogLevelString = NULL;
-int auditLogLevel = LOG;
+static char *auditLogLevelString = NULL;
+static int auditLogLevel = LOG;
 
 /*
  * GUC variable for pgaudit.log_parameter
@@ -125,7 +125,7 @@ int auditLogLevel = LOG;
  * Administrators can choose if parameters passed into a statement are
  * included in the audit log.
  */
-bool auditLogParameter = false;
+static bool auditLogParameter = false;
 
 /*
  * GUC variable for pgaudit.log_relation
@@ -134,7 +134,7 @@ bool auditLogParameter = false;
  * in READ/WRITE class queries.  By default, SESSION logs include the query but
  * do not have a log entry for each relation.
  */
-bool auditLogRelation = false;
+static bool auditLogRelation = false;
 
 /*
  * GUC variable for pgaudit.log_parameter_max_size
@@ -145,7 +145,7 @@ bool auditLogRelation = false;
  * size is greater than the specified number of bytes will be replaced
  * by a placeholder.
 */
-int auditLogParameterMaxSize = 0;
+static int auditLogParameterMaxSize = 0;
 
 /*
  * GUC variable for pgaudit.log_rows
@@ -153,14 +153,14 @@ int auditLogParameterMaxSize = 0;
  * Administrators can choose if the rows retrieved or affected by a statement
  * are included in the audit log.
  */
-bool auditLogRows = false;
+static bool auditLogRows = false;
 
 /*
  * GUC variable for pgaudit.log_statement
  *
  * Administrators can choose to not have the full statement text logged.
  */
-bool auditLogStatement = true;
+static bool auditLogStatement = true;
 
 /*
  * GUC variable for pgaudit.log_statement_once
@@ -170,7 +170,7 @@ bool auditLogStatement = true;
  * the audit log to facilitate searching, but this can cause the log to be
  * unnecessarily bloated in some environments.
  */
-bool auditLogStatementOnce = false;
+static bool auditLogStatementOnce = false;
 
 /*
  * GUC variable for pgaudit.role
@@ -179,7 +179,7 @@ bool auditLogStatementOnce = false;
  * Object-level auditing uses the privileges which are granted to this role to
  * determine if a statement should be logged.
  */
-char *auditRole = NULL;
+static char *auditRole = NULL;
 
 /*
  * String constants for the audit log fields.
@@ -240,6 +240,7 @@ typedef struct
                                    generated when not. */
     char *objectName;           /* Fully qualified object identification */
     const char *commandText;    /* sourceText / queryString */
+    int commandLen;             /* Length of commandText */
     ParamListInfo paramList;    /* QueryDesc/ProcessUtility parameters */
 
     bool granted;               /* Audit role has object permissions? */
@@ -269,7 +270,7 @@ typedef struct AuditEventStackItem
     MemoryContextCallback contextCallback;
 } AuditEventStackItem;
 
-AuditEventStackItem *auditEventStack = NULL;
+static AuditEventStackItem *auditEventStack = NULL;
 
 /*
  * pgAudit runs queries of its own when using the event trigger system.
@@ -315,7 +316,7 @@ stack_free(void *stackFree)
             /* Move top of stack to the item after the freed item */
             auditEventStack = nextItem->next;
 
-            /* If the stack is not empty */
+            /* If the stack is now empty */
             if (auditEventStack == NULL)
             {
                 /*
@@ -382,11 +383,7 @@ stack_push()
                                        &stackItem->contextCallback);
 
     /* Push new item onto the stack */
-    if (auditEventStack != NULL)
-        stackItem->next = auditEventStack;
-    else
-        stackItem->next = NULL;
-
+    stackItem->next = auditEventStack;
     auditEventStack = stackItem;
 
     MemoryContextSwitchTo(contextOld);
@@ -439,15 +436,65 @@ stack_find_context(MemoryContext findContext)
     AuditEventStackItem *nextItem = auditEventStack;
 
     /* Look through the stack for the stack entry by query memory context */
-    while (nextItem != NULL)
-    {
-        if (nextItem->auditEvent.queryContext == findContext)
-            break;
-
+    while (nextItem != NULL && nextItem->auditEvent.queryContext != findContext)
         nextItem = nextItem->next;
-    }
 
     return nextItem;
+}
+
+/*
+ * Set command text.
+ */
+static void
+command_text_set(AuditEvent *auditEvent, const char *commandText,
+                 int commandLoc, int commandLen)
+{
+    /* If statements are being logged then set command text. */
+    if (auditLogStatement)
+    {
+        char commandChr;
+
+        /* If location is not -1 then offset. */
+        if (commandLoc != -1)
+            commandText += commandLoc;
+
+        /* If len is zero then use the entire string. */
+        if (commandLen == 0)
+            commandLen = strlen(commandText);
+
+        /*
+         * Trim leading whitespace. This assumes that commandText is a valid
+         * zero-terminated string.
+         */
+        commandChr = *commandText;
+
+        while (commandChr == ' ' || commandChr == '\t' || commandChr == '\n' ||
+               commandChr == '\r')
+        {
+            commandText++;
+            commandLen--;
+            commandChr = *commandText;
+        }
+
+        /*
+         * Trim trailing whitespace. Also trim trailing semicolons since they
+         * might be included if commandLen was not provided. This makes output
+         * consistent with when commandLen is provided.
+         */
+        commandChr = *(commandText + commandLen - 1);
+
+        while (commandLen > 0 &&
+               (commandChr == ' ' || commandChr == ';' || commandChr == '\t' ||
+                commandChr == '\n'  || commandChr == '\r'))
+        {
+            commandLen--;
+            commandChr = *(commandText + commandLen - 1);
+        }
+
+        /* Assign final command text and length. */
+        auditEvent->commandText = commandText;
+        auditEvent->commandLen = commandLen;
+    }
 }
 
 /*
@@ -560,8 +607,8 @@ log_audit_event(AuditEventStackItem *stackItem)
                  */
                 case T_CreateRoleStmt:
                 case T_AlterRoleStmt:
-				case T_CreateUserMappingStmt:
-				case T_AlterUserMappingStmt:
+                case T_CreateUserMappingStmt:
+                case T_AlterUserMappingStmt:
 
                     if (stackItem->auditEvent.commandText != NULL)
                     {
@@ -571,7 +618,8 @@ log_audit_event(AuditEventStackItem *stackItem)
                         int passwordPos;
 
                         /* Copy the command string and convert to lower case */
-                        commandStr = pstrdup(stackItem->auditEvent.commandText);
+                        commandStr = pnstrdup(stackItem->auditEvent.commandText,
+                                              stackItem->auditEvent.commandLen);
 
                         for (i = 0; commandStr[i]; i++)
                             commandStr[i] =
@@ -586,6 +634,7 @@ log_audit_event(AuditEventStackItem *stackItem)
                             passwordPos = (passwordToken - commandStr) +
                                           strlen(TOKEN_PASSWORD);
 
+                            pfree(commandStr);
                             commandStr = palloc(passwordPos + 1 +
                                                 strlen(TOKEN_REDACTED) + 1);
 
@@ -600,7 +649,10 @@ log_audit_event(AuditEventStackItem *stackItem)
 
                             /* Assign new command string */
                             stackItem->auditEvent.commandText = commandStr;
+                            stackItem->auditEvent.commandLen = strlen(commandStr);
                         }
+                        else
+                            pfree(commandStr);
                     }
 
                 /* Fall through */
@@ -726,9 +778,13 @@ log_audit_event(AuditEventStackItem *stackItem)
     appendStringInfoCharMacro(&auditStr, ',');
     if (auditLogStatement && !(stackItem->auditEvent.statementLogged && auditLogStatementOnce))
     {
-        append_valid_csv(&auditStr, stackItem->auditEvent.commandText);
+        /* Log the command. */
+        char *commandStr = pnstrdup(stackItem->auditEvent.commandText,
+                                    stackItem->auditEvent.commandLen);
 
+        append_valid_csv(&auditStr, commandStr);
         appendStringInfoCharMacro(&auditStr, ',');
+        pfree(commandStr);
 
         /* Handle parameter logging, if enabled. */
         if (auditLogParameter)
@@ -1056,7 +1112,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
             continue;
 
         Assert(rte->rtekind == RTE_RELATION ||
-               rte->rtekind == RTE_SUBQUERY && rte->relkind == RELKIND_VIEW);
+               (rte->rtekind == RTE_SUBQUERY && rte->relkind == RELKIND_VIEW));
 
         found = true;
 
@@ -1322,6 +1378,7 @@ log_function_execute(Oid objectId)
     stackItem->auditEvent.command = CMDTAG_EXECUTE;
     stackItem->auditEvent.objectType = OBJECT_TYPE_FUNCTION;
     stackItem->auditEvent.commandText = stackItem->next->auditEvent.commandText;
+    stackItem->auditEvent.commandLen = stackItem->next->auditEvent.commandLen;
 
     log_audit_event(stackItem);
 
@@ -1390,7 +1447,9 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
         }
 
         /* Initialize the audit event */
-        stackItem->auditEvent.commandText = queryDesc->sourceText;
+        command_text_set(&stackItem->auditEvent, queryDesc->sourceText,
+                         queryDesc->plannedstmt->stmt_location,
+                         queryDesc->plannedstmt->stmt_len);
         stackItem->auditEvent.paramList = copyParamList(queryDesc->params);
     }
 
@@ -1452,8 +1511,8 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, List *permInfos, bool abort)
             else
             {
                 /*
-                 * Save auditOid and rangeTabls to call log_select_dml()
-                 * in pgaudit_ExecutorEnd_hook() later.
+                 * Save auditOid, rangeTabls, and permInfos to call
+                 * log_select_dml() in pgaudit_ExecutorEnd_hook() later.
                  */
                 auditEventStack->auditEvent.auditOid = auditOid;
                 auditEventStack->auditEvent.rangeTabls = rangeTabls;
@@ -1560,8 +1619,8 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         if (context == PROCESS_UTILITY_TOPLEVEL)
         {
             /*
-             * If the stack is not empty then the only allowed entries are open
-             * select, show, and explain cursors
+             * If the stack is not empty then the only allowed entries are call
+             * statements or open, select, show, and explain cursors
              */
             if (auditEventStack != NULL)
             {
@@ -1571,7 +1630,8 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
                 {
                     if (nextItem->auditEvent.commandTag != T_SelectStmt &&
                         nextItem->auditEvent.commandTag != T_VariableShowStmt &&
-                        nextItem->auditEvent.commandTag != T_ExplainStmt)
+                        nextItem->auditEvent.commandTag != T_ExplainStmt &&
+                        nextItem->auditEvent.commandTag != T_CallStmt)
                     {
                         elog(ERROR, "pgaudit stack is not empty");
                     }
@@ -1591,7 +1651,8 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         stackItem->auditEvent.logStmtLevel = GetCommandLogLevel(pstmt->utilityStmt);
         stackItem->auditEvent.commandTag = nodeTag(pstmt->utilityStmt);
         stackItem->auditEvent.command = CreateCommandTag(pstmt->utilityStmt);
-        stackItem->auditEvent.commandText = queryString;
+        command_text_set(&stackItem->auditEvent, queryString,
+                         pstmt->stmt_location, pstmt->stmt_len);
 
         /*
          * If this is a DO block log it before calling the next ProcessUtility
@@ -2217,7 +2278,7 @@ _PG_init(void)
 
         "Specifies whether logging will include the statement text and "
         "parameters with the first log entry for a statement/substatement "
-        "combination or with every entry.  Disabling this setting will result "
+        "combination or with every entry.  Enabling this setting will result "
         "in less verbose logging but may make it more difficult to determine "
         "the statement that generated a log entry, though the "
         "statement/substatement pair along with the process id should suffice "

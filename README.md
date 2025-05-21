@@ -4,7 +4,7 @@
 
 The PostgreSQL Audit Extension (pgAudit) provides detailed session and/or object audit logging via the standard PostgreSQL logging facility.
 
-The goal of the pgAudit is to provide PostgreSQL users with capability to produce audit logs often required to comply with government, financial, or ISO certifications.
+The goal of pgAudit is to provide PostgreSQL users with capability to produce audit logs often required to comply with government, financial, or ISO certifications.
 
 An audit is an official inspection of an individual's or organization's accounts, typically by an independent body. The information gathered by pgAudit is properly called an audit trail or audit log. The term audit log is used in this documentation.
 
@@ -48,13 +48,15 @@ To limit the number of relations audit logged for `SELECT` and `DML` statements,
 
 ## PostgreSQL Version Compatibility
 
-pgAudit was developed to support PostgreSQL 9.5 or greater.
+pgAudit supports PostgreSQL 13 or greater.
 
-In order to support new functionality introduced in each PostgreSQL release, pgAudit maintains a separate branch for each PostgreSQL major version (currently PostgreSQL 9.5 - 16) which will be maintained in a manner similar to the PostgreSQL project.
+In order to support new functionality introduced in each PostgreSQL release, pgAudit maintains a separate branch for each PostgreSQL major version (currently PostgreSQL 13 - 17) which will be maintained in a manner similar to the PostgreSQL project.
 
-Aside from bug fixes, no further development is planned for stable branches. New development, if any, will be strictly for next unreleased major version of PostgreSQL.
+Aside from bug fixes, no further development is allowed for stable branches. New development, if any, will be strictly for the next unreleased major version of PostgreSQL.
 
 pgAudit versions relate to PostgreSQL major versions as follows:
+
+- **pgAudit v17.X** is intended to support PostgreSQL 17.
 
 - **pgAudit v16.X** is intended to support PostgreSQL 16.
 
@@ -64,21 +66,9 @@ pgAudit versions relate to PostgreSQL major versions as follows:
 
 - **pgAudit v1.5.X** is intended to support PostgreSQL 13.
 
-- **pgAudit v1.4.X** is intended to support PostgreSQL 12.
-
-- **pgAudit v1.3.X** is intended to support PostgreSQL 11.
-
-- **pgAudit v1.2.X** is intended to support PostgreSQL 10.
-
-- **pgAudit v1.1.X** is intended to support PostgreSQL 9.6.
-
-- **pgAudit v1.0.X** is intended to support PostgreSQL 9.5.
-
 ## Compile and Install
 
-pgAudit can be compiled against an installed copy of PostgreSQL with development packages using `PGXS`.
-
-The following instructions are for RHEL 7.
+pgAudit can be compiled against an installed copy of PostgreSQL with development packages using `PGXS`. The following instructions should work on most Unix-like operating systems.
 
 Clone the pgAudit extension:
 ```
@@ -88,13 +78,13 @@ Change to pgAudit directory:
 ```
 cd pgaudit
 ```
-Checkout `REL_16_STABLE` branch (note that the stable branch may not exist for unreleased versions of PostgreSQL):
+Checkout `REL_17_STABLE` branch (note that the stable branch may not exist for unreleased versions of PostgreSQL):
 ```
-git checkout REL_16_STABLE
+git checkout REL_17_STABLE
 ```
 Build and install pgAudit:
 ```
-make install USE_PGXS=1 PG_CONFIG=/usr/pgsql-16/bin/pg_config
+make install USE_PGXS=1 PG_CONFIG=/usr/pgsql-17/bin/pg_config
 ```
 Instructions for testing and development may be found in `test`.
 
@@ -104,7 +94,7 @@ Settings may be modified only by a superuser. Allowing normal users to change th
 
 Settings can be specified globally (in `postgresql.conf` or using `ALTER SYSTEM ... SET`), at the database level (using `ALTER DATABASE ... SET`), or at the role level (using `ALTER ROLE ... SET`). Note that settings are not inherited through normal role inheritance and `SET ROLE` will not alter a user's pgAudit settings. This is a limitation of the roles system and not inherent to pgAudit.
 
-The pgAudit extension must be loaded in [shared_preload_libraries](http://www.postgresql.org/docs/16/runtime-config-client.html#GUC-SHARED-PRELOAD-LIBRARIES). Otherwise, an error will be raised at load time and no audit logging will occur.
+The pgAudit extension must be loaded in [shared_preload_libraries](http://www.postgresql.org/docs/17/runtime-config-client.html#GUC-SHARED-PRELOAD-LIBRARIES). Otherwise, an error will be raised at load time and no audit logging will occur.
 
 In addition, `CREATE EXTENSION pgaudit` must be called before `pgaudit.log` is set to ensure proper pgaudit functionality. The extension installs event triggers which add additional auditing for DDL. pgAudit will work without the extension installed but DDL statements will not have information about the object type and name.
 
@@ -150,7 +140,7 @@ The default is `off`.
 
 ### pgaudit.log_level
 
-Specifies the log level that will be used for log entries (see [Message Severity Levels](http://www.postgresql.org/docs/16/runtime-config-logging.html#RUNTIME-CONFIG-SEVERITY-LEVELS) for valid levels) but note that `ERROR`, `FATAL`, and `PANIC` are not allowed). This setting is used for regression testing and may also be useful to end users for testing or other purposes.
+Specifies the log level that will be used for log entries (see [Message Severity Levels](http://www.postgresql.org/docs/17/runtime-config-logging.html#RUNTIME-CONFIG-SEVERITY-LEVELS) for valid levels) but note that `ERROR`, `FATAL`, and `PANIC` are not allowed). This setting is used for regression testing and may also be useful to end users for testing or other purposes.
 
 Note that `pgaudit.log_level` is only enabled when `pgaudit.log_client` is `on`; otherwise the default will be used.
 
@@ -176,7 +166,7 @@ The default is `off`.
 
 ### pgaudit.log_rows
 
-Specifies that audit logging should include the rows retrieved or affected by a statement. When enabled the rows field will be included after the parameter field.
+Specifies that audit logging should include the number of rows retrieved or affected by a statement. When enabled the rows field will be included after the parameter field.
 
 The default is `off`.
 
@@ -188,7 +178,7 @@ The default is `on`.
 
 ### pgaudit.log_statement_once
 
-Specifies whether logging will include the statement text and parameters with the first log entry for a statement/substatement combination or with every entry. Disabling this setting will result in less verbose logging but may make it more difficult to determine the statement that generated a log entry, though the statement/substatement pair along with the process id should suffice to identify the statement text logged with a previous entry.
+Specifies whether logging will include the statement text and parameters with the first log entry for a statement/substatement combination or with every entry. Enabling this setting will result in less verbose logging but may make it more difficult to determine the statement that generated a log entry, though the statement/substatement pair along with the process id should suffice to identify the statement text logged with a previous entry.
 
 The default is `off`.
 
@@ -363,7 +353,7 @@ Audit entries are written to the standard logging facility and contain the follo
 
 - **PARAMETER** - If `pgaudit.log_parameter` is set then this field will contain the statement parameters as quoted CSV or `<none>` if there are no parameters. Otherwise, the field is `<not logged>`.
 
-Use [log_line_prefix](http://www.postgresql.org/docs/16/runtime-config-logging.html#GUC-LOG-LINE-PREFIX) to add any other fields that are needed to satisfy your audit log requirements. A typical log line prefix might be `'%m %u %d [%p]: '` which would provide the date/time, user name, database name, and process id for each audit log.
+Use [log_line_prefix](http://www.postgresql.org/docs/17/runtime-config-logging.html#GUC-LOG-LINE-PREFIX) to add any other fields that are needed to satisfy your audit log requirements. A typical log line prefix might be `'%m %u %d [%p]: '` which would provide the date/time, user name, database name, and process id for each audit log.
 
 ## Caveats
 
