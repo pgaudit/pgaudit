@@ -1401,11 +1401,10 @@ static ExecutorEnd_hook_type next_ExecutorEnd_hook = NULL;
  * that do not contain a table and so can't be idenitified accurately in
  * ExecutorCheckPerms.
  */
-static bool
+static void
 pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
 {
     AuditEventStackItem *stackItem = NULL;
-	bool plan_valid;
 
     if (!internalStatement)
     {
@@ -1455,9 +1454,9 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
 
     /* Call the previous hook or standard function */
     if (next_ExecutorStart_hook)
-        plan_valid = next_ExecutorStart_hook(queryDesc, eflags);
+        next_ExecutorStart_hook(queryDesc, eflags);
     else
-        plan_valid = standard_ExecutorStart(queryDesc, eflags);
+        standard_ExecutorStart(queryDesc, eflags);
 
     /*
      * Move the stack memory context to the query memory context.  This needs
@@ -1475,8 +1474,6 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
         if (auditLogRows)
             stackItem->auditEvent.queryContext = queryDesc->estate->es_query_cxt;
     }
-
-    return plan_valid;
 }
 
 /*
