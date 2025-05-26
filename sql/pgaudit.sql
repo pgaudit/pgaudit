@@ -1621,7 +1621,7 @@ SET pgaudit.log = 'all,-misc_set';
 SET pgaudit.log_level = 'warning';
 
 CREATE EXTENSION pg_stat_statements;
-ALTER EXTENSION pg_stat_statements UPDATE TO '1.11';
+ALTER EXTENSION pg_stat_statements UPDATE TO '1.12';
 DROP EXTENSION pg_stat_statements;
 
 SET pgaudit.log_level = 'notice';
