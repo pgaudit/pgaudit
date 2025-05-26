@@ -1408,7 +1408,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
 
     if (!internalStatement)
     {
-        /* Push the audit even onto the stack */
+        /* Push the audit event onto the stack */
         stackItem = stack_push();
 
         /* Initialize command using queryDesc->operation */
