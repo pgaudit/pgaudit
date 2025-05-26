@@ -4,7 +4,7 @@
 
 The PostgreSQL Audit Extension (pgAudit) provides detailed session and/or object audit logging via the standard PostgreSQL logging facility.
 
-The goal of the pgAudit is to provide PostgreSQL users with capability to produce audit logs often required to comply with government, financial, or ISO certifications.
+The goal of pgAudit is to provide PostgreSQL users with capability to produce audit logs often required to comply with government, financial, or ISO certifications.
 
 An audit is an official inspection of an individual's or organization's accounts, typically by an independent body. The information gathered by pgAudit is properly called an audit trail or audit log. The term audit log is used in this documentation.
 
@@ -70,9 +70,7 @@ pgAudit versions relate to PostgreSQL major versions as follows:
 
 ## Compile and Install
 
-pgAudit can be compiled against an installed copy of PostgreSQL with development packages using `PGXS`.
-
-The following instructions are for RHEL 7.
+pgAudit can be compiled against an installed copy of PostgreSQL with development packages using `PGXS`. The following instructions should work on most Unix-like operating systems.
 
 Clone the pgAudit extension:
 ```

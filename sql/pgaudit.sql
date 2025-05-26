@@ -457,6 +457,13 @@ SELECT *
    FOR UPDATE;
 
 --
+-- Not object logged
+-- Session logged on all tables because log = read and log_relation = on
+SELECT name
+FROM account
+    FOR UPDATE;
+
+--
 -- Object logged because of:
 -- select (password) on account (in the where clause)
 -- Session logged on all tables because log = read and log_relation = on

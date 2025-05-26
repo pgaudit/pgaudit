@@ -1289,6 +1289,16 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
                                                perminfo->updatedCols,
                                                auditPerms);
             }
+
+            /*
+             * SELECT FOR UPDATE is not logged when SELECT is not granted
+             */
+            if (rte->rellockmode == RowShareLock &&
+                !audit_on_relation(relOid, auditOid, ACL_SELECT))
+                auditEventStack->auditEvent.granted =
+                    audit_on_any_attribute(relOid, auditOid,
+                                           perminfo->selectedCols,
+                                           ACL_SELECT);
         }
 
         /* Do relation level logging if a grant was found */
@@ -1399,7 +1409,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
 
     if (!internalStatement)
     {
-        /* Push the audit even onto the stack */
+        /* Push the audit event onto the stack */
         stackItem = stack_push();
 
         /* Initialize command using queryDesc->operation */
