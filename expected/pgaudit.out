@@ -940,8 +940,7 @@ BEGIN
 	EXECUTE E'\t\n\r CREATE TABLE ' || table_name || E' (""weird name"" INT)\t\n\r ; DROP table ' || table_name;
 END $$",<none>
 NOTICE:  AUDIT: SESSION,35,2,DDL,CREATE TABLE,TABLE,public.do_table,"CREATE TABLE do_table (""weird name"" INT)",<none>
-NOTICE:  AUDIT: SESSION,35,3,DDL,DROP TABLE,TABLE,public.do_table,"CREATE TABLE do_table (""weird name"" INT)	
- ; DROP table do_table",<none>
+NOTICE:  AUDIT: SESSION,35,3,DDL,DROP TABLE,TABLE,public.do_table,DROP table do_table,<none>
 --
 -- Generate an error and make sure the stack gets cleared
 DO $$
