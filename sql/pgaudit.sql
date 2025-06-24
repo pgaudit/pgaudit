@@ -41,9 +41,9 @@ SELECT current_user \gset
 
 --
 -- Set pgaudit parameters for the current (super)user.
-ALTER ROLE :current_user SET pgaudit.log = 'Role';
-ALTER ROLE :current_user SET pgaudit.log_level = 'notice';
-ALTER ROLE :current_user SET pgaudit.log_client = ON;
+ALTER ROLE :"current_user" SET pgaudit.log = 'Role';
+ALTER ROLE :"current_user" SET pgaudit.log_level = 'notice';
+ALTER ROLE :"current_user" SET pgaudit.log_client = ON;
 
 \connect - :current_user;
 
@@ -1616,15 +1616,15 @@ DROP TABLE part_test;
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
 
-ALTER ROLE :current_user RESET pgaudit.log;
-ALTER ROLE :current_user RESET pgaudit.log_catalog;
-ALTER ROLE :current_user RESET pgaudit.log_client;
-ALTER ROLE :current_user RESET pgaudit.log_level;
-ALTER ROLE :current_user RESET pgaudit.log_parameter;
-ALTER ROLE :current_user RESET pgaudit.log_relation;
-ALTER ROLE :current_user RESET pgaudit.log_statement;
-ALTER ROLE :current_user RESET pgaudit.log_statement_once;
-ALTER ROLE :current_user RESET pgaudit.role;
+ALTER ROLE :"current_user" RESET pgaudit.log;
+ALTER ROLE :"current_user" RESET pgaudit.log_catalog;
+ALTER ROLE :"current_user" RESET pgaudit.log_client;
+ALTER ROLE :"current_user" RESET pgaudit.log_level;
+ALTER ROLE :"current_user" RESET pgaudit.log_parameter;
+ALTER ROLE :"current_user" RESET pgaudit.log_relation;
+ALTER ROLE :"current_user" RESET pgaudit.log_statement;
+ALTER ROLE :"current_user" RESET pgaudit.log_statement_once;
+ALTER ROLE :"current_user" RESET pgaudit.role;
 
 RESET pgaudit.log;
 RESET pgaudit.log_catalog;
