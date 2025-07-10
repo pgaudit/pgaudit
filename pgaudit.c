@@ -11,6 +11,7 @@
 #include "postgres.h"
 
 #include "access/htup_details.h"
+#include "access/parallel.h"
 #include "access/sysattr.h"
 #include "access/xact.h"
 #include "access/relation.h"
@@ -1402,7 +1403,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
 {
     AuditEventStackItem *stackItem = NULL;
 
-    if (!internalStatement)
+    if (!internalStatement && !IsParallelWorker())
     {
         /* Push the audit event onto the stack */
         stackItem = stack_push();
@@ -1485,7 +1486,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, List *permInfos, bool abort)
 
     /* Log DML if the audit role is valid or session logging is enabled */
     if ((auditOid != InvalidOid || auditLogBitmap != 0) &&
-        !IsAbortedTransactionBlockState())
+        !IsAbortedTransactionBlockState() && !IsParallelWorker())
     {
         /* If auditLogRows is on, wait for rows processed to be set */
         if (auditLogRows && auditEventStack != NULL)
@@ -1540,7 +1541,7 @@ pgaudit_ExecutorRun_hook(QueryDesc *queryDesc, ScanDirection direction, uint64 c
     else
         standard_ExecutorRun(queryDesc, direction, count, execute_once);
 
-    if (auditLogRows && !internalStatement)
+    if (auditLogRows && !internalStatement && !IsParallelWorker())
     {
         /* Find an item from the stack by the query memory context */
         stackItem = stack_find_context(queryDesc->estate->es_query_cxt);
@@ -1560,7 +1561,7 @@ pgaudit_ExecutorEnd_hook(QueryDesc *queryDesc)
     AuditEventStackItem *stackItem = NULL;
     AuditEventStackItem *auditEventStackFull = NULL;
 
-    if (auditLogRows && !internalStatement)
+    if (auditLogRows && !internalStatement && !IsParallelWorker())
     {
         /* Find an item from the stack by the query memory context */
         stackItem = stack_find_context(queryDesc->estate->es_query_cxt);
