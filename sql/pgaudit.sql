@@ -924,6 +924,36 @@ COMMIT;
 
 DROP TABLE part_test;
 
+--
+-- Test logging in parallel workers
+SET pgaudit.log = 'read';
+SET pgaudit.log_client = on;
+SET pgaudit.log_level = 'notice';
+
+-- Force parallel execution for testing
+SET max_parallel_workers_per_gather = 2;
+SET parallel_tuple_cost = 0;
+SET parallel_setup_cost = 0;
+SET min_parallel_table_scan_size = 0;
+SET min_parallel_index_scan_size = 0;
+
+-- Create table with enough data to trigger parallel execution
+CREATE TABLE parallel_test (id int, data text);
+INSERT INTO parallel_test SELECT generate_series(1, 1000), 'test data';
+
+SELECT count(*) FROM parallel_test;
+
+-- Cleanup parallel test
+DROP TABLE parallel_test;
+RESET max_parallel_workers_per_gather;
+RESET parallel_tuple_cost;
+RESET parallel_setup_cost;
+RESET min_parallel_table_scan_size;
+RESET min_parallel_index_scan_size;
+RESET pgaudit.log;
+RESET pgaudit.log_client;
+RESET pgaudit.log_level;
+
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
