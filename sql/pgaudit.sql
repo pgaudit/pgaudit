@@ -41,9 +41,9 @@ SELECT current_user \gset
 
 --
 -- Set pgaudit parameters for the current (super)user.
-ALTER ROLE :current_user SET pgaudit.log = 'Role';
-ALTER ROLE :current_user SET pgaudit.log_level = 'notice';
-ALTER ROLE :current_user SET pgaudit.log_client = ON;
+ALTER ROLE :"current_user" SET pgaudit.log = 'Role';
+ALTER ROLE :"current_user" SET pgaudit.log_level = 'notice';
+ALTER ROLE :"current_user" SET pgaudit.log_client = ON;
 
 \connect - :current_user;
 
@@ -1637,20 +1637,50 @@ DROP USER MAPPING FOR regress_user1 SERVER fdw_server;
 DROP SERVER fdw_server;
 DROP EXTENSION postgres_fdw;
 
+--
+-- Test logging in parallel workers
+SET pgaudit.log = 'read';
+SET pgaudit.log_client = on;
+SET pgaudit.log_level = 'notice';
+
+-- Force parallel execution for testing
+SET max_parallel_workers_per_gather = 2;
+SET parallel_tuple_cost = 0;
+SET parallel_setup_cost = 0;
+SET min_parallel_table_scan_size = 0;
+SET min_parallel_index_scan_size = 0;
+
+-- Create table with enough data to trigger parallel execution
+CREATE TABLE parallel_test (id int, data text);
+INSERT INTO parallel_test SELECT generate_series(1, 1000), 'test data';
+
+SELECT count(*) FROM parallel_test;
+
+-- Cleanup parallel test
+DROP TABLE parallel_test;
+RESET max_parallel_workers_per_gather;
+RESET parallel_tuple_cost;
+RESET parallel_setup_cost;
+RESET min_parallel_table_scan_size;
+RESET min_parallel_index_scan_size;
+RESET pgaudit.log;
+RESET pgaudit.log_client;
+RESET pgaudit.log_level;
+
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
 
-ALTER ROLE :current_user RESET pgaudit.log;
-ALTER ROLE :current_user RESET pgaudit.log_catalog;
-ALTER ROLE :current_user RESET pgaudit.log_client;
-ALTER ROLE :current_user RESET pgaudit.log_level;
-ALTER ROLE :current_user RESET pgaudit.log_parameter;
-ALTER ROLE :current_user RESET pgaudit.log_parameter_max_size;
-ALTER ROLE :current_user RESET pgaudit.log_relation;
-ALTER ROLE :current_user RESET pgaudit.log_statement;
-ALTER ROLE :current_user RESET pgaudit.log_statement_once;
-ALTER ROLE :current_user RESET pgaudit.role;
+ALTER ROLE :"current_user" RESET pgaudit.log;
+ALTER ROLE :"current_user" RESET pgaudit.log_catalog;
+ALTER ROLE :"current_user" RESET pgaudit.log_client;
+ALTER ROLE :"current_user" RESET pgaudit.log_level;
+ALTER ROLE :"current_user" RESET pgaudit.log_parameter;
+ALTER ROLE :"current_user" RESET pgaudit.log_parameter_max_size;
+ALTER ROLE :"current_user" RESET pgaudit.log_relation;
+ALTER ROLE :"current_user" RESET pgaudit.log_statement;
+ALTER ROLE :"current_user" RESET pgaudit.log_statement_once;
+ALTER ROLE :"current_user" RESET pgaudit.role;
 
 RESET pgaudit.log;
 RESET pgaudit.log_catalog;
