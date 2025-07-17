@@ -257,6 +257,18 @@ static int64 stackTotal = 0;
 static bool statementLogged = false;
 
 /*
+ * Check that the stack is not empty for hooks that add data to an audit event
+ * that was started by the ProcessUtility or ExecutorCheckPerms hooks.
+ *
+ * We are unable to continue in this case without losing an audit record. If the
+ * caller is purposefully breaking the hook sequence then they will need to
+ * disable auditing for the duration of the operation.
+ */
+ #define STACK_NOT_EMPTY() \
+    if (auditEventStack == NULL) \
+        elog(ERROR, "pgaudit stack is empty");
+
+/*
  * Stack functions
  *
  * Audit events can go down to multiple levels so a stack is maintained to keep
@@ -1330,7 +1342,10 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
     /* Log DML if the audit role is valid or session logging is enabled */
     if ((auditOid != InvalidOid || auditLogBitmap != 0) &&
         !IsAbortedTransactionBlockState() && !IsParallelWorker())
-        log_select_dml(auditOid, rangeTabls);
+        {
+            STACK_NOT_EMPTY();
+            log_select_dml(auditOid, rangeTabls);
+        }
 
     /* Call the next hook function */
     if (next_ExecutorCheckPerms_hook &&
