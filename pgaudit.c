@@ -290,6 +290,18 @@ static int64 stackTotal = 0;
 static bool statementLogged = false;
 
 /*
+ * Check that the stack is not empty for hooks that add data to an audit event
+ * that was started by the ProcessUtility or ExecutorCheckPerms hooks.
+ *
+ * We are unable to continue in this case without losing an audit record. If the
+ * caller is purposefully breaking the hook sequence then they will need to
+ * disable auditing for the duration of the operation.
+ */
+ #define STACK_NOT_EMPTY() \
+    if (auditEventStack == NULL) \
+        elog(ERROR, "pgaudit stack is empty");
+
+/*
  * Stack functions
  *
  * Audit events can go down to multiple levels so a stack is maintained to keep
@@ -1451,7 +1463,10 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, List *permInfos, bool abort)
             }
         }
         else
+        {
+            STACK_NOT_EMPTY();
             log_select_dml(auditOid, rangeTabls, permInfos);
+        }
     }
 
     /* Call the next hook function */
@@ -1483,7 +1498,10 @@ pgaudit_ExecutorRun_hook(QueryDesc *queryDesc, ScanDirection direction, uint64 c
 
         /* Accumulate the number of rows processed */
         if (stackItem != NULL)
+        {
+            STACK_NOT_EMPTY();
             stackItem->auditEvent.rows += queryDesc->estate->es_processed;
+        }
     }
 }
 
@@ -1503,6 +1521,8 @@ pgaudit_ExecutorEnd_hook(QueryDesc *queryDesc)
 
         if (stackItem != NULL && stackItem->auditEvent.rangeTabls != NULL)
         {
+            STACK_NOT_EMPTY();
+
             /* Reset auditEventStack to use in log_select_dml() */
             auditEventStackFull = auditEventStack;
             auditEventStack = stackItem;
