@@ -1388,7 +1388,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
  * Hook ExecutorCheckPerms to do session and object auditing for DML.
  */
 static bool
-pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
+pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool ereport_on_violation)
 {
     Oid auditOid;
 
@@ -1434,7 +1434,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls, bool abort)
 
     /* Call the next hook function */
     if (next_ExecutorCheckPerms_hook &&
-        !(*next_ExecutorCheckPerms_hook) (rangeTabls, abort))
+        !(*next_ExecutorCheckPerms_hook)(rangeTabls, ereport_on_violation))
         return false;
 
     return true;
