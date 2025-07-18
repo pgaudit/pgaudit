@@ -56,6 +56,7 @@ NOTICE:  AUDIT: SESSION,5,1,ROLE,ALTER ROLE,,,ALTER ROLE regress_user1 PassWord 
 ALTER USER regress_user1 encrypted /* random comment */PASSWORD
 	/* random comment */
     'md565cb1da342495ea6bb0418a6e5718c38' LOGIN;
+WARNING:  setting an MD5-encrypted password
 NOTICE:  AUDIT: SESSION,6,1,ROLE,ALTER ROLE,,,ALTER USER regress_user1 encrypted /* random comment */PASSWORD <REDACTED>,<not logged>
 ALTER ROLE regress_user1 SET pgaudit.log_client = ON;
 NOTICE:  AUDIT: SESSION,7,1,ROLE,ALTER ROLE,,,ALTER ROLE regress_user1 SET pgaudit.log_client = ON,<not logged>
@@ -991,6 +992,7 @@ NOTICE:  AUDIT: SESSION,41,1,DDL,ALTER TABLE,TABLE,test.test2,"ALTER TABLE test.
 	DROP COLUMN description",<none>
 DROP TABLE test.test2;
 NOTICE:  AUDIT: SESSION,42,1,DDL,DROP TABLE,TABLE,test.test2,DROP TABLE test.test2,<none>
+NOTICE:  AUDIT: SESSION,42,1,DDL,DROP TABLE,TABLE CONSTRAINT,test_id_not_null on test.test2,DROP TABLE test.test2,<none>
 NOTICE:  AUDIT: SESSION,42,1,DDL,DROP TABLE,TABLE CONSTRAINT,test_pkey on test.test2,DROP TABLE test.test2,<none>
 NOTICE:  AUDIT: SESSION,42,1,DDL,DROP TABLE,INDEX,test.test_pkey,DROP TABLE test.test2,<none>
 --
@@ -2547,9 +2549,9 @@ SET pgaudit.log = 'all,-misc_set';
 SET pgaudit.log_level = 'warning';
 CREATE EXTENSION pg_stat_statements;
 WARNING:  AUDIT: SESSION,3,1,DDL,CREATE EXTENSION,,,CREATE EXTENSION pg_stat_statements,<not logged>
-ALTER EXTENSION pg_stat_statements UPDATE TO '1.11';
-WARNING:  AUDIT: SESSION,4,1,DDL,ALTER EXTENSION,,,ALTER EXTENSION pg_stat_statements UPDATE TO '1.11',<not logged>
-NOTICE:  version "1.11" of extension "pg_stat_statements" is already installed
+ALTER EXTENSION pg_stat_statements UPDATE TO '1.12';
+WARNING:  AUDIT: SESSION,4,1,DDL,ALTER EXTENSION,,,ALTER EXTENSION pg_stat_statements UPDATE TO '1.12',<not logged>
+NOTICE:  version "1.12" of extension "pg_stat_statements" is already installed
 DROP EXTENSION pg_stat_statements;
 WARNING:  AUDIT: SESSION,5,1,DDL,DROP EXTENSION,,,DROP EXTENSION pg_stat_statements,<not logged>
 SET pgaudit.log_level = 'notice';

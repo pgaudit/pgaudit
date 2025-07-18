@@ -42,7 +42,7 @@
 #include "utils/timestamp.h"
 #include "utils/varlena.h"
 
-PG_MODULE_MAGIC;
+PG_MODULE_MAGIC_EXT(.name = "pgaudit", .version = "18.0");
 
 void _PG_init(void);
 
@@ -1553,15 +1553,15 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
  * Hook ExecutorRun to get rows processed by the current statement.
  */
 static void
-pgaudit_ExecutorRun_hook(QueryDesc *queryDesc, ScanDirection direction, uint64 count, bool execute_once)
+pgaudit_ExecutorRun_hook(QueryDesc *queryDesc, ScanDirection direction, uint64 count)
 {
     AuditEventStackItem *stackItem = NULL;
 
     /* Call the previous hook or standard function */
     if (next_ExecutorRun_hook)
-        next_ExecutorRun_hook(queryDesc, direction, count, execute_once);
+        next_ExecutorRun_hook(queryDesc, direction, count);
     else
-        standard_ExecutorRun(queryDesc, direction, count, execute_once);
+        standard_ExecutorRun(queryDesc, direction, count);
 
     if (auditLogRows && !internalStatement && !IsParallelWorker())
     {
