@@ -525,9 +525,8 @@ append_valid_csv(StringInfoData *buffer, const char *appendStr)
     if (appendStr == NULL)
         return;
 
-    /* Only format for CSV if appendStr contains: ", comma, \n, \r */
-    if (strstr(appendStr, ",") || strstr(appendStr, "\"") ||
-        strstr(appendStr, "\n") || strstr(appendStr, "\r"))
+    /* Only format for CSV if appendStr contains: comma, ", \n, \r */
+    if (strpbrk(appendStr, ",\"\n\r"))
     {
         appendStringInfoCharMacro(buffer, '"');
 
