@@ -21,4 +21,4 @@ include $(top_builddir)/src/Makefile.global
 include $(top_srcdir)/contrib/contrib-global.mk
 endif
 
-EXTRA_INSTALL += contrib/pg_stat_statements contrib/postgres_fdw
+EXTRA_INSTALL += contrib/pg_stat_statements
