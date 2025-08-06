@@ -2549,9 +2549,9 @@ SET pgaudit.log = 'all,-misc_set';
 SET pgaudit.log_level = 'warning';
 CREATE EXTENSION pg_stat_statements;
 WARNING:  AUDIT: SESSION,3,1,DDL,CREATE EXTENSION,,,CREATE EXTENSION pg_stat_statements,<not logged>
-ALTER EXTENSION pg_stat_statements UPDATE TO '1.12';
-WARNING:  AUDIT: SESSION,4,1,DDL,ALTER EXTENSION,,,ALTER EXTENSION pg_stat_statements UPDATE TO '1.12',<not logged>
-NOTICE:  version "1.12" of extension "pg_stat_statements" is already installed
+ALTER EXTENSION pg_stat_statements UPDATE TO '1.13';
+WARNING:  AUDIT: SESSION,4,1,DDL,ALTER EXTENSION,,,ALTER EXTENSION pg_stat_statements UPDATE TO '1.13',<not logged>
+NOTICE:  version "1.13" of extension "pg_stat_statements" is already installed
 DROP EXTENSION pg_stat_statements;
 WARNING:  AUDIT: SESSION,5,1,DDL,DROP EXTENSION,,,DROP EXTENSION pg_stat_statements,<not logged>
 SET pgaudit.log_level = 'notice';
