@@ -835,7 +835,7 @@ log_audit_event(AuditEventStackItem *stackItem)
 
                 if (auditLogParameterMaxSize > 0 &&
                     typeIsVarLena &&
-                    VARSIZE_ANY_EXHDR(prm->value) > auditLogParameterMaxSize)
+                    VARSIZE_ANY_EXHDR(DatumGetPointer(prm->value)) > auditLogParameterMaxSize)
                 {
                     append_valid_csv(&paramStrResult,
                                      "<long param suppressed>");
