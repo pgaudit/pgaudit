@@ -363,7 +363,7 @@ stack_free(void *stackFree)
  * store it.
  */
 static AuditEventStackItem *
-stack_push()
+stack_push(void)
 {
     MemoryContext contextAudit;
     MemoryContext contextOld;
@@ -667,6 +667,7 @@ log_audit_event(AuditEventStackItem *stackItem)
                             pfree(commandStr);
                     }
 
+                __attribute__((fallthrough));
                 /* Fall through */
 
                 /* Classify role statements */
@@ -835,7 +836,7 @@ log_audit_event(AuditEventStackItem *stackItem)
 
                 if (auditLogParameterMaxSize > 0 &&
                     typeIsVarLena &&
-                    VARSIZE_ANY_EXHDR(prm->value) > auditLogParameterMaxSize)
+                    VARSIZE_ANY_EXHDR(DatumGetPointer(prm->value)) > auditLogParameterMaxSize)
                 {
                     append_valid_csv(&paramStrResult,
                                      "<long param suppressed>");
