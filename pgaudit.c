@@ -1404,8 +1404,6 @@ static ExecutorCheckPerms_hook_type next_ExecutorCheckPerms_hook = NULL;
 static ProcessUtility_hook_type next_ProcessUtility_hook = NULL;
 static object_access_hook_type next_object_access_hook = NULL;
 static ExecutorStart_hook_type next_ExecutorStart_hook = NULL;
-/* The following hook functions are required to get rows */
-static ExecutorRun_hook_type next_ExecutorRun_hook = NULL;
 static ExecutorEnd_hook_type next_ExecutorEnd_hook = NULL;
 
 /*
@@ -1549,34 +1547,6 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
 }
 
 /*
- * Hook ExecutorRun to get rows processed by the current statement.
- */
-static void
-pgaudit_ExecutorRun_hook(QueryDesc *queryDesc, ScanDirection direction, uint64 count)
-{
-    AuditEventStackItem *stackItem = NULL;
-
-    /* Call the previous hook or standard function */
-    if (next_ExecutorRun_hook)
-        next_ExecutorRun_hook(queryDesc, direction, count);
-    else
-        standard_ExecutorRun(queryDesc, direction, count);
-
-    if (auditLogRows && !internalStatement && !IsParallelWorker())
-    {
-        /* Find an item from the stack by the query memory context */
-        stackItem = stack_find_context(queryDesc->estate->es_query_cxt);
-
-        /* Accumulate the number of rows processed */
-        if (stackItem != NULL)
-        {
-            STACK_NOT_EMPTY();
-            stackItem->auditEvent.rows += queryDesc->estate->es_processed;
-        }
-    }
-}
-
-/*
  * Hook ExecutorEnd to get rows processed by the current statement.
  */
 static void
@@ -1593,6 +1563,9 @@ pgaudit_ExecutorEnd_hook(QueryDesc *queryDesc)
         if (stackItem != NULL && stackItem->auditEvent.rangeTabls != NULL)
         {
             STACK_NOT_EMPTY();
+
+            /* Get rows processed */
+            stackItem->auditEvent.rows = queryDesc->estate->es_total_processed;
 
             /* Reset auditEventStack to use in log_select_dml() */
             auditEventStackFull = auditEventStack;
@@ -2344,10 +2317,6 @@ _PG_init(void)
 
     next_object_access_hook = object_access_hook;
     object_access_hook = pgaudit_object_access_hook;
-
-    /* The following hook functions are required to get rows */
-    next_ExecutorRun_hook = ExecutorRun_hook;
-    ExecutorRun_hook = pgaudit_ExecutorRun_hook;
 
     next_ExecutorEnd_hook = ExecutorEnd_hook;
     ExecutorEnd_hook = pgaudit_ExecutorEnd_hook;
