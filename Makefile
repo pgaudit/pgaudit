@@ -1,5 +1,3 @@
-# contrib/pg_audit/Makefile
-
 MODULE_big = pgaudit
 OBJS = pgaudit.o $(WIN32RES)
 

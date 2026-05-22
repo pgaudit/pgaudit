@@ -17,7 +17,7 @@ RUN useradd -m -u $UID -g $GID -o -s /bin/bash postgres
 
 # Add PostgreSQL repository
 RUN apt-get install -y --no-install-recommends postgresql-common
-RUN /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y -c 18
+RUN /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
 
 # Install PostgreSQL
 ENV PGVERSION=18
