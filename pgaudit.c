@@ -2126,7 +2126,7 @@ _PG_init(void)
 
         "Specifies that audit logging should include the parameters that were "
         "passed with the statement. When parameters are present they will be "
-        "be included in CSV format after the statement text.",
+        "included in CSV format after the statement text.",
 
         NULL,
         &auditLogParameter,
