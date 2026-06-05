@@ -1,8 +1,12 @@
 MODULE_big = pgaudit
 OBJS = pgaudit.o $(WIN32RES)
 
+# The version in the control file is the source of truth
+PGAUDIT_VERSION := $(shell grep default_version pgaudit.control | sed "s/.*'\(.*\)'/\1/")
+
 EXTENSION = pgaudit
-DATA = pgaudit--18.0.sql
+DATA = pgaudit--$(PGAUDIT_VERSION).sql
+PG_CPPFLAGS = -DPGAUDIT_VERSION="\"$(PGAUDIT_VERSION)\""
 PGFILEDESC = "pgAudit - An audit logging extension for PostgreSQL"
 
 REGRESS = pgaudit
