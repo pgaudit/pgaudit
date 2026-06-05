@@ -612,7 +612,12 @@ DO $$
 DECLARE
 	test INT;
 BEGIN
-	SELECT 1
+	SELECT 1,
+		   substring('Thomas' from 2 for 3)
+	  INTO test;
+
+	-- Very simple select into statements with scalar expressions are not logged
+	SELECT 56 * 89
 	  INTO test;
 END $$;
 
@@ -1287,7 +1292,8 @@ DO $$
 DECLARE
 	test INT;
 BEGIN
-	SELECT 1
+	SELECT 1,
+		   substring('Thomas' from 2 for 3)
 	  INTO test;
 END $$;
 

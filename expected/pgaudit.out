@@ -866,16 +866,28 @@ DO $$
 DECLARE
 	test INT;
 BEGIN
-	SELECT 1
+	SELECT 1,
+		   substring('Thomas' from 2 for 3)
+	  INTO test;
+
+	-- Very simple select into statements with scalar expressions are not logged
+	SELECT 56 * 89
 	  INTO test;
 END $$;
 NOTICE:  AUDIT: SESSION,29,1,FUNCTION,DO,,,"DO $$
 DECLARE
 	test INT;
 BEGIN
-	SELECT 1
+	SELECT 1,
+		   substring('Thomas' from 2 for 3)
+	  INTO test;
+
+	-- Very simple select into statements with scalar expressions are not logged
+	SELECT 56 * 89
 	  INTO test;
 END $$",<none>
+NOTICE:  AUDIT: SESSION,29,2,READ,SELECT,,,"SELECT 1,
+		   substring('Thomas' from 2 for 3)",<none>
 explain select 1;
 NOTICE:  AUDIT: SESSION,30,1,READ,SELECT,,,explain select 1,<none>
 NOTICE:  AUDIT: SESSION,30,2,MISC,EXPLAIN,,,explain select 1,<none>
@@ -2072,16 +2084,20 @@ DO $$
 DECLARE
 	test INT;
 BEGIN
-	SELECT 1
+	SELECT 1,
+		   substring('Thomas' from 2 for 3)
 	  INTO test;
 END $$;
 NOTICE:  AUDIT: SESSION,84,1,FUNCTION,DO,,,"DO $$
 DECLARE
 	test INT;
 BEGIN
-	SELECT 1
+	SELECT 1,
+		   substring('Thomas' from 2 for 3)
 	  INTO test;
 END $$",<none>,0
+NOTICE:  AUDIT: SESSION,84,2,READ,SELECT,,,"SELECT 1,
+		   substring('Thomas' from 2 for 3)",<none>,1
 explain select 1;
 NOTICE:  AUDIT: SESSION,85,1,READ,SELECT,,,explain select 1,<none>,0
 NOTICE:  AUDIT: SESSION,85,2,MISC,EXPLAIN,,,explain select 1,<none>,0
