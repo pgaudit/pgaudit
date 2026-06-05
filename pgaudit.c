@@ -42,7 +42,7 @@
 #include "utils/timestamp.h"
 #include "utils/varlena.h"
 
-PG_MODULE_MAGIC_EXT(.name = "pgaudit", .version = "18.0");
+PG_MODULE_MAGIC_EXT(.name = "pgaudit", .version = "19.0");
 
 void _PG_init(void);
 
