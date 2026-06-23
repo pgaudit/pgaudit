@@ -602,9 +602,9 @@ log_audit_event(AuditEventStackItem *stackItem)
                             commandStr = palloc(passwordPos + 1 +
                                                 strlen(TOKEN_REDACTED) + 1);
 
-                            strncpy(commandStr,
-                                    stackItem->auditEvent.commandText,
-                                    passwordPos);
+                            memcpy(commandStr,
+                                   stackItem->auditEvent.commandText,
+                                   passwordPos);
 
                             /* And append redacted token */
                             commandStr[passwordPos] = ' ';
