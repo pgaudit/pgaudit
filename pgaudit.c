@@ -1290,6 +1290,7 @@ log_function_execute(Oid objectId)
     HeapTuple proctup;
     Form_pg_proc proc;
     AuditEventStackItem *stackItem;
+    MemoryContext contextOld;
 
     /* Get info about the function. */
     proctup = SearchSysCache1(PROCOID, ObjectIdGetDatum(objectId));
@@ -1312,10 +1313,16 @@ log_function_execute(Oid objectId)
     /* Push audit event onto the stack */
     stackItem = stack_push();
 
-    /* Generate the fully-qualified function name. */
+    /*
+     * Generate the fully-qualified function name in the stack item's context so
+     * it is freed on stack_pop().  Otherwise it accumulates in the caller's
+     * (possibly statement-lifetime) context, e.g. a function called per row.
+     */
+    contextOld = MemoryContextSwitchTo(stackItem->contextAudit);
     stackItem->auditEvent.objectName =
         quote_qualified_identifier(get_namespace_name(proc->pronamespace),
                                    NameStr(proc->proname));
+    MemoryContextSwitchTo(contextOld);
     ReleaseSysCache(proctup);
 
     /* Log the function call */
@@ -1351,6 +1358,7 @@ static void
 pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
 {
     AuditEventStackItem *stackItem = NULL;
+    MemoryContext contextOld;
 
     if (!internalStatement && !IsParallelWorker())
     {
@@ -1391,9 +1399,16 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
                 break;
         }
 
-        /* Initialize the audit event */
+        /* Store command text */
         stackItem->auditEvent.commandText = queryDesc->sourceText;
+
+        /*
+         * Copy params into the stack item's context so they are freed with it.
+         * The context (and these params) is reparented to es_query_cxt below.
+         */
+        contextOld = MemoryContextSwitchTo(stackItem->contextAudit);
         stackItem->auditEvent.paramList = copyParamList(queryDesc->params);
+        MemoryContextSwitchTo(contextOld);
     }
 
     /* Call the previous hook or standard function */
@@ -1562,6 +1577,7 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
 {
     AuditEventStackItem *stackItem = NULL;
     int64 stackId = 0;
+    MemoryContext contextOld;
 
     /*
      * Don't audit substatements.  All the substatements we care about should
@@ -1596,7 +1612,15 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
             }
 
             stackItem = stack_push();
+
+            /*
+             * Copy params into the stack item's context so they are freed when
+             * the stack item is popped rather than leaking into the caller's
+             * context.
+             */
+            contextOld = MemoryContextSwitchTo(stackItem->contextAudit);
             stackItem->auditEvent.paramList = copyParamList(params);
+            MemoryContextSwitchTo(contextOld);
         }
         else
             stackItem = stack_push();
