@@ -212,6 +212,7 @@ static char *auditRole = NULL;
 #define OBJECT_TYPE_MATVIEW         "MATERIALIZED VIEW"
 #define OBJECT_TYPE_COMPOSITE_TYPE  "COMPOSITE TYPE"
 #define OBJECT_TYPE_FOREIGN_TABLE   "FOREIGN TABLE"
+#define OBJECT_TYPE_PROPGRAPH       "PROPERTY GRAPH"
 #define OBJECT_TYPE_FUNCTION        "FUNCTION"
 
 #define OBJECT_TYPE_UNKNOWN         "UNKNOWN"
@@ -1125,8 +1126,15 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
         if (rte->perminfoindex == 0)
             continue;
 
+        /*
+         * Views and property graphs are expanded into subqueries during
+         * rewriting but keep their relkind and perminfoindex so permissions
+         * on the view/graph are still checked here.
+         */
         Assert(rte->rtekind == RTE_RELATION ||
-               (rte->rtekind == RTE_SUBQUERY && rte->relkind == RELKIND_VIEW));
+               (rte->rtekind == RTE_SUBQUERY &&
+                (rte->relkind == RELKIND_VIEW ||
+                 rte->relkind == RELKIND_PROPGRAPH)));
 
         found = true;
 
@@ -1242,6 +1250,10 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
 
             case RELKIND_MATVIEW:
                 auditEventStack->auditEvent.objectType = OBJECT_TYPE_MATVIEW;
+                break;
+
+            case RELKIND_PROPGRAPH:
+                auditEventStack->auditEvent.objectType = OBJECT_TYPE_PROPGRAPH;
                 break;
 
             default:
