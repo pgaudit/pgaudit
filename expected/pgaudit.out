@@ -866,17 +866,28 @@ DO $$
 DECLARE
 	test INT;
 BEGIN
-	SELECT 1
+	SELECT 1,
+		   substring('Thomas' from 2 for 3)
+	  INTO test;
+
+	-- Very simple select into statements with scalar expressions are not logged
+	SELECT 56 * 89
 	  INTO test;
 END $$;
 NOTICE:  AUDIT: SESSION,29,1,FUNCTION,DO,,,"DO $$
 DECLARE
 	test INT;
 BEGIN
-	SELECT 1
+	SELECT 1,
+		   substring('Thomas' from 2 for 3)
+	  INTO test;
+
+	-- Very simple select into statements with scalar expressions are not logged
+	SELECT 56 * 89
 	  INTO test;
 END $$",<none>
-NOTICE:  AUDIT: SESSION,29,2,READ,SELECT,,,SELECT 1,<none>
+NOTICE:  AUDIT: SESSION,29,2,READ,SELECT,,,"SELECT 1,
+		   substring('Thomas' from 2 for 3)",<none>
 explain select 1;
 NOTICE:  AUDIT: SESSION,30,1,READ,SELECT,,,explain select 1,<none>
 NOTICE:  AUDIT: SESSION,30,2,MISC,EXPLAIN,,,explain select 1,<none>
@@ -1219,12 +1230,8 @@ NOTICE:  AUDIT: SESSION,66,1,WRITE,INSERT,TABLE,public.aaa,"INSERT INTO aaa VALU
 SET pgaudit.log_parameter TO OFF;
 INSERT INTO bbb VALUES (1);
 NOTICE:  AUDIT: SESSION,67,1,WRITE,INSERT,TABLE,public.bbb,INSERT INTO bbb VALUES (1),<not logged>
-NOTICE:  AUDIT: OBJECT,67,2,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
-NOTICE:  AUDIT: SESSION,67,2,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
-NOTICE:  AUDIT: OBJECT,67,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>
-NOTICE:  AUDIT: SESSION,67,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>
-NOTICE:  AUDIT: OBJECT,67,4,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
-NOTICE:  AUDIT: SESSION,67,4,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>
+NOTICE:  AUDIT: OBJECT,67,2,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>
+NOTICE:  AUDIT: SESSION,67,2,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>
 SET pgaudit.log_parameter TO ON;
 DROP TABLE bbb;
 DROP TABLE aaa;
@@ -2077,17 +2084,20 @@ DO $$
 DECLARE
 	test INT;
 BEGIN
-	SELECT 1
+	SELECT 1,
+		   substring('Thomas' from 2 for 3)
 	  INTO test;
 END $$;
 NOTICE:  AUDIT: SESSION,84,1,FUNCTION,DO,,,"DO $$
 DECLARE
 	test INT;
 BEGIN
-	SELECT 1
+	SELECT 1,
+		   substring('Thomas' from 2 for 3)
 	  INTO test;
 END $$",<none>,0
-NOTICE:  AUDIT: SESSION,84,2,READ,SELECT,,,SELECT 1,<none>,1
+NOTICE:  AUDIT: SESSION,84,2,READ,SELECT,,,"SELECT 1,
+		   substring('Thomas' from 2 for 3)",<none>,1
 explain select 1;
 NOTICE:  AUDIT: SESSION,85,1,READ,SELECT,,,explain select 1,<none>,0
 NOTICE:  AUDIT: SESSION,85,2,MISC,EXPLAIN,,,explain select 1,<none>,0
@@ -2404,13 +2414,9 @@ INSERT INTO aaa VALUES (generate_series(1,100));
 NOTICE:  AUDIT: SESSION,120,1,WRITE,INSERT,TABLE,public.aaa,"INSERT INTO aaa VALUES (generate_series(1,100))",<none>,100
 SET pgaudit.log_parameter TO OFF;
 INSERT INTO bbb VALUES (1);
-NOTICE:  AUDIT: OBJECT,121,1,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>,1
-NOTICE:  AUDIT: SESSION,121,1,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>,1
-NOTICE:  AUDIT: OBJECT,121,2,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>,1
-NOTICE:  AUDIT: SESSION,121,2,READ,SELECT,TABLE,public.aaa,"SELECT 1 FROM ONLY ""public"".""aaa"" x WHERE ""id"" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x",<not logged>,1
-NOTICE:  AUDIT: OBJECT,121,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>,1
-NOTICE:  AUDIT: SESSION,121,3,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>,1
-NOTICE:  AUDIT: SESSION,121,4,WRITE,INSERT,TABLE,public.bbb,INSERT INTO bbb VALUES (1),<not logged>,1
+NOTICE:  AUDIT: OBJECT,121,1,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>,1
+NOTICE:  AUDIT: SESSION,121,1,WRITE,UPDATE,TABLE,public.bbb,UPDATE bbb set id = new.id + 1,<not logged>,1
+NOTICE:  AUDIT: SESSION,121,2,WRITE,INSERT,TABLE,public.bbb,INSERT INTO bbb VALUES (1),<not logged>,1
 SET pgaudit.log_parameter TO ON;
 DROP TABLE bbb;
 DROP TABLE aaa;
@@ -2549,9 +2555,9 @@ SET pgaudit.log = 'all,-misc_set';
 SET pgaudit.log_level = 'warning';
 CREATE EXTENSION pg_stat_statements;
 WARNING:  AUDIT: SESSION,3,1,DDL,CREATE EXTENSION,,,CREATE EXTENSION pg_stat_statements,<not logged>
-ALTER EXTENSION pg_stat_statements UPDATE TO '1.12';
-WARNING:  AUDIT: SESSION,4,1,DDL,ALTER EXTENSION,,,ALTER EXTENSION pg_stat_statements UPDATE TO '1.12',<not logged>
-NOTICE:  version "1.12" of extension "pg_stat_statements" is already installed
+ALTER EXTENSION pg_stat_statements UPDATE TO '1.13';
+WARNING:  AUDIT: SESSION,4,1,DDL,ALTER EXTENSION,,,ALTER EXTENSION pg_stat_statements UPDATE TO '1.13',<not logged>
+NOTICE:  version "1.13" of extension "pg_stat_statements" is already installed
 DROP EXTENSION pg_stat_statements;
 WARNING:  AUDIT: SESSION,5,1,DDL,DROP EXTENSION,,,DROP EXTENSION pg_stat_statements,<not logged>
 SET pgaudit.log_level = 'notice';
@@ -2598,9 +2604,34 @@ RESET parallel_tuple_cost;
 RESET parallel_setup_cost;
 RESET min_parallel_table_scan_size;
 RESET min_parallel_index_scan_size;
-RESET pgaudit.log;
-RESET pgaudit.log_client;
-RESET pgaudit.log_level;
+-- Test logging of SQL/PGQ property graphs queried via GRAPH_TABLE.  A property
+-- graph is rewritten into a subquery but keeps relkind 'g' and its
+-- perminfoindex, so it reaches log_select_dml() as an RTE_SUBQUERY that is not
+-- a view.
+SET pgaudit.log_relation = on;
+CREATE TABLE graph_vertex (id int PRIMARY KEY, name text);
+INSERT INTO graph_vertex VALUES (1, 'alice'), (2, 'bob');
+CREATE PROPERTY GRAPH graph_test VERTEX TABLES (graph_vertex);
+--
+-- Session logged on the property graph (object type PROPERTY GRAPH) and on the
+-- underlying vertex table because log = read and log_relation = on
+SELECT name
+  FROM GRAPH_TABLE (graph_test MATCH (v IS graph_vertex) COLUMNS (v.name))
+ ORDER BY name;
+NOTICE:  AUDIT: SESSION,14,1,READ,SELECT,PROPERTY GRAPH,public.graph_test,"SELECT name
+  FROM GRAPH_TABLE (graph_test MATCH (v IS graph_vertex) COLUMNS (v.name))
+ ORDER BY name",<not logged>
+NOTICE:  AUDIT: SESSION,14,1,READ,SELECT,TABLE,public.graph_vertex,"SELECT name
+  FROM GRAPH_TABLE (graph_test MATCH (v IS graph_vertex) COLUMNS (v.name))
+ ORDER BY name",<not logged>
+ name  
+-------
+ alice
+ bob
+(2 rows)
+
+DROP PROPERTY GRAPH graph_test;
+DROP TABLE graph_vertex;
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
