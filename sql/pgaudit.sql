@@ -1691,6 +1691,33 @@ SELECT name
 DROP PROPERTY GRAPH graph_test;
 DROP TABLE graph_vertex;
 
+--
+-- Test that a role substatement (GRANT) collected as the last command of a DDL
+-- statement does not cause the statement to be logged a second time by the
+-- ProcessUtility hook, reading the object name/type after their memory context
+-- has been freed, when only DDL is being logged.
+SET pgaudit.log = 'none';
+CREATE EXTENSION pgaudit;
+
+SET pgaudit.log_client = on;
+SET pgaudit.log_level = 'notice';
+SET pgaudit.log_relation = off;
+SET pgaudit.log = 'ddl';
+
+CREATE TABLE schema_grant_tbl (id int);
+CREATE ROLE regress_schema_grant;
+
+CREATE SCHEMA schema_grant
+	GRANT SELECT
+	   ON public.schema_grant_tbl
+	   TO regress_schema_grant;
+
+SET pgaudit.log = 'none';
+DROP SCHEMA schema_grant;
+DROP TABLE schema_grant_tbl;
+DROP ROLE regress_schema_grant;
+DROP EXTENSION pgaudit;
+
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
