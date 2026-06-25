@@ -685,7 +685,7 @@ NOTICE:  AUDIT: SESSION,7,1,DDL,CREATE SCHEMA,SCHEMA,test,CREATE SCHEMA test,<no
 --
 -- Copy account to stdout
 COPY account TO stdout;
-NOTICE:  AUDIT: SESSION,8,1,READ,SELECT,TABLE,public.account,COPY account TO stdout,<none>
+NOTICE:  AUDIT: SESSION,8,1,READ,COPY,TABLE,public.account,COPY account TO stdout,<none>
 1	regress_user1	HASH2	yada, yada
 --
 -- Create a table from a query
@@ -701,7 +701,7 @@ SELECT *
 --
 -- Copy from stdin to account copy
 COPY test.account_copy from stdin;
-NOTICE:  AUDIT: SESSION,10,1,WRITE,INSERT,TABLE,test.account_copy,COPY test.account_copy from stdin,<none>
+NOTICE:  AUDIT: SESSION,10,1,WRITE,COPY,TABLE,test.account_copy,COPY test.account_copy from stdin,<none>
 --
 -- Test prepared statement
 PREPARE pgclassstmt (oid) AS
@@ -1830,7 +1830,8 @@ COPY account TO stdout;
 1	regress_user1	HASH4	yada, yada3
 1	regress_user2	HASH4	yada, yada3
 1	user3	HASH4	yada, yada3
-NOTICE:  AUDIT: SESSION,51,1,READ,COPY,,,COPY account TO stdout,<none>,0
+NOTICE:  AUDIT: OBJECT,51,1,READ,COPY,TABLE,public.account,COPY account TO stdout,<none>,3
+NOTICE:  AUDIT: SESSION,51,1,READ,COPY,TABLE,public.account,COPY account TO stdout,<none>,3
 --
 -- Drop a table from a query
 DROP TABLE test.account_copy;
@@ -1852,7 +1853,7 @@ SELECT *
 --
 -- Copy from stdin to account copy
 COPY test.account_copy from stdin;
-NOTICE:  AUDIT: SESSION,54,1,WRITE,COPY,,,COPY test.account_copy from stdin,<none>,0
+NOTICE:  AUDIT: SESSION,54,1,WRITE,COPY,TABLE,test.account_copy,COPY test.account_copy from stdin,<none>,1
 --
 -- Test prepared statement
 PREPARE pgclassstmt1 (oid) AS
