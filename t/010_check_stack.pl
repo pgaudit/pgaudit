@@ -221,6 +221,52 @@ $node->start;
     ok($node->log_contains(qr/AUDIT:.*,CALL,/), 'CALL was audit logged');
 }
 
+# EXPLAIN statement
+#
+# EXPLAIN returns its plan a row at a time, so a row-limited Execute leaves the
+# portal suspended with an ExplainStmt on the audit stack.
+#-------------------------------------------------------------------------------
+{
+    my $sock = pg_connect($node);
+
+    print $sock query_msg('BEGIN');
+    read_until_ready($sock);
+
+    # Extended protocol: EXPLAIN with a row limit of 1 leaves the portal
+    # suspended, exactly as JDBC's setFetchSize(n>0) does, so the ExplainStmt
+    # lingers.
+    print $sock parse_msg('', 'EXPLAIN SELECT g FROM generate_series(1, 5) g ORDER BY g');
+    print $sock bind_msg('p_explain', '');
+    print $sock execute_msg('p_explain', 1);
+    print $sock sync_msg();
+
+    my ($explain_types, $explain_errors) = read_until_ready($sock);
+
+    ok((grep { $_ eq 's' } @$explain_types),
+        'EXPLAIN leaves the portal suspended (PortalSuspended received)')
+      or diag('explain reply messages: ' . join(',', @$explain_types));
+    is_deeply($explain_errors, [], 'EXPLAIN itself raised no error')
+      or diag('explain errors: ' . join(' | ', @$explain_errors));
+
+    # CLOSE ALL is a top-level utility statement: with the suspended EXPLAIN
+    # still on the audit stack this is where pgaudit raised "pgaudit stack is
+    # not empty".
+    print $sock query_msg('CLOSE ALL');
+
+    my ($close_types, $close_errors) = read_until_ready($sock);
+
+    is_deeply($close_errors, [],
+        'CLOSE after a suspended EXPLAIN does not raise "pgaudit stack is not empty"')
+      or diag('close errors: ' . join(' | ', @$close_errors));
+
+    print $sock query_msg('COMMIT');
+    read_until_ready($sock);
+    print $sock terminate_msg();
+    close($sock);
+
+    ok($node->log_contains(qr/AUDIT:.*,EXPLAIN,/), 'EXPLAIN was audit logged');
+}
+
 $node->stop;
 
 done_testing();
