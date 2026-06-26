@@ -160,7 +160,7 @@ sub pg_connect
     return $sock;
 }
 
-# Bring up a single node with pgaudit; each test uses its own connection.
+# Bring up a single node with pgaudit
 #-------------------------------------------------------------------------------
 my $node = PostgreSQL::Test::Cluster->new('audit');
 
@@ -171,102 +171,95 @@ $node->append_conf('postgresql.conf', "pgaudit.log = 'all'");
 $node->append_conf('postgresql.conf', "logging_collector = off");
 $node->start;
 
-# CALL statement
-#
-# A procedure that opens a cursor leaves a CallStmt on the audit stack when the
-# CALL runs in a suspended portal.
+# One scenario per command tag that pgaudit_ProcessUtility_hook() allows to
+# remain on the stack.  Each statement returns more than one row, so the
+# row-limited Execute below suspends its portal and leaves the tag behind.
 #-------------------------------------------------------------------------------
-{
-    my $sock = pg_connect($node);
+my @tests = (
+    {
+        name => 'SELECT',
+        stmt => 'SELECT * FROM pg_class',
+        log  => qr/AUDIT:.*,SELECT,/,
+    },
+    {
+        name => 'SHOW',
+        stmt => 'SHOW all',
+        log  => qr/AUDIT:.*,SHOW,/,
+    },
+    {
+        name => 'EXPLAIN',
+        stmt => 'EXPLAIN SELECT g FROM generate_series(1, 5) g ORDER BY g',
+        log  => qr/AUDIT:.*,EXPLAIN,/,
+    },
+    {
+        name  => 'CALL',
+        setup => [
+            q{CREATE PROCEDURE pcursor(INOUT result refcursor) LANGUAGE plpgsql AS }
+              . q{$proc$ BEGIN OPEN result FOR SELECT generate_series(1, 5); END $proc$}
+        ],
+        stmt => q{CALL pcursor('cc')},
+        log  => qr/AUDIT:.*,CALL,/,
+    },
+);
 
-    # A procedure that opens a cursor via an INOUT refcursor parameter.
-    print $sock query_msg(
-        q{CREATE PROCEDURE pcursor(INOUT result refcursor) LANGUAGE plpgsql AS }
-      . q{$proc$ BEGIN OPEN result FOR SELECT generate_series(1, 5); END $proc$});
-    read_until_ready($sock);
+# Run each scenario on its own connection: optionally set up state, run the
+# statement over the extended protocol with a row limit of 1 so its portal is
+# left suspended (leaving its command tag on the audit stack), then confirm a
+# following top-level utility does not raise "pgaudit stack is not empty".
+for my $test (@tests)
+{
+    # Connect and begin transaction
+    my $name = $test->{name};
+    my $sock = pg_connect($node);
+    my $offset = -s $node->logfile;
 
     print $sock query_msg('BEGIN');
     read_until_ready($sock);
 
-    # Extended protocol: CALL with a row limit of 1 leaves the portal suspended,
-    # exactly as JDBC's setFetchSize(n>0) does, so the CallStmt lingers.
-    print $sock parse_msg('', q{CALL pcursor('cc')});
-    print $sock bind_msg('p_call', '');
-    print $sock execute_msg('p_call', 1);
+    # Optional setup inside the transaction (declare a cursor, create a
+    # procedure that opens one, ...).
+    for my $sql (@{ $test->{setup} // [] })
+    {
+        print $sock query_msg($sql);
+        read_until_ready($sock);
+    }
+
+    # A named portal plus a non-zero row limit leaves the portal suspended,
+    # exactly as JDBC's setFetchSize(n>0) does.
+    print $sock parse_msg('', $test->{stmt});
+    print $sock bind_msg('p_stack', '');
+    print $sock execute_msg('p_stack', 1);
     print $sock sync_msg();
 
-    my ($call_types, $call_errors) = read_until_ready($sock);
+    my ($types, $errors) = read_until_ready($sock);
 
-    ok((grep { $_ eq 's' } @$call_types),
-        'CALL leaves the portal suspended (PortalSuspended received)')
-      or diag('call reply messages: ' . join(',', @$call_types));
-    is_deeply($call_errors, [], 'CALL itself raised no error')
-      or diag('call errors: ' . join(' | ', @$call_errors));
+    ok((grep { $_ eq 's' } @$types), "$name leaves the portal suspended")
+      or diag("$name reply messages: " . join(',', @$types));
+    is_deeply($errors, [], "$name itself raised no error")
+      or diag("$name errors: " . join(' | ', @$errors));
 
-    # CLOSE is a top-level utility statement: with the suspended CALL still on
-    # the audit stack this is where pgaudit raised "pgaudit stack is not empty".
-    print $sock query_msg('CLOSE cc');
-
-    my ($close_types, $close_errors) = read_until_ready($sock);
-
-    is_deeply($close_errors, [],
-        'CLOSE after a suspended CALL does not raise "pgaudit stack is not empty"')
-      or diag('close errors: ' . join(' | ', @$close_errors));
-
-    print $sock query_msg('COMMIT');
-    read_until_ready($sock);
-    print $sock terminate_msg();
-    close($sock);
-
-    ok($node->log_contains(qr/AUDIT:.*,CALL,/), 'CALL was audit logged');
-}
-
-# EXPLAIN statement
-#
-# EXPLAIN returns its plan a row at a time, so a row-limited Execute leaves the
-# portal suspended with an ExplainStmt on the audit stack.
-#-------------------------------------------------------------------------------
-{
-    my $sock = pg_connect($node);
-
-    print $sock query_msg('BEGIN');
-    read_until_ready($sock);
-
-    # Extended protocol: EXPLAIN with a row limit of 1 leaves the portal
-    # suspended, exactly as JDBC's setFetchSize(n>0) does, so the ExplainStmt
-    # lingers.
-    print $sock parse_msg('', 'EXPLAIN SELECT g FROM generate_series(1, 5) g ORDER BY g');
-    print $sock bind_msg('p_explain', '');
-    print $sock execute_msg('p_explain', 1);
-    print $sock sync_msg();
-
-    my ($explain_types, $explain_errors) = read_until_ready($sock);
-
-    ok((grep { $_ eq 's' } @$explain_types),
-        'EXPLAIN leaves the portal suspended (PortalSuspended received)')
-      or diag('explain reply messages: ' . join(',', @$explain_types));
-    is_deeply($explain_errors, [], 'EXPLAIN itself raised no error')
-      or diag('explain errors: ' . join(' | ', @$explain_errors));
-
-    # CLOSE ALL is a top-level utility statement: with the suspended EXPLAIN
-    # still on the audit stack this is where pgaudit raised "pgaudit stack is
-    # not empty".
+    # CLOSE ALL is a top-level utility statement: with the suspended statement
+    # still on the audit stack this is where pgaudit raised the error.
     print $sock query_msg('CLOSE ALL');
 
-    my ($close_types, $close_errors) = read_until_ready($sock);
+    my (undef, $close_errors) = read_until_ready($sock);
 
     is_deeply($close_errors, [],
-        'CLOSE after a suspended EXPLAIN does not raise "pgaudit stack is not empty"')
-      or diag('close errors: ' . join(' | ', @$close_errors));
+        "CLOSE after a suspended $name does not raise \"pgaudit stack is not empty\"")
+      or diag("$name close errors: " . join(' | ', @$close_errors));
 
+    # Commit and disconnect
     print $sock query_msg('COMMIT');
     read_until_ready($sock);
     print $sock terminate_msg();
     close($sock);
 
-    ok($node->log_contains(qr/AUDIT:.*,EXPLAIN,/), 'EXPLAIN was audit logged');
+    # Check log
+    ok($node->log_contains($test->{log}, $offset), "$name was audit logged");
 }
 
+# Cleanup
+#-------------------------------------------------------------------------------
 $node->stop;
 
 done_testing();
