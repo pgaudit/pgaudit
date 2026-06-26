@@ -7,6 +7,9 @@ RUN dnf install -y sudo make gcc llvm-toolset openssl-devel redhat-rpm-config kr
 RUN dnf -y install epel-release
 RUN crb enable
 
+# Install the Perl modules needed for the TAP tests (perl-IPC-Run lives in EPEL)
+RUN dnf install -y perl perl-Test-Harness perl-Test-Simple perl-IPC-Run
+
 # Create postgres user/group with specific IDs
 ARG UID=1000
 ARG GID=1000
@@ -26,7 +29,8 @@ RUN dnf config-manager --set-enabled pgdg19-updates-testing
 # Install PostgreSQL
 ENV PGVERSION=19
 
-RUN dnf install -y postgresql${PGVERSION?}-server postgresql${PGVERSION?}-devel postgresql${PGVERSION?}-contrib
+RUN dnf install -y postgresql${PGVERSION?}-server postgresql${PGVERSION?}-devel postgresql${PGVERSION?}-contrib \
+    postgresql${PGVERSION?}-test
 
 # Create PostgreSQL cluster
 ENV PGBIN=/usr/pgsql-${PGVERSION}/bin
