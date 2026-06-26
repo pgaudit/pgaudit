@@ -221,14 +221,11 @@ $node->start;
     ok($node->log_contains(qr/AUDIT:.*,CALL,/), 'CALL was audit logged');
 }
 
-# ===========================================================================
-# FETCH statement (issue #298)
+# FETCH statement
 #
 # Fetching from a cursor over the extended protocol with a row limit leaves a
-# suspended portal and a FetchStmt on the audit stack.  The following CLOSE
-# then walked the stack and, before the fix, raised "pgaudit stack is not
-# empty".
-# ===========================================================================
+# suspended portal and a FetchStmt on the audit stack.
+#-------------------------------------------------------------------------------
 {
     my $sock = pg_connect($node);
 
@@ -242,6 +239,7 @@ $node->start;
     print $sock bind_msg('p_fetch', '');
     print $sock execute_msg('p_fetch', 1);
     print $sock sync_msg();
+
     my ($fetch_types, $fetch_errors) = read_until_ready($sock);
 
     ok((grep { $_ eq 's' } @$fetch_types),
@@ -251,6 +249,7 @@ $node->start;
       or diag('fetch errors: ' . join(' | ', @$fetch_errors));
 
     print $sock query_msg('CLOSE c');
+
     my ($close_types, $close_errors) = read_until_ready($sock);
 
     is_deeply($close_errors, [],
