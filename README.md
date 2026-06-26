@@ -359,6 +359,8 @@ Use [log_line_prefix](http://www.postgresql.org/docs/18/runtime-config-logging.h
 
 ## Caveats
 
+Audit logging is best-effort and not transactional. pgAudit writes audit entries through the standard PostgreSQL logging facility, which does not flush each entry to disk synchronously with the transaction that produced it, nor does it propagate write errors back to the session. There is no guarantee that a committed transaction will have a corresponding audit log entry. If the server crashes or loses power, or the log destination becomes unavailable (for example, the log volume fills up) after a transaction commits but before its audit entries are durably written, those entries may be lost. Conversely, a statement is logged when it executes, so an entry may be written even if its transaction later rolls back.
+
 Object renames are logged under the name they were renamed to. For example, renaming a table will produce the following result:
 ```
 ALTER TABLE test RENAME TO test2;
