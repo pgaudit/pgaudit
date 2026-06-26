@@ -1,15 +1,19 @@
-# Regression test for pgaudit issue #298 ("pgaudit stack is not empty" on
-# FETCH).  When a client fetches from a cursor using the extended query
-# protocol with a row limit (the JDBC setFetchSize(n>0) scenario), the FETCH
-# runs in a named portal that is left *suspended*.  pgaudit pushes a FetchStmt
-# onto its audit stack for that portal, and because the portal outlives the
-# statement the entry lingers.  The next top-level utility statement (here a
-# CLOSE) walks the stack in pgaudit_ProcessUtility_hook() and, before the fix,
-# raised "pgaudit stack is not empty".
+# Regression tests for the pgaudit "pgaudit stack is not empty" stack check in
+# pgaudit_ProcessUtility_hook().
+#
+# Some commands legitimately leave an audit-stack entry behind when they run in
+# a portal that outlives the statement -- this happens when a client uses the
+# extended query protocol with a row limit (the JDBC setFetchSize(n>0)
+# scenario), which leaves the portal *suspended*.  The next top-level utility
+# statement then walks the stack and must not raise "pgaudit stack is not
+# empty" for those entries.
 #
 # libpq (and therefore psql, pg_regress and DBD::Pg) always sends Execute with
-# a row limit of 0, so it can never suspend a portal and cannot reproduce this.
-# We therefore speak the v3 frontend/backend protocol directly over the socket.
+# a row limit of 0, so it can never suspend a portal and cannot reproduce any
+# of this.  We therefore speak the v3 frontend/backend protocol directly over
+# the socket.
+#
+# Each test below opens its own connection so the scenarios are independent.
 
 use strict;
 use warnings FATAL => 'all';
@@ -105,8 +109,32 @@ sub read_until_ready
     return (\@types, \@errors);
 }
 
+# Open a raw socket to the node and complete startup (trust auth, no password).
+sub pg_connect
+{
+    my ($node) = @_;
+    my $host = $node->host;
+    my $sock;
+    if (substr($host, 0, 1) eq '/')
+    {
+        $sock = IO::Socket::UNIX->new(Peer => "$host/.s.PGSQL." . $node->port)
+          or die "could not connect to unix socket: $!";
+    }
+    else
+    {
+        $sock = IO::Socket::INET->new(PeerHost => $host, PeerPort => $node->port)
+          or die "could not connect to $host: $!";
+    }
+    $sock->autoflush(1);
+    binmode($sock);
+
+    print $sock startup_msg(user => 'postgres', database => 'postgres');
+    read_until_ready($sock);
+    return $sock;
+}
+
 # ---------------------------------------------------------------------------
-# Bring up a node with pgaudit and connect over a raw socket
+# Bring up a single node with pgaudit; each test uses its own connection.
 # ---------------------------------------------------------------------------
 
 my $node = PostgreSQL::Test::Cluster->new('audit');
@@ -117,64 +145,99 @@ $node->append_conf('postgresql.conf', "pgaudit.log = 'all'");
 $node->append_conf('postgresql.conf', "logging_collector = off");
 $node->start;
 
-# The node uses trust auth, so no password handshake is required.
-my $host = $node->host;
-my $sock;
-if (substr($host, 0, 1) eq '/')
+# ===========================================================================
+# CALL statement (commit 3b4cfdc / PR #249)
+#
+# A procedure that opens a cursor leaves a CallStmt on the audit stack when the
+# CALL runs in a suspended portal.  The following CLOSE then walked the stack
+# and, before the fix, raised "pgaudit stack is not empty".
+# ===========================================================================
 {
-    $sock = IO::Socket::UNIX->new(Peer => "$host/.s.PGSQL." . $node->port)
-      or die "could not connect to unix socket: $!";
+    my $sock = pg_connect($node);
+
+    # A procedure that opens a cursor via an INOUT refcursor parameter.
+    print $sock query_msg(
+        q{CREATE PROCEDURE pcursor(INOUT result refcursor) LANGUAGE plpgsql AS }
+      . q{$proc$ BEGIN OPEN result FOR SELECT generate_series(1, 5); END $proc$});
+    read_until_ready($sock);
+
+    print $sock query_msg('BEGIN');
+    read_until_ready($sock);
+
+    # Extended protocol: CALL with a row limit of 1 leaves the portal suspended,
+    # exactly as JDBC's setFetchSize(n>0) does, so the CallStmt lingers.
+    print $sock parse_msg('', q{CALL pcursor('cc')});
+    print $sock bind_msg('p_call', '');
+    print $sock execute_msg('p_call', 1);
+    print $sock sync_msg();
+    my ($call_types, $call_errors) = read_until_ready($sock);
+
+    ok((grep { $_ eq 's' } @$call_types),
+        'CALL leaves the portal suspended (PortalSuspended received)')
+      or diag('call reply messages: ' . join(',', @$call_types));
+    is_deeply($call_errors, [], 'CALL itself raised no error')
+      or diag('call errors: ' . join(' | ', @$call_errors));
+
+    # CLOSE is a top-level utility statement: with the suspended CALL still on
+    # the audit stack this is where pgaudit raised "pgaudit stack is not empty".
+    print $sock query_msg('CLOSE cc');
+    my ($close_types, $close_errors) = read_until_ready($sock);
+
+    is_deeply($close_errors, [],
+        'CLOSE after a suspended CALL does not raise "pgaudit stack is not empty"')
+      or diag('close errors: ' . join(' | ', @$close_errors));
+
+    print $sock query_msg('COMMIT');
+    read_until_ready($sock);
+    print $sock terminate_msg();
+    close($sock);
+
+    ok($node->log_contains(qr/AUDIT:.*,CALL,/), 'CALL was audit logged');
 }
-else
+
+# ===========================================================================
+# FETCH statement (issue #298)
+#
+# Fetching from a cursor over the extended protocol with a row limit leaves a
+# suspended portal and a FetchStmt on the audit stack.  The following CLOSE
+# then walked the stack and, before the fix, raised "pgaudit stack is not
+# empty".
+# ===========================================================================
 {
-    $sock = IO::Socket::INET->new(PeerHost => $host, PeerPort => $node->port)
-      or die "could not connect to $host: $!";
+    my $sock = pg_connect($node);
+
+    print $sock query_msg('BEGIN');
+    read_until_ready($sock);
+    print $sock query_msg('DECLARE c CURSOR FOR SELECT generate_series(1, 5)');
+    read_until_ready($sock);
+
+    # Extended protocol: FETCH ALL FROM c, but Execute with a row limit of 1.
+    print $sock parse_msg('', 'FETCH ALL FROM c');
+    print $sock bind_msg('p_fetch', '');
+    print $sock execute_msg('p_fetch', 1);
+    print $sock sync_msg();
+    my ($fetch_types, $fetch_errors) = read_until_ready($sock);
+
+    ok((grep { $_ eq 's' } @$fetch_types),
+        'FETCH leaves the portal suspended (PortalSuspended received)')
+      or diag('fetch reply messages: ' . join(',', @$fetch_types));
+    is_deeply($fetch_errors, [], 'FETCH itself raised no error')
+      or diag('fetch errors: ' . join(' | ', @$fetch_errors));
+
+    print $sock query_msg('CLOSE c');
+    my ($close_types, $close_errors) = read_until_ready($sock);
+
+    is_deeply($close_errors, [],
+        'CLOSE after a suspended FETCH does not raise "pgaudit stack is not empty"')
+      or diag('close errors: ' . join(' | ', @$close_errors));
+
+    print $sock query_msg('COMMIT');
+    read_until_ready($sock);
+    print $sock terminate_msg();
+    close($sock);
+
+    ok($node->log_contains(qr/AUDIT:.*,FETCH,/), 'FETCH was audit logged');
 }
-$sock->autoflush(1);
-binmode($sock);
-
-print $sock startup_msg(user => 'postgres', database => 'postgres');
-read_until_ready($sock);
-
-# Open an explicit transaction and declare a cursor that returns several rows.
-print $sock query_msg('BEGIN');
-read_until_ready($sock);
-print $sock query_msg('DECLARE c CURSOR FOR SELECT generate_series(1, 5)');
-read_until_ready($sock);
-
-# Extended protocol: FETCH ALL FROM c, but Execute with a row limit of 1.
-# A named portal plus a non-zero row limit leaves the portal suspended,
-# exactly as JDBC's setFetchSize(n>0) does.
-print $sock parse_msg('', 'FETCH ALL FROM c');
-print $sock bind_msg('p_fetch', '');
-print $sock execute_msg('p_fetch', 1);
-print $sock sync_msg();
-my ($fetch_types, $fetch_errors) = read_until_ready($sock);
-
-# Sanity check: if the portal was not suspended ('s') the bug conditions were
-# not reproduced and a green result below would be meaningless.
-ok((grep { $_ eq 's' } @$fetch_types),
-    'FETCH leaves the portal suspended (PortalSuspended received)')
-  or diag('fetch reply messages: ' . join(',', @$fetch_types));
-is_deeply($fetch_errors, [], 'FETCH itself raised no error')
-  or diag('fetch errors: ' . join(' | ', @$fetch_errors));
-
-# CLOSE is a top-level utility statement.  With the suspended FETCH still on
-# the audit stack this is where pgaudit raised "pgaudit stack is not empty".
-print $sock query_msg('CLOSE c');
-my ($close_types, $close_errors) = read_until_ready($sock);
-
-is_deeply($close_errors, [],
-    'CLOSE after a suspended FETCH does not raise "pgaudit stack is not empty"')
-  or diag('close errors: ' . join(' | ', @$close_errors));
-
-print $sock query_msg('COMMIT');
-read_until_ready($sock);
-print $sock terminate_msg();
-close($sock);
-
-# pgaudit should still have logged the FETCH (auditing is not broken by the fix).
-ok($node->log_contains(qr/AUDIT:.*,FETCH,/), 'FETCH was audit logged');
 
 $node->stop;
 
