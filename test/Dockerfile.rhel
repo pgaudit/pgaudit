@@ -1,7 +1,8 @@
 FROM rockylinux/rockylinux:9
 
 # Install packages
-RUN dnf install -y sudo make gcc llvm-toolset openssl-devel redhat-rpm-config krb5-devel
+RUN dnf install -y sudo make gcc llvm-toolset openssl-devel redhat-rpm-config krb5-devel \
+    perl perl-IPC-Run perl-DBD-Pg perl-Test-Harness perl-Test-Simple
 
 # Install and enable EPEL repository
 RUN dnf -y install epel-release
@@ -26,7 +27,8 @@ RUN dnf config-manager --set-enabled pgdg19-updates-testing
 # Install PostgreSQL
 ENV PGVERSION=19
 
-RUN dnf install -y postgresql${PGVERSION?}-server postgresql${PGVERSION?}-devel postgresql${PGVERSION?}-contrib
+RUN dnf install -y postgresql${PGVERSION?}-server postgresql${PGVERSION?}-devel postgresql${PGVERSION?}-contrib \
+    postgresql${PGVERSION?}-test
 
 # Create PostgreSQL cluster
 ENV PGBIN=/usr/pgsql-${PGVERSION}/bin
