@@ -200,6 +200,12 @@ my @tests = (
         stmt => q{CALL pcursor('cc')},
         log  => qr/AUDIT:.*,CALL,/,
     },
+    {
+        name  => 'FETCH',
+        setup => ['DECLARE c CURSOR FOR SELECT generate_series(1, 5)'],
+        stmt  => 'FETCH ALL FROM c',
+        log   => qr/AUDIT:.*,FETCH,/,
+    },
 );
 
 # Run each scenario on its own connection: optionally set up state, run the
