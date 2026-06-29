@@ -301,6 +301,50 @@ UPDATE public.test4
 update public.test4 set name = 'foo' where name = 'bar';
 
 --
+-- Create test5 to check that a SELECT grant on a column is not matched
+-- against columns that are only inserted or updated (not read).
+-- See https://github.com/pgaudit/pgaudit/issues/205.
+CREATE TABLE test5
+(
+	col1 int,
+	col2 text
+);
+
+GRANT SELECT (col2)
+   ON TABLE public.test5
+   TO regress_auditor;
+
+--
+-- Not object logged: col2 is inserted but not returned, so the select (col2)
+-- grant must not match the inserted (non-read) column.
+INSERT INTO public.test5 (col1, col2)
+				  VALUES (1, 'bar')
+			   RETURNING col1;
+
+--
+-- Object logged because of:
+-- select (col2) on test5 (col2 is read via RETURNING)
+INSERT INTO public.test5 (col1, col2)
+				  VALUES (1, 'bar')
+			   RETURNING col2;
+
+--
+-- Not object logged: col2 is updated but not returned, so the select (col2)
+-- grant must not match the updated (non-read) column.
+UPDATE public.test5
+   SET col2 = 'baz'
+ RETURNING col1;
+
+--
+-- Object logged because of:
+-- select (col2) on test5 (col2 is read via RETURNING)
+UPDATE public.test5
+   SET col1 = 2
+ RETURNING col2;
+
+DROP TABLE test5;
+
+--
 -- Confirm that "long" parameter values will not be logged if pgaudit.log_parameter_max_size
 -- is set.
 \connect - :current_user
