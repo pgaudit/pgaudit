@@ -1712,10 +1712,24 @@ CREATE SCHEMA schema_grant
 	   ON public.schema_grant_tbl
 	   TO regress_schema_grant;
 
+-- The same scenario written with the CREATE SCHEMA ... AUTHORIZATION form.  Its
+-- schema elements execute as the target role, so create the table as an element
+-- (owned by that role) and grant on it; the trailing GRANT substatement
+-- exercises the same path.
+CREATE ROLE regress_schema_auth;
+
+CREATE SCHEMA AUTHORIZATION regress_schema_auth
+	CREATE TABLE schema_auth_tbl (id int)
+	GRANT SELECT
+	   ON schema_auth_tbl
+	   TO PUBLIC;
+
 SET pgaudit.log = 'none';
 DROP SCHEMA schema_grant;
+DROP SCHEMA regress_schema_auth CASCADE;
 DROP TABLE schema_grant_tbl;
 DROP ROLE regress_schema_grant;
+DROP ROLE regress_schema_auth;
 DROP EXTENSION pgaudit;
 
 -- Cleanup
