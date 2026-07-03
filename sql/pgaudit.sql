@@ -342,6 +342,22 @@ UPDATE public.test5
    SET col1 = 2
  RETURNING col2;
 
+--
+-- Object logged because of:
+-- select (col2) on test5 (col2 is read via RETURNING even though it is also the
+-- updated column; the update alone must not cause logging)
+UPDATE public.test5
+   SET col2 = 'baz'
+ RETURNING col2;
+
+--
+-- Object logged because of:
+-- select (col2) on test5 (col2 is read via the RETURNING OLD/NEW references
+-- added in PostgreSQL 18, which count as reads like a plain column reference)
+UPDATE public.test5
+   SET col1 = 3
+ RETURNING old.col2, new.col2;
+
 DROP TABLE test5;
 
 --
