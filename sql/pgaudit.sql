@@ -301,6 +301,65 @@ UPDATE public.test4
 update public.test4 set name = 'foo' where name = 'bar';
 
 --
+-- Create test5 to check that a SELECT grant on a column is not matched
+-- against columns that are only inserted or updated (not read).
+CREATE TABLE test5
+(
+	col1 int,
+	col2 text
+);
+
+GRANT SELECT (col2)
+   ON TABLE public.test5
+   TO regress_auditor;
+
+--
+-- Not object logged: col2 is inserted but not returned, so the select (col2)
+-- grant must not match the inserted (non-read) column.
+INSERT INTO public.test5 (col1, col2)
+				  VALUES (1, 'bar')
+			   RETURNING col1;
+
+--
+-- Object logged because of:
+-- select (col2) on test5 (col2 is read via RETURNING)
+INSERT INTO public.test5 (col1, col2)
+				  VALUES (1, 'bar')
+			   RETURNING col2;
+
+--
+-- Not object logged: col2 is updated but not returned, so the select (col2)
+-- grant must not match the updated (non-read) column.
+UPDATE public.test5
+   SET col2 = 'baz'
+ RETURNING col1;
+
+--
+-- Object logged because of:
+-- select (col2) on test5 (col2 is read via RETURNING)
+UPDATE public.test5
+   SET col1 = 2
+ RETURNING col2;
+
+--
+-- Object logged because of:
+-- select (col2) on test5 (col2 is read via RETURNING even though it is also the
+-- updated column; the update alone must not cause logging)
+UPDATE public.test5
+   SET col2 = 'baz'
+ RETURNING col2;
+
+--
+-- Object logged because of:
+-- select (col2) on test5 (col2 is read via the RETURNING OLD/NEW references
+-- added in PostgreSQL 18, which count as reads like a plain column reference)
+UPDATE public.test5
+   SET col1 = 3
+ RETURNING old.col2, new.col2;
+
+DROP TABLE test5;
+
+--
 -- Confirm that "long" parameter values will not be logged if pgaudit.log_parameter_max_size
 -- is set.
 \connect - :current_user
@@ -1690,6 +1749,47 @@ SELECT name
 
 DROP PROPERTY GRAPH graph_test;
 DROP TABLE graph_vertex;
+
+--
+-- Test that a role substatement (GRANT) collected as the last command of a DDL
+-- statement does not cause the statement to be logged a second time by the
+-- ProcessUtility hook, reading the object name/type after their memory context
+-- has been freed, when only DDL is being logged.
+SET pgaudit.log = 'none';
+CREATE EXTENSION pgaudit;
+
+SET pgaudit.log_client = on;
+SET pgaudit.log_level = 'notice';
+SET pgaudit.log_relation = off;
+SET pgaudit.log = 'ddl';
+
+CREATE TABLE schema_grant_tbl (id int);
+CREATE ROLE regress_schema_grant;
+
+CREATE SCHEMA schema_grant
+	GRANT SELECT
+	   ON public.schema_grant_tbl
+	   TO regress_schema_grant;
+
+-- The same scenario written with the CREATE SCHEMA ... AUTHORIZATION form.  Its
+-- schema elements execute as the target role, so create the table as an element
+-- (owned by that role) and grant on it; the trailing GRANT substatement
+-- exercises the same path.
+CREATE ROLE regress_schema_auth;
+
+CREATE SCHEMA AUTHORIZATION regress_schema_auth
+	CREATE TABLE schema_auth_tbl (id int)
+	GRANT SELECT
+	   ON schema_auth_tbl
+	   TO PUBLIC;
+
+SET pgaudit.log = 'none';
+DROP SCHEMA schema_grant;
+DROP SCHEMA regress_schema_auth CASCADE;
+DROP TABLE schema_grant_tbl;
+DROP ROLE regress_schema_grant;
+DROP ROLE regress_schema_auth;
+DROP EXTENSION pgaudit;
 
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise

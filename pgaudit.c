@@ -1313,7 +1313,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
                                                perminfo->insertedCols,
-                                               auditPerms);
+                                               ACL_INSERT);
 
                 /*
                  * Check the update columns
@@ -1323,7 +1323,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
                                                perminfo->updatedCols,
-                                               auditPerms);
+                                               ACL_UPDATE);
             }
 
             /*
@@ -1681,7 +1681,7 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         {
             /*
              * If the stack is not empty then the only allowed entries are call
-             * statements or open, select, show, and explain cursors
+             * statements or open, select, show, explain, and fetch cursors
              */
             if (auditEventStack != NULL)
             {
@@ -1692,7 +1692,8 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
                     if (nextItem->auditEvent.commandTag != T_SelectStmt &&
                         nextItem->auditEvent.commandTag != T_VariableShowStmt &&
                         nextItem->auditEvent.commandTag != T_ExplainStmt &&
-                        nextItem->auditEvent.commandTag != T_CallStmt)
+                        nextItem->auditEvent.commandTag != T_CallStmt &&
+                        nextItem->auditEvent.commandTag != T_FetchStmt)
                     {
                         elog(ERROR, "pgaudit stack is not empty");
                     }
@@ -1914,6 +1915,12 @@ pgaudit_ddl_command_end(PG_FUNCTION_ARGS)
         }
         else
             log_audit_event(auditEventStack);
+
+        /*
+        * Mark the audit event as logged so it won't be logged again with fields
+        * that have been freed.
+        */
+        auditEventStack->auditEvent.logged = true;
     }
 
     /* Complete the query */
@@ -1997,6 +2004,12 @@ pgaudit_sql_drop(PG_FUNCTION_ARGS)
 
         auditEventStack->auditEvent.logged = false;
         log_audit_event(auditEventStack);
+
+        /*
+        * Mark the audit event as logged so it won't be logged again with fields
+        * that have been freed.
+        */
+        auditEventStack->auditEvent.logged = true;
     }
 
     /* Complete the query */
