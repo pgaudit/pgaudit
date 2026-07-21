@@ -1296,7 +1296,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
                                                perminfo->insertedCols,
-                                               auditPerms);
+                                               ACL_INSERT);
 
                 /*
                  * Check the update columns
@@ -1306,7 +1306,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
                                                perminfo->updatedCols,
-                                               auditPerms);
+                                               ACL_UPDATE);
             }
         }
 
