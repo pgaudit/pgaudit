@@ -71,6 +71,16 @@ PG_FUNCTION_INFO_V1(pgaudit_sql_drop);
 #define LOG_NONE        0               /* nothing */
 #define LOG_ALL         (0xFFFFFFFF)    /* All */
 
+/*
+ * Classes where auditing is driven by the executor hooks (ExecutorStart,
+ * ExecutorCheckPerms, ExecutorEnd).  log_select_dml() emits READ, WRITE, or
+ * (for unclassified commands) MISC records, and function-execute auditing
+ * (LOG_FUNCTION) relies on an executor stack item created by
+ * pgaudit_ExecutorStart_hook().  When none of these classes are enabled the
+ * executor hooks have no work to do.
+ */
+#define LOG_EXECUTOR    (LOG_READ | LOG_WRITE | LOG_MISC | LOG_FUNCTION)
+
 /* GUC variable for pgaudit.log, which defines the classes to log. */
 static char *auditLog = NULL;
 
@@ -1325,7 +1335,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
                                                perminfo->insertedCols,
-                                               auditPerms);
+                                               ACL_INSERT);
 
                 /*
                  * Check the update columns
@@ -1335,7 +1345,7 @@ log_select_dml(Oid auditOid, List *rangeTabls, List *permInfos)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
                                                perminfo->updatedCols,
-                                               auditPerms);
+                                               ACL_UPDATE);
             }
 
             /*
@@ -1450,6 +1460,24 @@ static ExecutorStart_hook_type next_ExecutorStart_hook = NULL;
 static ExecutorEnd_hook_type next_ExecutorEnd_hook = NULL;
 
 /*
+ * Are the executor hooks required for the current configuration?
+ *
+ * The executor hooks perform per-statement work -- pushing a stack item,
+ * looking up the audit role, and building object identities for every relation
+ * -- on behalf of SELECT/DML and function-execute auditing.  None of that
+ * produces output unless a class in LOG_EXECUTOR is enabled or object-level
+ * auditing is configured via pgaudit.role.  Skipping the hooks entirely
+ * otherwise avoids significant overhead for high-volume DML under
+ * configurations such as pgaudit.log = 'ddl, role'.
+ */
+static inline bool
+audit_executor_enabled(void)
+{
+    return (auditLogBitmap & LOG_EXECUTOR) != 0 ||
+           (auditRole != NULL && auditRole[0] != '\0');
+}
+
+/*
  * Hook ExecutorStart to get the query text and basic command type for queries
  * that do not contain a table and so can't be idenitified accurately in
  * ExecutorCheckPerms.
@@ -1460,7 +1488,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
     AuditEventStackItem *stackItem = NULL;
     MemoryContext contextOld;
 
-    if (!internalStatement && !IsParallelWorker())
+    if (audit_executor_enabled() && !internalStatement && !IsParallelWorker())
     {
         /* Push the audit event onto the stack */
         stackItem = stack_push();
@@ -1545,46 +1573,53 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
                                 List *permInfos,
                                 bool ereport_on_violation)
 {
-    Oid auditOid;
-
-    /* Get the audit oid if the role exists */
-    auditOid = get_role_oid(auditRole, true);
-
-    /* Log DML if the audit role is valid or session logging is enabled */
-    if ((auditOid != InvalidOid || auditLogBitmap != 0) &&
+    /*
+     * Only do audit work when an executor-driven class is enabled or object
+     * auditing via pgaudit.role might apply.  This short-circuits the role
+     * lookup and per-statement DML processing for configurations such as
+     * pgaudit.log = 'ddl, role'.
+     */
+    if (audit_executor_enabled() &&
         !IsAbortedTransactionBlockState() && !IsParallelWorker())
     {
-        /* If auditLogRows is on, wait for rows processed to be set */
-        if (auditLogRows && auditEventStack != NULL)
+        /* Get the audit oid if the role exists */
+        Oid auditOid = get_role_oid(auditRole, true);
+
+        /* Log DML if the audit role is valid or session logging is enabled */
+        if (auditOid != InvalidOid || auditLogBitmap != 0)
         {
-            /* Check if the top item is SELECT/INSERT for CREATE TABLE AS */
-            if (auditEventStack->auditEvent.commandTag == T_SelectStmt &&
-                auditEventStack->next != NULL &&
-                auditEventStack->next->auditEvent.command == CMDTAG_CREATE_TABLE_AS &&
-                auditEventStack->auditEvent.rangeTabls != NULL)
+            /* If auditLogRows is on, wait for rows processed to be set */
+            if (auditLogRows && auditEventStack != NULL)
             {
-                /*
-                 * First, log the INSERT event for CREATE TABLE AS here.
-                 * The SELECT event for CREATE TABLE AS will be logged
-                 * in pgaudit_ExecutorEnd_hook() later to get rows.
-                 */
-                log_select_dml(auditOid, rangeTabls, permInfos);
+                /* Check if the top item is SELECT/INSERT for CREATE TABLE AS */
+                if (auditEventStack->auditEvent.commandTag == T_SelectStmt &&
+                    auditEventStack->next != NULL &&
+                    auditEventStack->next->auditEvent.command == CMDTAG_CREATE_TABLE_AS &&
+                    auditEventStack->auditEvent.rangeTabls != NULL)
+                {
+                    /*
+                     * First, log the INSERT event for CREATE TABLE AS here.
+                     * The SELECT event for CREATE TABLE AS will be logged
+                     * in pgaudit_ExecutorEnd_hook() later to get rows.
+                     */
+                    log_select_dml(auditOid, rangeTabls, permInfos);
+                }
+                else
+                {
+                    /*
+                     * Save auditOid, rangeTabls, and permInfos to call
+                     * log_select_dml() in pgaudit_ExecutorEnd_hook() later.
+                     */
+                    auditEventStack->auditEvent.auditOid = auditOid;
+                    auditEventStack->auditEvent.rangeTabls = rangeTabls;
+                    auditEventStack->auditEvent.permInfos = permInfos;
+                }
             }
             else
             {
-                /*
-                 * Save auditOid, rangeTabls, and permInfos to call
-                 * log_select_dml() in pgaudit_ExecutorEnd_hook() later.
-                 */
-                auditEventStack->auditEvent.auditOid = auditOid;
-                auditEventStack->auditEvent.rangeTabls = rangeTabls;
-                auditEventStack->auditEvent.permInfos = permInfos;
+                STACK_NOT_EMPTY();
+                log_select_dml(auditOid, rangeTabls, permInfos);
             }
-        }
-        else
-        {
-            STACK_NOT_EMPTY();
-            log_select_dml(auditOid, rangeTabls, permInfos);
         }
     }
 
@@ -1606,7 +1641,8 @@ pgaudit_ExecutorEnd_hook(QueryDesc *queryDesc)
     AuditEventStackItem *stackItem = NULL;
     AuditEventStackItem *auditEventStackFull = NULL;
 
-    if (auditLogRows && !internalStatement && !IsParallelWorker())
+    if (auditLogRows && audit_executor_enabled() &&
+        !internalStatement && !IsParallelWorker())
     {
         /* Find an item from the stack by the query memory context */
         stackItem = stack_find_context(queryDesc->estate->es_query_cxt);
@@ -1667,7 +1703,7 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         {
             /*
              * If the stack is not empty then the only allowed entries are call
-             * statements or open, select, show, and explain cursors
+             * statements or open, select, show, explain, and fetch cursors
              */
             if (auditEventStack != NULL)
             {
@@ -1678,7 +1714,8 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
                     if (nextItem->auditEvent.commandTag != T_SelectStmt &&
                         nextItem->auditEvent.commandTag != T_VariableShowStmt &&
                         nextItem->auditEvent.commandTag != T_ExplainStmt &&
-                        nextItem->auditEvent.commandTag != T_CallStmt)
+                        nextItem->auditEvent.commandTag != T_CallStmt &&
+                        nextItem->auditEvent.commandTag != T_FetchStmt)
                     {
                         elog(ERROR, "pgaudit stack is not empty");
                     }
@@ -1917,6 +1954,12 @@ pgaudit_ddl_command_end(PG_FUNCTION_ARGS)
         }
         else
             log_audit_event(auditEventStack);
+
+        /*
+        * Mark the audit event as logged so it won't be logged again with fields
+        * that have been freed.
+        */
+        auditEventStack->auditEvent.logged = true;
     }
 
     /* Complete the query */
@@ -2000,6 +2043,12 @@ pgaudit_sql_drop(PG_FUNCTION_ARGS)
 
         auditEventStack->auditEvent.logged = false;
         log_audit_event(auditEventStack);
+
+        /*
+        * Mark the audit event as logged so it won't be logged again with fields
+        * that have been freed.
+        */
+        auditEventStack->auditEvent.logged = true;
     }
 
     /* Complete the query */

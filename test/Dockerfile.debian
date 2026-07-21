@@ -3,7 +3,7 @@ FROM ubuntu:noble
 # Install packages
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y sudo wget gnupg tzdata locales lsb-release apt-utils make gcc libssl-dev \
-    libkrb5-dev
+    libkrb5-dev perl libipc-run-perl
 
 # Remove the default ubuntu user to reduce the chance of a conflict with the host user
 RUN userdel ubuntu
