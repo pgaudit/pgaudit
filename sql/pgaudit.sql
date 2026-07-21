@@ -973,6 +973,7 @@ COPY h FROM stdin;
 3	3
 \.
 COPY h TO stdout;
+COPY (SELECT * FROM h) TO stdout;
 CREATE INDEX h_idx ON h (x);
 DROP INDEX h_idx;
 DROP TABLE h;
@@ -1637,6 +1638,7 @@ COPY h FROM stdin;
 3	3
 \.
 COPY h TO stdout;
+COPY (SELECT * FROM h) TO stdout;
 CREATE INDEX h_idx ON h (x);
 DROP INDEX h_idx;
 DROP TABLE h;

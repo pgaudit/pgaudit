@@ -1818,6 +1818,17 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
                            stackItem->auditEvent.rangeTabls,
                            stackItem->auditEvent.permInfos);
         }
+        /*
+         * Query-form COPY (COPY (query) TO) runs its inner query through the
+         * executor, which logs a separate select/dml entry with the row count,
+         * and then the COPY statement itself is logged by log_audit_event()
+         * below.  Apply the processed count so that entry also reports the rows
+         * affected instead of zero.  (Table-form COPY is handled by the flush
+         * above, which marks the entry logged, so it is skipped here.)
+         */
+        else if (auditLogRows &&
+                 stackItem->auditEvent.commandTag == T_CopyStmt)
+            stackItem->auditEvent.rows = qc ? qc->nprocessed : 0;
 
         /*
          * Log the utility command if logging is on, the command has not
