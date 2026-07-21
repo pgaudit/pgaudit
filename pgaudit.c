@@ -1198,7 +1198,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
                                                rte->insertedCols,
-                                               auditPerms);
+                                               ACL_INSERT);
 
                 /*
                  * Check the update columns
@@ -1208,7 +1208,7 @@ log_select_dml(Oid auditOid, List *rangeTabls)
                     auditEventStack->auditEvent.granted =
                         audit_on_any_attribute(relOid, auditOid,
                                                rte->updatedCols,
-                                               auditPerms);
+                                               ACL_UPDATE);
             }
         }
 
