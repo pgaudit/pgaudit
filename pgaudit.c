@@ -1803,13 +1803,10 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         stack_valid(stackId);
 
         /*
-         * The executor hooks do not supply the rows affected for a utility
-         * command that defers a select/dml audit entry, nor for COPY.  Use the
-         * processed count from the completed command instead.
+         * Neither form of COPY gets the rows affected from the executor hooks.
+         * Use the processed count from the completed command instead.
          */
-        if (auditLogRows &&
-            (stackItem->auditEvent.rangeTabls != NULL ||
-             stackItem->auditEvent.commandTag == T_CopyStmt))
+        if (auditLogRows && stackItem->auditEvent.commandTag == T_CopyStmt)
         {
             stackItem->auditEvent.rows = qc ? qc->nprocessed : 0;
 

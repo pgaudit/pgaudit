@@ -1644,6 +1644,18 @@ DROP INDEX h_idx;
 DROP TABLE h;
 
 --
+-- Test that foreign key validation is not logged against the ALTER TABLE.
+-- The tables must be populated so the constraint is validated by
+-- RI_Initial_Check(), which checks permissions outside the executor.
+CREATE TABLE fk_pk (id int PRIMARY KEY);
+INSERT INTO fk_pk VALUES (1);
+CREATE TABLE fk_fk (id int);
+INSERT INTO fk_fk VALUES (1);
+ALTER TABLE fk_fk ADD CONSTRAINT fk_fk_id_fkey FOREIGN KEY (id) REFERENCES fk_pk(id);
+DROP TABLE fk_fk;
+DROP TABLE fk_pk;
+
+--
 -- Change configuration of user 1 so that full statements are not logged
 \connect - :current_user
 ALTER ROLE regress_user1 RESET pgaudit.log_relation;
