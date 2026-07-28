@@ -2624,7 +2624,9 @@ NOTICE:  AUDIT: SESSION,151,1,DDL,DROP TABLE,,,DROP TABLE h,<none>,0
 --
 -- Test that foreign key validation is not logged against the ALTER TABLE.
 -- The tables must be populated so the constraint is validated by
--- RI_Initial_Check(), which checks permissions outside the executor.
+-- RI_Initial_Check(), which checks permissions outside the executor.  Both
+-- commands that validate reach it, i.e. adding a constraint and validating one
+-- that was added NOT VALID.
 CREATE TABLE fk_pk (id int PRIMARY KEY);
 NOTICE:  AUDIT: SESSION,152,1,DDL,CREATE TABLE,,,CREATE TABLE fk_pk (id int PRIMARY KEY),<none>,0
 INSERT INTO fk_pk VALUES (1);
@@ -2637,10 +2639,16 @@ ALTER TABLE fk_fk ADD CONSTRAINT fk_fk_id_fkey FOREIGN KEY (id) REFERENCES fk_pk
 NOTICE:  AUDIT: SESSION,156,1,READ,SELECT,TABLE,public.fk_fk,"SELECT fk.""id"" FROM ONLY ""public"".""fk_fk"" fk LEFT OUTER JOIN ONLY ""public"".""fk_pk"" pk ON ( pk.""id"" OPERATOR(pg_catalog.=) fk.""id"") WHERE pk.""id"" IS NULL AND (fk.""id"" IS NOT NULL)",<none>,0
 NOTICE:  AUDIT: SESSION,156,1,READ,SELECT,TABLE,public.fk_pk,"SELECT fk.""id"" FROM ONLY ""public"".""fk_fk"" fk LEFT OUTER JOIN ONLY ""public"".""fk_pk"" pk ON ( pk.""id"" OPERATOR(pg_catalog.=) fk.""id"") WHERE pk.""id"" IS NULL AND (fk.""id"" IS NOT NULL)",<none>,0
 NOTICE:  AUDIT: SESSION,156,2,DDL,ALTER TABLE,,,ALTER TABLE fk_fk ADD CONSTRAINT fk_fk_id_fkey FOREIGN KEY (id) REFERENCES fk_pk(id),<none>,0
+ALTER TABLE fk_fk ADD CONSTRAINT fk_fk_id_fkey_nv FOREIGN KEY (id) REFERENCES fk_pk(id) NOT VALID;
+NOTICE:  AUDIT: SESSION,157,1,DDL,ALTER TABLE,,,ALTER TABLE fk_fk ADD CONSTRAINT fk_fk_id_fkey_nv FOREIGN KEY (id) REFERENCES fk_pk(id) NOT VALID,<none>,0
+ALTER TABLE fk_fk VALIDATE CONSTRAINT fk_fk_id_fkey_nv;
+NOTICE:  AUDIT: SESSION,158,1,READ,SELECT,TABLE,public.fk_fk,"SELECT fk.""id"" FROM ONLY ""public"".""fk_fk"" fk LEFT OUTER JOIN ONLY ""public"".""fk_pk"" pk ON ( pk.""id"" OPERATOR(pg_catalog.=) fk.""id"") WHERE pk.""id"" IS NULL AND (fk.""id"" IS NOT NULL)",<none>,0
+NOTICE:  AUDIT: SESSION,158,1,READ,SELECT,TABLE,public.fk_pk,"SELECT fk.""id"" FROM ONLY ""public"".""fk_fk"" fk LEFT OUTER JOIN ONLY ""public"".""fk_pk"" pk ON ( pk.""id"" OPERATOR(pg_catalog.=) fk.""id"") WHERE pk.""id"" IS NULL AND (fk.""id"" IS NOT NULL)",<none>,0
+NOTICE:  AUDIT: SESSION,158,2,DDL,ALTER TABLE,,,ALTER TABLE fk_fk VALIDATE CONSTRAINT fk_fk_id_fkey_nv,<none>,0
 DROP TABLE fk_fk;
-NOTICE:  AUDIT: SESSION,157,1,DDL,DROP TABLE,,,DROP TABLE fk_fk,<none>,0
+NOTICE:  AUDIT: SESSION,159,1,DDL,DROP TABLE,,,DROP TABLE fk_fk,<none>,0
 DROP TABLE fk_pk;
-NOTICE:  AUDIT: SESSION,158,1,DDL,DROP TABLE,,,DROP TABLE fk_pk,<none>,0
+NOTICE:  AUDIT: SESSION,160,1,DDL,DROP TABLE,,,DROP TABLE fk_pk,<none>,0
 --
 -- Change configuration of user 1 so that full statements are not logged
 \connect - :current_user
