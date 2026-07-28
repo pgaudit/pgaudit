@@ -1578,8 +1578,17 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
      * auditing via pgaudit.role might apply.  This short-circuits the role
      * lookup and per-statement DML processing for configurations such as
      * pgaudit.log = 'ddl, role'.
+     *
+     * Also skip checks that are not enforcing.  A caller passing
+     * ereport_on_violation false is asking whether it may proceed, not
+     * executing a statement against the relations, so there is nothing to
+     * audit.  RI_Initial_Check() does this to decide whether it can validate a
+     * foreign key with a single query, and it runs while the utility command's
+     * own stack item is on top of the stack, so auditing the check would
+     * attribute the referenced relations to that command.  The validation query
+     * it goes on to run is audited normally.
      */
-    if (audit_executor_enabled() &&
+    if (audit_executor_enabled() && ereport_on_violation &&
         !IsAbortedTransactionBlockState() && !IsParallelWorker())
     {
         /* Get the audit oid if the role exists */
