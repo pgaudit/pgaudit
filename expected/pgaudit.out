@@ -1390,6 +1390,34 @@ NOTICE:  AUDIT: SESSION,97,1,DDL,DROP INDEX,,,DROP INDEX h_idx;,<none>
 DROP TABLE h;
 NOTICE:  AUDIT: SESSION,98,1,DDL,DROP TABLE,,,DROP TABLE h;,<none>
 --
+-- Test that foreign key validation is not logged against the ALTER TABLE.
+-- The tables must be populated so the constraint is validated by
+-- RI_Initial_Check(), which checks permissions outside the executor.  Both
+-- commands that validate reach it, i.e. adding a constraint and validating one
+-- that was added NOT VALID.
+CREATE TABLE fk_pk (id int PRIMARY KEY);
+NOTICE:  AUDIT: SESSION,99,1,DDL,CREATE TABLE,,,CREATE TABLE fk_pk (id int PRIMARY KEY);,<none>
+INSERT INTO fk_pk VALUES (1);
+NOTICE:  AUDIT: SESSION,100,1,WRITE,INSERT,TABLE,public.fk_pk,INSERT INTO fk_pk VALUES (1);,<none>
+CREATE TABLE fk_fk (id int);
+NOTICE:  AUDIT: SESSION,101,1,DDL,CREATE TABLE,,,CREATE TABLE fk_fk (id int);,<none>
+INSERT INTO fk_fk VALUES (1);
+NOTICE:  AUDIT: SESSION,102,1,WRITE,INSERT,TABLE,public.fk_fk,INSERT INTO fk_fk VALUES (1);,<none>
+ALTER TABLE fk_fk ADD CONSTRAINT fk_fk_id_fkey FOREIGN KEY (id) REFERENCES fk_pk(id);
+NOTICE:  AUDIT: SESSION,103,1,READ,SELECT,TABLE,public.fk_fk,"SELECT fk.""id"" FROM ONLY ""public"".""fk_fk"" fk LEFT OUTER JOIN ONLY ""public"".""fk_pk"" pk ON ( pk.""id"" OPERATOR(pg_catalog.=) fk.""id"") WHERE pk.""id"" IS NULL AND (fk.""id"" IS NOT NULL)",<none>
+NOTICE:  AUDIT: SESSION,103,1,READ,SELECT,TABLE,public.fk_pk,"SELECT fk.""id"" FROM ONLY ""public"".""fk_fk"" fk LEFT OUTER JOIN ONLY ""public"".""fk_pk"" pk ON ( pk.""id"" OPERATOR(pg_catalog.=) fk.""id"") WHERE pk.""id"" IS NULL AND (fk.""id"" IS NOT NULL)",<none>
+NOTICE:  AUDIT: SESSION,103,2,DDL,ALTER TABLE,,,ALTER TABLE fk_fk ADD CONSTRAINT fk_fk_id_fkey FOREIGN KEY (id) REFERENCES fk_pk(id);,<none>
+ALTER TABLE fk_fk ADD CONSTRAINT fk_fk_id_fkey_nv FOREIGN KEY (id) REFERENCES fk_pk(id) NOT VALID;
+NOTICE:  AUDIT: SESSION,104,1,DDL,ALTER TABLE,,,ALTER TABLE fk_fk ADD CONSTRAINT fk_fk_id_fkey_nv FOREIGN KEY (id) REFERENCES fk_pk(id) NOT VALID;,<none>
+ALTER TABLE fk_fk VALIDATE CONSTRAINT fk_fk_id_fkey_nv;
+NOTICE:  AUDIT: SESSION,105,1,READ,SELECT,TABLE,public.fk_fk,"SELECT fk.""id"" FROM ONLY ""public"".""fk_fk"" fk LEFT OUTER JOIN ONLY ""public"".""fk_pk"" pk ON ( pk.""id"" OPERATOR(pg_catalog.=) fk.""id"") WHERE pk.""id"" IS NULL AND (fk.""id"" IS NOT NULL)",<none>
+NOTICE:  AUDIT: SESSION,105,1,READ,SELECT,TABLE,public.fk_pk,"SELECT fk.""id"" FROM ONLY ""public"".""fk_fk"" fk LEFT OUTER JOIN ONLY ""public"".""fk_pk"" pk ON ( pk.""id"" OPERATOR(pg_catalog.=) fk.""id"") WHERE pk.""id"" IS NULL AND (fk.""id"" IS NOT NULL)",<none>
+NOTICE:  AUDIT: SESSION,105,2,DDL,ALTER TABLE,,,ALTER TABLE fk_fk VALIDATE CONSTRAINT fk_fk_id_fkey_nv;,<none>
+DROP TABLE fk_fk;
+NOTICE:  AUDIT: SESSION,106,1,DDL,DROP TABLE,,,DROP TABLE fk_fk;,<none>
+DROP TABLE fk_pk;
+NOTICE:  AUDIT: SESSION,107,1,DDL,DROP TABLE,,,DROP TABLE fk_pk;,<none>
+--
 -- Test rows retrived or affected by statements
 \connect - :current_user
 SET pgaudit.log = 'all';
