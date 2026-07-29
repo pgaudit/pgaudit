@@ -1538,8 +1538,20 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
     /* Get the audit oid if the role exists */
     auditOid = get_role_oid(auditRole, true);
 
-    /* Log DML if the audit role is valid or session logging is enabled */
+    /*
+     * Log DML if the audit role is valid or session logging is enabled.
+     *
+     * Also skip checks that are not enforcing.  A caller passing
+     * ereport_on_violation false is asking whether it may proceed, not
+     * executing a statement against the relations, so there is nothing to
+     * audit.  RI_Initial_Check() does this to decide whether it can validate a
+     * foreign key with a single query, and it runs while the utility command's
+     * own stack item is on top of the stack, so auditing the check would
+     * attribute the referenced relations to that command.  The validation query
+     * it goes on to run is audited normally.
+     */
     if ((auditOid != InvalidOid || auditLogBitmap != 0) &&
+        ereport_on_violation &&
         !IsAbortedTransactionBlockState() && !IsParallelWorker())
     {
         /* If auditLogRows is on, wait for rows processed to be set */
