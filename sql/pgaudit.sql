@@ -979,6 +979,22 @@ DROP INDEX h_idx;
 DROP TABLE h;
 
 --
+-- Test that foreign key validation is not logged against the ALTER TABLE.
+-- The tables must be populated so the constraint is validated by
+-- RI_Initial_Check(), which checks permissions outside the executor.  Both
+-- commands that validate reach it, i.e. adding a constraint and validating one
+-- that was added NOT VALID.
+CREATE TABLE fk_pk (id int PRIMARY KEY);
+INSERT INTO fk_pk VALUES (1);
+CREATE TABLE fk_fk (id int);
+INSERT INTO fk_fk VALUES (1);
+ALTER TABLE fk_fk ADD CONSTRAINT fk_fk_id_fkey FOREIGN KEY (id) REFERENCES fk_pk(id);
+ALTER TABLE fk_fk ADD CONSTRAINT fk_fk_id_fkey_nv FOREIGN KEY (id) REFERENCES fk_pk(id) NOT VALID;
+ALTER TABLE fk_fk VALIDATE CONSTRAINT fk_fk_id_fkey_nv;
+DROP TABLE fk_fk;
+DROP TABLE fk_pk;
+
+--
 -- Test rows retrived or affected by statements
 \connect - :current_user
 
