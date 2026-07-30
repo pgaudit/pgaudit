@@ -136,7 +136,7 @@ sub read_until_ready
 # Open a raw socket to the node and complete startup (trust auth, no password).
 sub pg_connect
 {
-    my ($node) = @_;
+    my ($node, $user) = @_;
     my $host = $node->host;
     my $sock;
 
@@ -154,7 +154,7 @@ sub pg_connect
     $sock->autoflush(1);
     binmode($sock);
 
-    print $sock startup_msg(user => 'postgres', database => 'postgres');
+    print $sock startup_msg(user => $user, database => 'postgres');
     read_until_ready($sock);
 
     return $sock;
@@ -170,6 +170,10 @@ $node->append_conf('postgresql.conf', "pgaudit.log = 'all'");
 # Keep audit output on stderr so $node->log_contains() can see it.
 $node->append_conf('postgresql.conf', "logging_collector = off");
 $node->start;
+
+# initdb created the cluster with the current operating system user as its
+# bootstrap superuser, which is not necessarily postgres
+my $superuser = $node->safe_psql('postgres', 'SELECT current_user');
 
 # One scenario per command tag that pgaudit_ProcessUtility_hook() allows to
 # remain on the stack.  Each statement returns more than one row, so the
@@ -216,7 +220,7 @@ for my $test (@tests)
 {
     # Connect and begin transaction
     my $name = $test->{name};
-    my $sock = pg_connect($node);
+    my $sock = pg_connect($node, $superuser);
     my $offset = -s $node->logfile;
 
     print $sock query_msg('BEGIN');
