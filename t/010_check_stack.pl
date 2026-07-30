@@ -154,7 +154,7 @@ sub pg_connect
     $sock->autoflush(1);
     binmode($sock);
 
-    print $sock startup_msg(user => 'postgres', database => 'postgres');
+    print $sock startup_msg(user => $ENV{PGUSER} || $ENV{USER} || 'postgres', database => 'postgres');
     read_until_ready($sock);
 
     return $sock;
