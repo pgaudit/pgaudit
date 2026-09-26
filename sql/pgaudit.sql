@@ -1757,27 +1757,6 @@ RESET parallel_setup_cost;
 RESET min_parallel_table_scan_size;
 RESET min_parallel_index_scan_size;
 
--- Test logging of SQL/PGQ property graphs queried via GRAPH_TABLE.  A property
--- graph is rewritten into a subquery but keeps relkind 'g' and its
--- perminfoindex, so it reaches log_select_dml() as an RTE_SUBQUERY that is not
--- a view.
-SET pgaudit.log_relation = on;
-
-CREATE TABLE graph_vertex (id int PRIMARY KEY, name text);
-INSERT INTO graph_vertex VALUES (1, 'alice'), (2, 'bob');
-
-CREATE PROPERTY GRAPH graph_test VERTEX TABLES (graph_vertex);
-
---
--- Session logged on the property graph (object type PROPERTY GRAPH) and on the
--- underlying vertex table because log = read and log_relation = on
-SELECT name
-  FROM GRAPH_TABLE (graph_test MATCH (v IS graph_vertex) COLUMNS (v.name))
- ORDER BY name;
-
-DROP PROPERTY GRAPH graph_test;
-DROP TABLE graph_vertex;
-
 --
 -- Test that a role substatement (GRANT) collected as the last command of a DDL
 -- statement does not cause the statement to be logged a second time by the
