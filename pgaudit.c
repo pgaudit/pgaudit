@@ -264,6 +264,7 @@ typedef struct
     List *rangeTabls;           /* Tables in query tracking rows */
     List *permInfos;            /* Permission info rows for each table involved
                                    in the query */
+    bool permsPending;          /* Next permission check is this event's own */
 } AuditEvent;
 
 /*
@@ -1485,6 +1486,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
     {
         /* Push the audit event onto the stack */
         stackItem = stack_push();
+        stackItem->auditEvent.permsPending = true;
 
         /* Initialize command using queryDesc->operation */
         switch (queryDesc->operation)
@@ -1549,6 +1551,9 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
      */
     if (stackItem)
     {
+        /* Checks made after ExecutorStart are not this event's own */
+        stackItem->auditEvent.permsPending = false;
+
         MemoryContextSetParent(stackItem->contextAudit,
                                queryDesc->estate->es_query_cxt);
 
@@ -1567,6 +1572,17 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
                                 bool ereport_on_violation)
 {
     /*
+     * Only the top stack item's own check is audited: the first one made by its
+     * ExecutorStart, or COPY's.  Consume it even when not auditing.  Since
+     * PostgreSQL 19 the RI fast path also calls this hook from FK triggers.
+     */
+    bool ownCheck = auditEventStack != NULL &&
+                    auditEventStack->auditEvent.permsPending;
+
+    if (ownCheck)
+        auditEventStack->auditEvent.permsPending = false;
+
+    /*
      * Only do audit work when an executor-driven class is enabled or object
      * auditing via pgaudit.role might apply.  This short-circuits the role
      * lookup and per-statement DML processing for configurations such as
@@ -1581,7 +1597,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
      * attribute the referenced relations to that command.  The validation query
      * it goes on to run is audited normally.
      */
-    if (audit_executor_enabled() && ereport_on_violation &&
+    if (audit_executor_enabled() && ereport_on_violation && ownCheck &&
         !IsAbortedTransactionBlockState() && !IsParallelWorker())
     {
         /* Get the audit oid if the role exists */
@@ -1745,6 +1761,8 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         stackItem->auditEvent.logStmtLevel = GetCommandLogLevel(pstmt->utilityStmt);
         stackItem->auditEvent.commandTag = nodeTag(pstmt->utilityStmt);
         stackItem->auditEvent.command = CreateCommandTag(pstmt->utilityStmt);
+        stackItem->auditEvent.permsPending =
+            stackItem->auditEvent.commandTag == T_CopyStmt;
         command_text_set(&stackItem->auditEvent, queryString,
                          pstmt->stmt_location, pstmt->stmt_len);
 

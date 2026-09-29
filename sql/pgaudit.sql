@@ -1798,6 +1798,44 @@ DROP ROLE regress_schema_grant;
 DROP ROLE regress_schema_auth;
 DROP EXTENSION pgaudit;
 
+--
+-- Test that RI fast-path FK checks (PostgreSQL 19+) are not audited, do not
+-- crash with pgaudit.log_rows, and work when deferred to COMMIT.
+SET pgaudit.log = 'read, write';
+SET pgaudit.log_relation = on;
+
+CREATE TABLE ri_pk (id int PRIMARY KEY);
+CREATE TABLE ri_fk (id int REFERENCES ri_pk (id) DEFERRABLE);
+INSERT INTO ri_pk VALUES (1), (2);
+
+INSERT INTO ri_fk VALUES (1);
+
+BEGIN;
+SET CONSTRAINTS ALL DEFERRED;
+INSERT INTO ri_fk VALUES (2);
+COMMIT;
+
+SET pgaudit.log_rows = on;
+
+INSERT INTO ri_fk VALUES (1), (2);
+
+BEGIN;
+SET CONSTRAINTS ALL DEFERRED;
+INSERT INTO ri_fk VALUES (1), (2);
+SET CONSTRAINTS ALL IMMEDIATE;
+COMMIT;
+
+COPY ri_fk FROM stdin;
+1
+2
+\.
+
+RESET pgaudit.log_rows;
+SET pgaudit.log = 'none';
+DROP TABLE ri_fk;
+DROP TABLE ri_pk;
+RESET pgaudit.log_relation;
+
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';
