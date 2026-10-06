@@ -1460,6 +1460,28 @@ NOTICE:  AUDIT: SESSION,107,1,DDL,DROP TABLE,,,DROP TABLE fk_fk,<none>
 DROP TABLE fk_pk;
 NOTICE:  AUDIT: SESSION,108,1,DDL,DROP TABLE,,,DROP TABLE fk_pk,<none>
 --
+-- Test that FK checks made by the RI fast path are not logged against the
+-- statement.  Since PostgreSQL 19 the fast path checks permissions from the FK
+-- trigger, which runs after the statement's own check, or at COMMIT when the
+-- constraint is deferred and the stack is empty.
+CREATE TABLE ri_pk (id int PRIMARY KEY);
+NOTICE:  AUDIT: SESSION,109,1,DDL,CREATE TABLE,,,CREATE TABLE ri_pk (id int PRIMARY KEY),<none>
+CREATE TABLE ri_fk (id int REFERENCES ri_pk (id) DEFERRABLE);
+NOTICE:  AUDIT: SESSION,110,1,DDL,CREATE TABLE,,,CREATE TABLE ri_fk (id int REFERENCES ri_pk (id) DEFERRABLE),<none>
+INSERT INTO ri_pk VALUES (1), (2);
+NOTICE:  AUDIT: SESSION,111,1,WRITE,INSERT,TABLE,public.ri_pk,"INSERT INTO ri_pk VALUES (1), (2)",<none>
+INSERT INTO ri_fk VALUES (1);
+NOTICE:  AUDIT: SESSION,112,1,WRITE,INSERT,TABLE,public.ri_fk,INSERT INTO ri_fk VALUES (1),<none>
+BEGIN;
+SET CONSTRAINTS ALL DEFERRED;
+INSERT INTO ri_fk VALUES (2);
+NOTICE:  AUDIT: SESSION,113,1,WRITE,INSERT,TABLE,public.ri_fk,INSERT INTO ri_fk VALUES (2),<none>
+COMMIT;
+DROP TABLE ri_fk;
+NOTICE:  AUDIT: SESSION,114,1,DDL,DROP TABLE,,,DROP TABLE ri_fk,<none>
+DROP TABLE ri_pk;
+NOTICE:  AUDIT: SESSION,115,1,DDL,DROP TABLE,,,DROP TABLE ri_pk,<none>
+--
 -- Test rows retrived or affected by statements
 \connect - :current_user
 SET pgaudit.log = 'all';
@@ -2650,6 +2672,31 @@ NOTICE:  AUDIT: SESSION,150,1,DDL,DROP INDEX,,,DROP INDEX h_idx,<none>,0
 DROP TABLE h;
 NOTICE:  AUDIT: SESSION,151,1,DDL,DROP TABLE,,,DROP TABLE h,<none>,0
 --
+-- Test that FK checks made by the RI fast path are not logged against the
+-- statement.  Since PostgreSQL 19 the fast path checks permissions from the FK
+-- trigger, which runs after the statement's own check, or when the constraint
+-- is deferred to SET CONSTRAINTS ... IMMEDIATE or COMMIT.
+CREATE TABLE ri_pk (id int PRIMARY KEY);
+NOTICE:  AUDIT: SESSION,152,1,DDL,CREATE TABLE,,,CREATE TABLE ri_pk (id int PRIMARY KEY),<none>,0
+CREATE TABLE ri_fk (id int REFERENCES ri_pk (id) DEFERRABLE);
+NOTICE:  AUDIT: SESSION,153,1,DDL,CREATE TABLE,,,CREATE TABLE ri_fk (id int REFERENCES ri_pk (id) DEFERRABLE),<none>,0
+INSERT INTO ri_pk VALUES (1), (2);
+NOTICE:  AUDIT: SESSION,154,1,WRITE,INSERT,TABLE,public.ri_pk,"INSERT INTO ri_pk VALUES (1), (2)",<none>,2
+INSERT INTO ri_fk VALUES (1), (2);
+NOTICE:  AUDIT: SESSION,155,1,WRITE,INSERT,TABLE,public.ri_fk,"INSERT INTO ri_fk VALUES (1), (2)",<none>,2
+BEGIN;
+SET CONSTRAINTS ALL DEFERRED;
+INSERT INTO ri_fk VALUES (1), (2);
+NOTICE:  AUDIT: SESSION,156,1,WRITE,INSERT,TABLE,public.ri_fk,"INSERT INTO ri_fk VALUES (1), (2)",<none>,2
+SET CONSTRAINTS ALL IMMEDIATE;
+COMMIT;
+COPY ri_fk FROM stdin;
+NOTICE:  AUDIT: SESSION,157,1,WRITE,COPY,TABLE,public.ri_fk,COPY ri_fk FROM stdin,<none>,2
+DROP TABLE ri_fk;
+NOTICE:  AUDIT: SESSION,158,1,DDL,DROP TABLE,,,DROP TABLE ri_fk,<none>,0
+DROP TABLE ri_pk;
+NOTICE:  AUDIT: SESSION,159,1,DDL,DROP TABLE,,,DROP TABLE ri_pk,<none>,0
+--
 -- Change configuration of user 1 so that full statements are not logged
 \connect - :current_user
 ALTER ROLE regress_user1 RESET pgaudit.log_relation;
@@ -2805,38 +2852,6 @@ DROP TABLE schema_grant_tbl;
 DROP ROLE regress_schema_grant;
 DROP ROLE regress_schema_auth;
 DROP EXTENSION pgaudit;
---
--- Test that RI fast-path FK checks (PostgreSQL 19+) are not audited, do not
--- crash with pgaudit.log_rows, and work when deferred to COMMIT.
-SET pgaudit.log = 'read, write';
-SET pgaudit.log_relation = on;
-CREATE TABLE ri_pk (id int PRIMARY KEY);
-CREATE TABLE ri_fk (id int REFERENCES ri_pk (id) DEFERRABLE);
-INSERT INTO ri_pk VALUES (1), (2);
-NOTICE:  AUDIT: SESSION,17,1,WRITE,INSERT,TABLE,public.ri_pk,"INSERT INTO ri_pk VALUES (1), (2)",<not logged>
-INSERT INTO ri_fk VALUES (1);
-NOTICE:  AUDIT: SESSION,18,1,WRITE,INSERT,TABLE,public.ri_fk,INSERT INTO ri_fk VALUES (1),<not logged>
-BEGIN;
-SET CONSTRAINTS ALL DEFERRED;
-INSERT INTO ri_fk VALUES (2);
-NOTICE:  AUDIT: SESSION,19,1,WRITE,INSERT,TABLE,public.ri_fk,INSERT INTO ri_fk VALUES (2),<not logged>
-COMMIT;
-SET pgaudit.log_rows = on;
-INSERT INTO ri_fk VALUES (1), (2);
-NOTICE:  AUDIT: SESSION,20,1,WRITE,INSERT,TABLE,public.ri_fk,"INSERT INTO ri_fk VALUES (1), (2)",<not logged>,2
-BEGIN;
-SET CONSTRAINTS ALL DEFERRED;
-INSERT INTO ri_fk VALUES (1), (2);
-NOTICE:  AUDIT: SESSION,21,1,WRITE,INSERT,TABLE,public.ri_fk,"INSERT INTO ri_fk VALUES (1), (2)",<not logged>,2
-SET CONSTRAINTS ALL IMMEDIATE;
-COMMIT;
-COPY ri_fk FROM stdin;
-NOTICE:  AUDIT: SESSION,22,1,WRITE,COPY,TABLE,public.ri_fk,COPY ri_fk FROM stdin,<not logged>,2
-RESET pgaudit.log_rows;
-SET pgaudit.log = 'none';
-DROP TABLE ri_fk;
-DROP TABLE ri_pk;
-RESET pgaudit.log_relation;
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
 SET client_min_messages = 'warning';

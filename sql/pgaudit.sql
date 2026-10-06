@@ -995,6 +995,25 @@ DROP TABLE fk_fk;
 DROP TABLE fk_pk;
 
 --
+-- Test that FK checks made by the RI fast path are not logged against the
+-- statement.  Since PostgreSQL 19 the fast path checks permissions from the FK
+-- trigger, which runs after the statement's own check, or at COMMIT when the
+-- constraint is deferred and the stack is empty.
+CREATE TABLE ri_pk (id int PRIMARY KEY);
+CREATE TABLE ri_fk (id int REFERENCES ri_pk (id) DEFERRABLE);
+INSERT INTO ri_pk VALUES (1), (2);
+
+INSERT INTO ri_fk VALUES (1);
+
+BEGIN;
+SET CONSTRAINTS ALL DEFERRED;
+INSERT INTO ri_fk VALUES (2);
+COMMIT;
+
+DROP TABLE ri_fk;
+DROP TABLE ri_pk;
+
+--
 -- Test rows retrived or affected by statements
 \connect - :current_user
 
@@ -1660,6 +1679,31 @@ DROP INDEX h_idx;
 DROP TABLE h;
 
 --
+-- Test that FK checks made by the RI fast path are not logged against the
+-- statement.  Since PostgreSQL 19 the fast path checks permissions from the FK
+-- trigger, which runs after the statement's own check, or when the constraint
+-- is deferred to SET CONSTRAINTS ... IMMEDIATE or COMMIT.
+CREATE TABLE ri_pk (id int PRIMARY KEY);
+CREATE TABLE ri_fk (id int REFERENCES ri_pk (id) DEFERRABLE);
+INSERT INTO ri_pk VALUES (1), (2);
+
+INSERT INTO ri_fk VALUES (1), (2);
+
+BEGIN;
+SET CONSTRAINTS ALL DEFERRED;
+INSERT INTO ri_fk VALUES (1), (2);
+SET CONSTRAINTS ALL IMMEDIATE;
+COMMIT;
+
+COPY ri_fk FROM stdin;
+1
+2
+\.
+
+DROP TABLE ri_fk;
+DROP TABLE ri_pk;
+
+--
 -- Change configuration of user 1 so that full statements are not logged
 \connect - :current_user
 ALTER ROLE regress_user1 RESET pgaudit.log_relation;
@@ -1797,44 +1841,6 @@ DROP TABLE schema_grant_tbl;
 DROP ROLE regress_schema_grant;
 DROP ROLE regress_schema_auth;
 DROP EXTENSION pgaudit;
-
---
--- Test that RI fast-path FK checks (PostgreSQL 19+) are not audited, do not
--- crash with pgaudit.log_rows, and work when deferred to COMMIT.
-SET pgaudit.log = 'read, write';
-SET pgaudit.log_relation = on;
-
-CREATE TABLE ri_pk (id int PRIMARY KEY);
-CREATE TABLE ri_fk (id int REFERENCES ri_pk (id) DEFERRABLE);
-INSERT INTO ri_pk VALUES (1), (2);
-
-INSERT INTO ri_fk VALUES (1);
-
-BEGIN;
-SET CONSTRAINTS ALL DEFERRED;
-INSERT INTO ri_fk VALUES (2);
-COMMIT;
-
-SET pgaudit.log_rows = on;
-
-INSERT INTO ri_fk VALUES (1), (2);
-
-BEGIN;
-SET CONSTRAINTS ALL DEFERRED;
-INSERT INTO ri_fk VALUES (1), (2);
-SET CONSTRAINTS ALL IMMEDIATE;
-COMMIT;
-
-COPY ri_fk FROM stdin;
-1
-2
-\.
-
-RESET pgaudit.log_rows;
-SET pgaudit.log = 'none';
-DROP TABLE ri_fk;
-DROP TABLE ri_pk;
-RESET pgaudit.log_relation;
 
 -- Cleanup
 -- Set client_min_messages up to warning to avoid noise
