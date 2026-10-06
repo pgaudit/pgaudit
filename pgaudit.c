@@ -1572,9 +1572,17 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
                                 bool ereport_on_violation)
 {
     /*
-     * Only the top stack item's own check is audited: the first one made by its
-     * ExecutorStart, or COPY's.  Consume it even when not auditing.  Since
-     * PostgreSQL 19 the RI fast path also calls this hook from FK triggers.
+     * Only audit the top stack item's own check, i.e. the first one made by its
+     * ExecutorStart or by COPY.  Consume it even when not auditing so a later
+     * check cannot be mistaken for it.
+     *
+     * Any other check runs on behalf of something other than the statement on
+     * top of the stack, so auditing it would attribute the relations to that
+     * statement, or fail when the stack is empty.  Since PostgreSQL 19 the RI
+     * fast path checks from FK triggers, which may fire after the statement's
+     * own check or be deferred to COMMIT.  RI_Initial_Check() also checks while
+     * the utility command's stack item is on top.  The queries these go on to
+     * run, if any, are audited normally.
      */
     bool ownCheck = auditEventStack != NULL &&
                     auditEventStack->auditEvent.permsPending;
@@ -1591,13 +1599,9 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
      * Also skip checks that are not enforcing.  A caller passing
      * ereport_on_violation false is asking whether it may proceed, not
      * executing a statement against the relations, so there is nothing to
-     * audit.  RI_Initial_Check() does this to decide whether it can validate a
-     * foreign key with a single query, and it runs while the utility command's
-     * own stack item is on top of the stack, so auditing the check would
-     * attribute the referenced relations to that command.  The validation query
-     * it goes on to run is audited normally.
+     * audit.
      */
-    if (audit_executor_enabled() && ereport_on_violation && ownCheck &&
+    if (ownCheck && audit_executor_enabled() && ereport_on_violation &&
         !IsAbortedTransactionBlockState() && !IsParallelWorker())
     {
         /* Get the audit oid if the role exists */
@@ -1607,7 +1611,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
         if (auditOid != InvalidOid || auditLogBitmap != 0)
         {
             /* If auditLogRows is on, wait for rows processed to be set */
-            if (auditLogRows && auditEventStack != NULL)
+            if (auditLogRows)
             {
                 /* Check if the top item is SELECT/INSERT for CREATE TABLE AS */
                 if (auditEventStack->auditEvent.commandTag == T_SelectStmt &&
@@ -1634,10 +1638,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
                 }
             }
             else
-            {
-                STACK_NOT_EMPTY();
                 log_select_dml(auditOid, rangeTabls, permInfos);
-            }
         }
     }
 
