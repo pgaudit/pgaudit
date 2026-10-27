@@ -1592,13 +1592,21 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
             }
             else
             {
+                MemoryContext contextOld;
+
                 /*
                  * Save auditOid, rangeTabls, and permInfos to call
-                 * log_select_dml() in pgaudit_ExecutorEnd_hook() later.
+                 * log_select_dml() in pgaudit_ExecutorEnd_hook() later, or
+                 * in pgaudit_ProcessUtility_hook() for COPY.  Copy the
+                 * lists into the stack item's context since they belong to
+                 * the caller, which may free them before the statement
+                 * completes.
                  */
+                contextOld = MemoryContextSwitchTo(auditEventStack->contextAudit);
                 auditEventStack->auditEvent.auditOid = auditOid;
-                auditEventStack->auditEvent.rangeTabls = rangeTabls;
-                auditEventStack->auditEvent.permInfos = permInfos;
+                auditEventStack->auditEvent.rangeTabls = copyObject(rangeTabls);
+                auditEventStack->auditEvent.permInfos = copyObject(permInfos);
+                MemoryContextSwitchTo(contextOld);
             }
         }
         else
