@@ -1609,6 +1609,22 @@ DROP INDEX h_idx;
 DROP TABLE h;
 
 --
+-- Test DDL logged by the event triggers.  The extension was dropped before the
+-- log_rows tests so the DDL above is logged without the event triggers.  The
+-- queries run by the event triggers check permissions while the DDL statement
+-- is on top of the stack so those checks must not be saved on the DDL
+-- statement's stack item.  Both event triggers are covered, i.e.
+-- ddl_command_end for CREATE and ALTER and sql_drop for DROP.
+CREATE EXTENSION pgaudit;
+
+CREATE TABLE ddl_rows (id int);
+ALTER TABLE ddl_rows ADD COLUMN name text;
+DROP TABLE ddl_rows;
+
+DROP EXTENSION pgaudit;
+
+
+--
 -- Change configuration of user 1 so that full statements are not logged
 \connect - :current_user
 ALTER ROLE regress_user1 RESET pgaudit.log_relation;
