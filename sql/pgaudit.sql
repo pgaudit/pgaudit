@@ -995,6 +995,50 @@ DROP TABLE fk_fk;
 DROP TABLE fk_pk;
 
 --
+-- Test that FK checks made by the RI fast path are not logged against the
+-- statement.  Since PostgreSQL 19 the fast path checks permissions from the FK
+-- trigger, which runs after the statement's own check or, when the constraint
+-- is deferred, at COMMIT.  A top-level COMMIT runs with the stack empty, while
+-- one made by a procedure or DO block runs with the CALL or DO on top.
+CREATE TABLE ri_pk (id int PRIMARY KEY);
+CREATE TABLE ri_fk (id int REFERENCES ri_pk (id) DEFERRABLE);
+INSERT INTO ri_pk VALUES (1), (2);
+
+INSERT INTO ri_fk VALUES (1);
+
+BEGIN;
+SET CONSTRAINTS ALL DEFERRED;
+INSERT INTO ri_fk VALUES (2);
+COMMIT;
+
+COPY ri_fk FROM stdin;
+1
+2
+\.
+
+CREATE PROCEDURE ri_proc() LANGUAGE plpgsql AS $$
+BEGIN
+	SET CONSTRAINTS ALL DEFERRED;
+	INSERT INTO ri_fk VALUES (1);
+	COMMIT;
+	INSERT INTO ri_fk VALUES (2);
+END $$;
+
+CALL ri_proc();
+
+DO $$
+BEGIN
+	SET CONSTRAINTS ALL DEFERRED;
+	INSERT INTO ri_fk VALUES (1);
+	COMMIT;
+END $$;
+
+DROP PROCEDURE ri_proc();
+
+DROP TABLE ri_fk;
+DROP TABLE ri_pk;
+
+--
 -- Test rows retrived or affected by statements
 \connect - :current_user
 
@@ -1658,6 +1702,51 @@ COPY (SELECT * FROM h) TO stdout;
 CREATE INDEX h_idx ON h (x);
 DROP INDEX h_idx;
 DROP TABLE h;
+
+--
+-- Test that FK checks made by the RI fast path are not logged against the
+-- statement.  Since PostgreSQL 19 the fast path checks permissions from the FK
+-- trigger, which runs after the statement's own check or, when the constraint
+-- is deferred, at SET CONSTRAINTS ... IMMEDIATE or COMMIT, including a COMMIT
+-- made by a procedure or DO block.
+CREATE TABLE ri_pk (id int PRIMARY KEY);
+CREATE TABLE ri_fk (id int REFERENCES ri_pk (id) DEFERRABLE);
+INSERT INTO ri_pk VALUES (1), (2);
+
+INSERT INTO ri_fk VALUES (1), (2);
+
+BEGIN;
+SET CONSTRAINTS ALL DEFERRED;
+INSERT INTO ri_fk VALUES (1), (2);
+SET CONSTRAINTS ALL IMMEDIATE;
+COMMIT;
+
+COPY ri_fk FROM stdin;
+1
+2
+\.
+
+CREATE PROCEDURE ri_proc() LANGUAGE plpgsql AS $$
+BEGIN
+	SET CONSTRAINTS ALL DEFERRED;
+	INSERT INTO ri_fk VALUES (1);
+	COMMIT;
+	INSERT INTO ri_fk VALUES (2);
+END $$;
+
+CALL ri_proc();
+
+DO $$
+BEGIN
+	SET CONSTRAINTS ALL DEFERRED;
+	INSERT INTO ri_fk VALUES (1);
+	COMMIT;
+END $$;
+
+DROP PROCEDURE ri_proc();
+
+DROP TABLE ri_fk;
+DROP TABLE ri_pk;
 
 --
 -- Change configuration of user 1 so that full statements are not logged

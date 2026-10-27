@@ -264,6 +264,7 @@ typedef struct
     List *rangeTabls;           /* Tables in query tracking rows */
     List *permInfos;            /* Permission info rows for each table involved
                                    in the query */
+    bool permsPending;          /* Next permission check is this event's own */
 } AuditEvent;
 
 /*
@@ -1485,6 +1486,7 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
     {
         /* Push the audit event onto the stack */
         stackItem = stack_push();
+        stackItem->auditEvent.permsPending = true;
 
         /* Initialize command using queryDesc->operation */
         switch (queryDesc->operation)
@@ -1549,6 +1551,9 @@ pgaudit_ExecutorStart_hook(QueryDesc *queryDesc, int eflags)
      */
     if (stackItem)
     {
+        /* Checks made after ExecutorStart are not this event's own */
+        stackItem->auditEvent.permsPending = false;
+
         MemoryContextSetParent(stackItem->contextAudit,
                                queryDesc->estate->es_query_cxt);
 
@@ -1567,6 +1572,25 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
                                 bool ereport_on_violation)
 {
     /*
+     * Only audit the top stack item's own check, i.e. the first one made by its
+     * ExecutorStart or by COPY.  Consume it even when not auditing so a later
+     * check cannot be mistaken for it.
+     *
+     * Any other check runs on behalf of something other than the statement on
+     * top of the stack, so auditing it would attribute the relations to that
+     * statement, or fail when the stack is empty.  Since PostgreSQL 19 the RI
+     * fast path checks from FK triggers, which may fire after the statement's
+     * own check or be deferred to COMMIT.  RI_Initial_Check() also checks while
+     * the utility command's stack item is on top.  The queries these go on to
+     * run, if any, are audited normally.
+     */
+    bool ownCheck = auditEventStack != NULL &&
+                    auditEventStack->auditEvent.permsPending;
+
+    if (ownCheck)
+        auditEventStack->auditEvent.permsPending = false;
+
+    /*
      * Only do audit work when an executor-driven class is enabled or object
      * auditing via pgaudit.role might apply.  This short-circuits the role
      * lookup and per-statement DML processing for configurations such as
@@ -1575,13 +1599,9 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
      * Also skip checks that are not enforcing.  A caller passing
      * ereport_on_violation false is asking whether it may proceed, not
      * executing a statement against the relations, so there is nothing to
-     * audit.  RI_Initial_Check() does this to decide whether it can validate a
-     * foreign key with a single query, and it runs while the utility command's
-     * own stack item is on top of the stack, so auditing the check would
-     * attribute the referenced relations to that command.  The validation query
-     * it goes on to run is audited normally.
+     * audit.
      */
-    if (audit_executor_enabled() && ereport_on_violation &&
+    if (ownCheck && audit_executor_enabled() && ereport_on_violation &&
         !IsAbortedTransactionBlockState() && !IsParallelWorker())
     {
         /* Get the audit oid if the role exists */
@@ -1591,7 +1611,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
         if (auditOid != InvalidOid || auditLogBitmap != 0)
         {
             /* If auditLogRows is on, wait for rows processed to be set */
-            if (auditLogRows && auditEventStack != NULL)
+            if (auditLogRows)
             {
                 /* Check if the top item is SELECT/INSERT for CREATE TABLE AS */
                 if (auditEventStack->auditEvent.commandTag == T_SelectStmt &&
@@ -1618,10 +1638,7 @@ pgaudit_ExecutorCheckPerms_hook(List *rangeTabls,
                 }
             }
             else
-            {
-                STACK_NOT_EMPTY();
                 log_select_dml(auditOid, rangeTabls, permInfos);
-            }
         }
     }
 
@@ -1745,6 +1762,8 @@ pgaudit_ProcessUtility_hook(PlannedStmt *pstmt,
         stackItem->auditEvent.logStmtLevel = GetCommandLogLevel(pstmt->utilityStmt);
         stackItem->auditEvent.commandTag = nodeTag(pstmt->utilityStmt);
         stackItem->auditEvent.command = CreateCommandTag(pstmt->utilityStmt);
+        stackItem->auditEvent.permsPending =
+            stackItem->auditEvent.commandTag == T_CopyStmt;
         command_text_set(&stackItem->auditEvent, queryString,
                          pstmt->stmt_location, pstmt->stmt_len);
 
