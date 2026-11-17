@@ -5,7 +5,8 @@ OBJS = pgaudit.o $(WIN32RES)
 PGAUDIT_VERSION := $(shell grep default_version $(dir $(firstword $(MAKEFILE_LIST)))pgaudit.control | sed "s/.*'\(.*\)'/\1/")
 
 EXTENSION = pgaudit
-DATA = pgaudit--$(PGAUDIT_VERSION).sql pgaudit--1.6--1.6.1.sql pgaudit--1.6.1--1.6.2.sql pgaudit--1.6.2--$(PGAUDIT_VERSION).sql
+DATA = pgaudit--$(PGAUDIT_VERSION).sql pgaudit--1.6--1.6.1.sql pgaudit--1.6.1--1.6.2.sql pgaudit--1.6.2--1.6.3.sql \
+    pgaudit--1.6.3--$(PGAUDIT_VERSION).sql
 PGFILEDESC = "pgAudit - An audit logging extension for PostgreSQL"
 
 REGRESS = pgaudit
