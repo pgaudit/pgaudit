@@ -30,9 +30,18 @@ jobs:
         uses: actions/checkout@v6
         with:
           path: pgaudit
+          # Fetch full history for the release tags used by the upgrade test
+          fetch-depth: 0
+
+      - name: Fetch Release Tags
+        # Forks may not have the release tags so fetch them from the main repository
+        run: git -C ${GITHUB_WORKSPACE?}/pgaudit fetch --tags https://github.com/pgaudit/pgaudit.git
 
       - name: Build Test Container
         run: docker build --build-arg UID=$(id -u) --build-arg GID=$(id -g) -f ${GITHUB_WORKSPACE?}/pgaudit/test/Dockerfile.${{matrix.image}} -t pgaudit-test ${GITHUB_WORKSPACE?}/pgaudit
 
       - name: Run Test
         run: docker run -v ${GITHUB_WORKSPACE?}/pgaudit:/pgaudit pgaudit-test /pgaudit/test/test.sh
+
+      - name: Run Upgrade Test
+        run: docker run -v ${GITHUB_WORKSPACE?}/pgaudit:/pgaudit pgaudit-test /pgaudit/test/test-upgrade.sh
