@@ -5,7 +5,7 @@ OBJS = pgaudit.o $(WIN32RES)
 PGAUDIT_VERSION := $(shell grep default_version $(dir $(firstword $(MAKEFILE_LIST)))pgaudit.control | sed "s/.*'\(.*\)'/\1/")
 
 EXTENSION = pgaudit
-DATA = pgaudit--$(PGAUDIT_VERSION).sql
+DATA = pgaudit--$(PGAUDIT_VERSION).sql pgaudit--18.0--$(PGAUDIT_VERSION).sql
 PG_CPPFLAGS = -DPGAUDIT_VERSION="\"$(PGAUDIT_VERSION)\""
 PGFILEDESC = "pgAudit - An audit logging extension for PostgreSQL"
 
